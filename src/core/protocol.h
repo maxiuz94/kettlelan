@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <optional>
 #include <span>
+#include <string>
 #include <vector>
 
 #include "ip.h"
@@ -20,7 +21,7 @@ namespace kettle::protocol {
 
 inline constexpr int kChannelData = 0;    // pakiety IP
 inline constexpr int kChannelControl = 1; // HELLO / HELLO_ACK
-inline constexpr uint8_t kVersion = 1;
+inline constexpr uint8_t kVersion = 2;
 
 enum class MessageType : uint8_t { Hello = 1, HelloAck = 2 };
 
@@ -33,6 +34,10 @@ struct HelloMessage {
 
 std::vector<uint8_t> encode(const HelloMessage& msg);
 std::optional<HelloMessage> decode(std::span<const uint8_t> data);
+
+// Znacznik, po którym KettleLAN odnajduje lobby sieci w Steamie (16 znaków szesnastkowych).
+// Wyliczany z całego kodu, więc bez kodu nie da się znaleźć ani podejrzeć cudzej sieci.
+std::string lobbyTag(const netcode::NetworkCode& code);
 
 uint64_t computeProof(const netcode::NetworkCode& code, uint64_t senderSteamId, uint64_t receiverSteamId);
 

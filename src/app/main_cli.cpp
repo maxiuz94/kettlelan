@@ -56,7 +56,7 @@ private:
 void printHelp() {
     std::cout << "\nPolecenia:\n"
                  "  utworz [nazwa]   – tworzy nową sieć i pokazuje jej kod\n"
-                 "  dolacz <kod>     – dołącza do sieci, np. dolacz KTL-7F3Q-9XM2-A4KD\n"
+                 "  dolacz <kod>     – łączy z siecią o tym kodzie, np. dolacz KTL-7F3Q-9XM2-A4KD\n"
                  "  lista            – członkowie sieci, ich adresy i ping\n"
                  "  kod              – pokazuje kod obecnej sieci\n"
                  "  opusc            – opuszcza sieć\n"
@@ -65,7 +65,7 @@ void printHelp() {
 }
 
 void printPeers(const steam::Network& net) {
-    if (net.state() == steam::State::Creating || net.state() == steam::State::Joining) {
+    if (net.state() == steam::State::Connecting) {
         std::cout << "Łączę się z siecią, chwilę…\n";
         return;
     }
@@ -87,7 +87,25 @@ void printPeers(const steam::Network& net) {
     std::cout << "\n";
 }
 
-void handleCommand(const std::string& line, steam::Network& net) {
+// Usuwa sekwencje klawiszy specjalnych (strzałki itp.), które terminal wkleja jako „^[[A”.
+std::string stripEscapes(const std::string& line) {
+    std::string out;
+    for (size_t i = 0; i < line.size(); ++i) {
+        if (line[i] == '\x1b') {
+            ++i;
+            if (i < line.size() && (line[i] == '[' || line[i] == 'O')) {
+                ++i;
+                while (i < line.size() && !(line[i] >= '@' && line[i] <= '~')) ++i;
+            }
+            continue;
+        }
+        out += line[i];
+    }
+    return out;
+}
+
+void handleCommand(const std::string& rawLine, steam::Network& net) {
+    const std::string line = stripEscapes(rawLine);
     std::istringstream in(line);
     std::string cmd;
     in >> cmd;
@@ -100,7 +118,7 @@ void handleCommand(const std::string& line, steam::Network& net) {
     else if (cmd == "dolacz" || cmd == "dołącz" || cmd == "join") {
         const auto code = netcode::parse(rest);
         if (!code) std::cout << "To nie wygląda na kod sieci (format: KTL-XXXX-XXXX-XXXX).\n";
-        else net.join(*code);
+        else net.connect(*code, "");
     } else if (cmd == "lista" || cmd == "list") printPeers(net);
     else if (cmd == "kod" || cmd == "code") {
         if (net.state() == steam::State::Connected) std::cout << "Kod sieci: " << net.codeText() << "\n";

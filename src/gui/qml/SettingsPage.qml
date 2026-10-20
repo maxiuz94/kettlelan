@@ -84,6 +84,13 @@ Item {
                     }
                     Toggle {
                         Layout.fillWidth: true
+                        title: "Łącz automatycznie z ostatnią siecią"
+                        hint: "Po uruchomieniu wraca do sieci, której nie opuściłeś przyciskiem „Opuść”"
+                        checked: Backend.autoConnect
+                        onUserToggled: (value) => Backend.autoConnect = value
+                    }
+                    Toggle {
+                        Layout.fillWidth: true
                         title: "Zamknięcie okna chowa do zasobnika"
                         hint: Backend.trayAvailable ? "Sieć działa dalej w tle" : "Twój pulpit nie ma zasobnika systemowego"
                         enabled: Backend.trayAvailable

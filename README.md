@@ -51,6 +51,10 @@ wymagają.
    albo wklej cudzy kod w pole **Kod sieci** i kliknij **Dołącz**.
 4. Na liście członków kliknij osobę, żeby skopiować jej adres – wpisz go w grze przy łączeniu z serwerem.
 
+**Kod sieci jest stały.** Sieć zapisuje się na liście „Twoje sieci” i wystarczy kliknąć **Połącz**, nawet gdy
+nikogo w niej nie ma – pierwsza osoba „otwiera” sieć, kolejne do niej dołączają. Domyślnie KettleLAN po
+uruchomieniu wraca do ostatniej sieci (chyba że ją opuściłeś przyciskiem **Opuść**).
+
 Zamknięcie okna chowa KettleLAN do zasobnika (sieć działa dalej). Całkowite zamknięcie:
 menu ikony w zasobniku → **Zakończ KettleLAN**.
 

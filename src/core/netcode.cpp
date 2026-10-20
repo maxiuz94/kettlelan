@@ -1,6 +1,7 @@
 #include "netcode.h"
 
 #include <cctype>
+#include <random>
 
 namespace kettle::netcode {
 
@@ -17,7 +18,7 @@ static int decodeChar(char c) {
 }
 
 std::string format(const NetworkCode& code) {
-    const uint64_t bits = (uint64_t(code.lobbyAccountId) << 28) | (code.secret & kSecretMask);
+    const uint64_t bits = (uint64_t(code.networkId) << 28) | (code.secret & kSecretMask);
     std::string out = "KTL";
     for (int i = 0; i < kChars; ++i) {
         if (i % 4 == 0) out += '-';
@@ -25,6 +26,14 @@ std::string format(const NetworkCode& code) {
         out += kAlphabet[(bits >> shift) & 0x1F];
     }
     return out;
+}
+
+NetworkCode generate() {
+    std::random_device rd;
+    NetworkCode c;
+    while (c.networkId == 0) c.networkId = uint32_t(rd());
+    while (c.secret == 0) c.secret = uint32_t(rd()) & kSecretMask;
+    return c;
 }
 
 std::optional<NetworkCode> parse(const std::string& text) {
@@ -43,9 +52,9 @@ std::optional<NetworkCode> parse(const std::string& text) {
         bits = (bits << 5) | uint64_t(v);
     }
     NetworkCode code;
-    code.lobbyAccountId = uint32_t(bits >> 28);
+    code.networkId = uint32_t(bits >> 28);
     code.secret = uint32_t(bits & kSecretMask);
-    if (code.lobbyAccountId == 0) return std::nullopt;
+    if (code.networkId == 0) return std::nullopt;
     return code;
 }
 

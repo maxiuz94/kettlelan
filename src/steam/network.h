@@ -24,7 +24,7 @@
 
 namespace kettle::steam {
 
-enum class State { Idle, Creating, Joining, Connected };
+enum class State { Idle, Connecting, Connected };
 
 struct PeerInfo {
     uint64_t steamId = 0;
@@ -47,8 +47,10 @@ public:
     ~Network();
 
     // --- wątek Steama ---
-    void create(const std::string& name);
-    void join(const netcode::NetworkCode& code);
+    void create(const std::string& name);  // nowa sieć z nowym kodem
+    // Łączy z siecią o danym kodzie: dołącza do osób, które już w niej są, albo otwiera ją,
+    // jeśli nikogo nie ma. `nameHint` – nazwa używana, gdy to my otwieramy sieć.
+    void connect(const netcode::NetworkCode& code, const std::string& nameHint);
     void leave();
     void poll();   // odbiór wiadomości – wywoływać jak najczęściej
     void tick();   // zadania okresowe – co ~0,5 s
@@ -77,8 +79,13 @@ private:
     STEAM_CALLBACK(Network, onSessionRequest, SteamNetworkingMessagesSessionRequest_t);
     STEAM_CALLBACK(Network, onSessionFailed, SteamNetworkingMessagesSessionFailed_t);
 
+    void startSearch(bool merge);
+    void onLobbyList(LobbyMatchList_t* result, bool ioFailure);
     void onLobbyCreated(LobbyCreated_t* result, bool ioFailure);
     void onLobbyEntered(LobbyEnter_t* result, bool ioFailure);
+    void enterLobby(CSteamID id);
+    void leaveLobbyOnly();
+    CCallResult<Network, LobbyMatchList_t> listCall_;
     CCallResult<Network, LobbyCreated_t> createCall_;
     CCallResult<Network, LobbyEnter_t> enterCall_;
 
@@ -100,7 +107,12 @@ private:
     std::atomic<State> state_{State::Idle};
     CSteamID lobby_;
     std::optional<netcode::NetworkCode> code_;
-    std::string pendingName_;
+    std::string tag_;
+    std::string nameHint_;
+    bool searchPending_ = false;
+    bool mergeSearch_ = false;
+    int joinRetries_ = 0;
+    std::chrono::steady_clock::time_point nextMergeCheck_{};
 
     mutable std::shared_mutex mutex_;          // chroni peers_ i routes_
     std::map<uint64_t, Peer> peers_;           // członkowie lobby (bez nas)

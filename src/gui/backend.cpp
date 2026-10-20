@@ -1,7 +1,10 @@
 #include "backend.h"
 
+#include <algorithm>
+
 #include <QAction>
 #include <QClipboard>
+#include <QDateTime>
 #include <QCoreApplication>
 #include <QDesktopServices>
 #include <QDir>
@@ -36,11 +39,15 @@ QString statusName(EngineStatus s) {
 QString netStateName(steam::State s) {
     switch (s) {
     case steam::State::Idle: return QStringLiteral("idle");
-    case steam::State::Creating: return QStringLiteral("creating");
-    case steam::State::Joining: return QStringLiteral("joining");
+    case steam::State::Connecting: return QStringLiteral("connecting");
     case steam::State::Connected: return QStringLiteral("connected");
     }
     return QStringLiteral("idle");
+}
+
+QString normalizeCode(const QString& code) {
+    const auto c = netcode::parse(code.toStdString());
+    return c ? QString::fromStdString(netcode::format(*c)) : QString();
 }
 
 QVariantMap peerToMap(const QString& name, const QString& address, bool self, bool owner, bool verified,
@@ -84,6 +91,8 @@ Backend::Backend(bool demo, QObject* parent) : QObject(parent), demo_(demo) {
     closeToTray_ = s.value(QStringLiteral("closeToTray"), true).toBool();
     notifications_ = s.value(QStringLiteral("notifications"), true).toBool();
     theme_ = s.value(QStringLiteral("theme"), QStringLiteral("system")).toString();
+    autoConnect_ = s.value(QStringLiteral("autoConnect"), true).toBool();
+    loadSaved();
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
     connect(QGuiApplication::styleHints(), &QStyleHints::colorSchemeChanged, this, &Backend::themeChanged);
@@ -130,6 +139,24 @@ void Backend::applySnapshot(const Snapshot& snap) {
         if (p.self || p.verified) ++memberCount_;
     }
     emit changed();
+
+    if (netState_ == QLatin1String("connected") && !networkCode_.isEmpty()) {
+        const QString sig = networkCode_ + networkName_;
+        if (sig != lastSavedSignature_) {
+            lastSavedSignature_ = sig;
+            rememberNetwork(networkCode_, networkName_);
+            QSettings().setValue(QStringLiteral("lastNetwork"), networkCode_);
+        }
+    } else {
+        lastSavedSignature_.clear();
+    }
+
+    // Automatyczny powrót do ostatniej sieci – raz, zaraz po połączeniu ze Steamem.
+    if (status_ == QLatin1String("ready") && !autoConnectDone_) {
+        autoConnectDone_ = true;
+        const QString last = QSettings().value(QStringLiteral("lastNetwork")).toString();
+        if (autoConnect_ && !last.isEmpty() && netState_ == QLatin1String("idle")) connectSaved(last);
+    }
     rebuildTrayMenu();
 }
 
@@ -170,10 +197,30 @@ void Backend::joinNetwork(const QString& code) {
         emit toast(QStringLiteral("To nie wygląda na kod sieci. Kod ma postać KTL-XXXX-XXXX-XXXX."));
         return;
     }
-    if (engine_) engine_->join(code.toStdString());
+    const QString normalized = normalizeCode(code);
+    if (engine_) engine_->join(normalized.toStdString(), savedName(normalized).toStdString());
+}
+
+void Backend::connectSaved(const QString& code) { joinNetwork(code); }
+
+void Backend::forgetNetwork(const QString& code) {
+    const QString c = normalizeCode(code);
+    for (int i = 0; i < saved_.size(); ++i) {
+        if (saved_[i].toMap().value(QStringLiteral("code")).toString() == c) {
+            const QString name = saved_[i].toMap().value(QStringLiteral("name")).toString();
+            saved_.removeAt(i);
+            storeSaved();
+            if (QSettings().value(QStringLiteral("lastNetwork")).toString() == c)
+                QSettings().remove(QStringLiteral("lastNetwork"));
+            emit toast(QStringLiteral("Usunięto „%1” z Twoich sieci").arg(name));
+            return;
+        }
+    }
 }
 
 void Backend::leaveNetwork() {
+    // Świadome opuszczenie: przy następnym uruchomieniu nie wracamy automatycznie do tej sieci.
+    QSettings().remove(QStringLiteral("lastNetwork"));
     if (demo_) {
         netState_ = QStringLiteral("idle");
         emit changed();
@@ -212,6 +259,47 @@ void Backend::setCloseToTray(bool v) {
     closeToTray_ = v;
     QSettings().setValue(QStringLiteral("closeToTray"), v);
     emit settingsChanged();
+}
+
+void Backend::setAutoConnect(bool v) {
+    if (v == autoConnect_) return;
+    autoConnect_ = v;
+    QSettings().setValue(QStringLiteral("autoConnect"), v);
+    emit settingsChanged();
+}
+
+// ---------------------------------------------------------------- zapisane sieci
+
+void Backend::loadSaved() {
+    saved_ = QSettings().value(QStringLiteral("networks")).toList();
+}
+
+void Backend::storeSaved() {
+    std::sort(saved_.begin(), saved_.end(), [](const QVariant& a, const QVariant& b) {
+        return a.toMap().value(QStringLiteral("lastUsed")).toString() > b.toMap().value(QStringLiteral("lastUsed")).toString();
+    });
+    if (!demo_) QSettings().setValue(QStringLiteral("networks"), saved_);
+    emit savedChanged();
+}
+
+QString Backend::savedName(const QString& code) const {
+    for (const auto& v : saved_)
+        if (v.toMap().value(QStringLiteral("code")).toString() == code) return v.toMap().value(QStringLiteral("name")).toString();
+    return {};
+}
+
+void Backend::rememberNetwork(const QString& code, const QString& name) {
+    QVariantMap entry;
+    entry[QStringLiteral("code")] = code;
+    entry[QStringLiteral("name")] = name.isEmpty() ? QStringLiteral("Sieć KettleLAN") : name;
+    entry[QStringLiteral("lastUsed")] = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
+    for (int i = 0; i < saved_.size(); ++i)
+        if (saved_[i].toMap().value(QStringLiteral("code")).toString() == code) {
+            saved_.removeAt(i);
+            break;
+        }
+    saved_.prepend(entry);
+    storeSaved();
 }
 
 void Backend::setNotifications(bool v) {
@@ -312,7 +400,7 @@ void Backend::rebuildTrayMenu() {
     const bool connected = netState_ == QLatin1String("connected");
 
     // Menu przebudowujemy tylko przy zmianie składu sieci (ping zmienia się co sekundę).
-    QString sig = netState_ + networkName_ + networkCode_;
+    QString sig = netState_ + networkName_ + networkCode_ + QString::number(saved_.size());
     for (const auto& v : peers_) {
         const auto m = v.toMap();
         sig += m.value(QStringLiteral("name")).toString() + m.value(QStringLiteral("address")).toString() +
@@ -347,6 +435,15 @@ void Backend::rebuildTrayMenu() {
             copyText(networkCode_, QStringLiteral("Skopiowano kod sieci – wyślij go znajomym"));
         });
         trayMenu_->addAction(QStringLiteral("Opuść sieć"), this, [this] { leaveNetwork(); });
+    } else if (netState_ == QLatin1String("idle") && status_ == QLatin1String("ready") && !saved_.isEmpty()) {
+        trayMenu_->addAction(QStringLiteral("Twoje sieci"))->setEnabled(false);
+        for (const auto& v : saved_) {
+            const auto m = v.toMap();
+            const QString code = m.value(QStringLiteral("code")).toString();
+            trayMenu_->addAction(QStringLiteral("Połącz: %1").arg(m.value(QStringLiteral("name")).toString()), this,
+                                 [this, code] { connectSaved(code); });
+        }
+        trayMenu_->addSeparator();
     }
     trayMenu_->addAction(QStringLiteral("Pokaż okno"), this, [this] { showWindow(); });
     trayMenu_->addSeparator();
@@ -365,6 +462,14 @@ void Backend::loadDemo() {
     } else {
         status_ = QStringLiteral("ready");
     }
+    auto demoEntry = [](const QString& name, const QString& code) {
+        QVariantMap m;
+        m[QStringLiteral("name")] = name;
+        m[QStringLiteral("code")] = code;
+        return QVariant(m);
+    };
+    saved_ = {demoEntry(QStringLiteral("Wieczór z Quake"), QStringLiteral("KTL-50AA-1SZ3-XRK3")),
+              demoEntry(QStringLiteral("Warcraft III ze znajomymi"), QStringLiteral("KTL-7F3Q-9XM2-A4KD"))};
     if (demoPage_ == QLatin1String("network")) {
         netState_ = QStringLiteral("connected");
         networkName_ = QStringLiteral("Wieczór z Quake");

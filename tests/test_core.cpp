@@ -93,6 +93,19 @@ static void testProtocol() {
     CHECK(protocol::computeProof(code, 111, 222) != protocol::computeProof(other, 111, 222));
     bytes[0] = 'X';
     CHECK(!protocol::decode(bytes));
+
+    const auto tag = protocol::lobbyTag(code);
+    CHECK(tag.size() == 16);
+    CHECK(tag == protocol::lobbyTag(code));
+    CHECK(tag != protocol::lobbyTag(other));
+}
+
+static void testGenerate() {
+    const auto a = netcode::generate();
+    const auto b = netcode::generate();
+    CHECK(a.networkId != 0 && a.secret != 0 && a.secret <= netcode::kSecretMask);
+    CHECK(!(a == b));
+    CHECK(netcode::parse(netcode::format(a)) == a);
 }
 
 int main() {
@@ -101,6 +114,7 @@ int main() {
     testAddresses();
     testIPv4Parse();
     testProtocol();
+    testGenerate();
     if (failures == 0) std::printf("Wszystkie testy rdzenia OK\n");
     return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }

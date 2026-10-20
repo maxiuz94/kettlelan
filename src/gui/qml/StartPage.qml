@@ -9,7 +9,7 @@ import KettleLAN.Core
 Item {
     id: page
     signal openSettings()
-    readonly property bool busy: Backend.netState === "creating" || Backend.netState === "joining"
+    readonly property bool busy: Backend.netState === "connecting"
 
     ColumnLayout {
         anchors.fill: parent
@@ -83,7 +83,7 @@ Item {
                 implicitHeight: 52
                 kind: "primary"
                 iconName: "plus"
-                text: Backend.netState === "creating" ? "Tworzę sieć…" : "Utwórz sieć"
+                text: "Utwórz sieć"
                 enabled: !page.busy
                 onClicked: createDialog.open()
             }
@@ -119,21 +119,98 @@ Item {
                     AppButton {
                         id: joinButton
                         kind: "secondary"
-                        text: Backend.netState === "joining" ? "Dołączam…" : "Dołącz"
+                        text: "Dołącz"
                         enabled: !page.busy && Backend.isCodeValid(codeField.text)
                         onClicked: Backend.joinNetwork(codeField.text)
                     }
                 }
                 Text {
                     Layout.fillWidth: true
-                    text: "Kod dostaniesz od osoby, która utworzyła sieć."
+                    text: "Kod dostaniesz od osoby, która utworzyła sieć. Kod się nie zmienia – zapisz go raz."
                     color: Theme.muted
                     font.pixelSize: 12
                     wrapMode: Text.WordWrap
                 }
             }
 
-            Item { Layout.fillHeight: true }
+            // --- łączenie w toku
+            RowLayout {
+                Layout.fillWidth: true
+                visible: page.busy
+                spacing: 10
+                BusyIndicator { implicitWidth: 28; implicitHeight: 28; running: page.busy }
+                Text { text: "Łączę z siecią…"; color: Theme.text; font.pixelSize: 14; Layout.fillWidth: true }
+            }
+
+            // --- zapisane sieci
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                spacing: 8
+                visible: Backend.savedNetworks.length > 0 && !page.busy
+                Text { text: "Twoje sieci"; color: Theme.muted; font.pixelSize: 13; font.weight: Font.DemiBold }
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    Layout.maximumHeight: savedList.contentHeight + 2
+                    radius: Theme.radius
+                    color: Theme.surface
+                    border.color: Theme.border
+                    clip: true
+                    ListView {
+                        id: savedList
+                        anchors.fill: parent
+                        anchors.margins: 1
+                        model: Backend.savedNetworks
+                        boundsBehavior: Flickable.StopAtBounds
+                        ScrollBar.vertical: ScrollBar {}
+                        delegate: Rectangle {
+                            id: savedRow
+                            required property var modelData
+                            required property int index
+                            width: savedList.width
+                            implicitHeight: 60
+                            color: "transparent"
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 14
+                                anchors.rightMargin: 8
+                                spacing: 8
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 3
+                                    Text { text: savedRow.modelData.name; color: Theme.text; font.pixelSize: 14; font.weight: Font.DemiBold; elide: Text.ElideRight; Layout.fillWidth: true }
+                                    Text { text: savedRow.modelData.code; color: Theme.muted; font.family: Theme.mono; font.pixelSize: 12 }
+                                }
+                                AppButton {
+                                    kind: "secondary"
+                                    implicitHeight: 40
+                                    leftPadding: 14
+                                    rightPadding: 14
+                                    font.pixelSize: 14
+                                    text: "Połącz"
+                                    onClicked: Backend.connectSaved(savedRow.modelData.code)
+                                }
+                                IconButton {
+                                    iconName: "trash"
+                                    iconSize: 18
+                                    label: "Zapomnij sieć"
+                                    onClicked: Backend.forgetNetwork(savedRow.modelData.code)
+                                }
+                            }
+                            Rectangle {
+                                visible: savedRow.index < savedList.count - 1
+                                anchors.bottom: parent.bottom
+                                width: parent.width
+                                height: 1
+                                color: Theme.border
+                            }
+                        }
+                    }
+                }
+            }
+
+            Item { Layout.fillHeight: true; visible: Backend.savedNetworks.length === 0 || page.busy }
         }
 
         // --- stopka

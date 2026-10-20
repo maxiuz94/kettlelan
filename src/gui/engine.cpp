@@ -50,10 +50,10 @@ void Engine::create(const std::string& name) {
     });
 }
 
-void Engine::join(const std::string& text) {
-    post([this, text] {
+void Engine::join(const std::string& text, const std::string& nameHint) {
+    post([this, text, nameHint] {
         if (!st_->net) return;
-        if (const auto code = netcode::parse(text)) st_->net->join(*code);
+        if (const auto code = netcode::parse(text)) st_->net->connect(*code, nameHint);
         else if (onEvent_) onEvent_("To nie wygląda na kod sieci. Kod ma postać KTL-XXXX-XXXX-XXXX.");
         st_->dirty = true;
     });

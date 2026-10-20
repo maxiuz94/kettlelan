@@ -1,7 +1,6 @@
 #include "network.h"
 
 #include <algorithm>
-#include <random>
 
 #include "log.h"
 #include "protocol.h"
@@ -18,7 +17,13 @@ constexpr int kHelloAttempts = 15; // ok. 30 s prób
 constexpr int kDataFlags = k_nSteamNetworkingSend_UnreliableNoNagle | k_nSteamNetworkingSend_AutoRestartBrokenSession;
 constexpr int kControlFlags = k_nSteamNetworkingSend_Reliable | k_nSteamNetworkingSend_AutoRestartBrokenSession;
 
+constexpr auto kFirstMergeCheck = std::chrono::seconds(5);
+constexpr auto kMergeInterval = std::chrono::seconds(30);
+constexpr int kMaxJoinRetries = 3;
+
 constexpr const char* kKeyMarker = "kettlelan";
+constexpr const char* kMarkerValue = "2";
+constexpr const char* kKeyTag = "tag";
 constexpr const char* kKeyName = "name";
 constexpr const char* kKeyProto = "proto";
 
@@ -31,20 +36,6 @@ SteamNetworkingIdentity identityFor(uint64_t steamId) {
 std::string nameOf(uint64_t steamId) {
     const char* n = SteamFriends()->GetFriendPersonaName(CSteamID(uint64(steamId)));
     return (n && *n) ? std::string(n) : std::to_string(steamId);
-}
-
-// Numer lobby odtwarzany z kodu sieci. Lobby Steama mają zawsze typ „chat” i dwie flagi
-// instancji: Lobby + MMSLobby (numer zaczyna się od 0x0186…).
-CSteamID lobbyIdFromCode(const netcode::NetworkCode& code) {
-    return CSteamID(code.lobbyAccountId, k_EChatInstanceFlagLobby | k_EChatInstanceFlagMMSLobby,
-                    SteamUtils()->GetConnectedUniverse(), k_EAccountTypeChat);
-}
-
-uint32_t randomSecret() {
-    std::random_device rd;
-    uint32_t s = 0;
-    while (s == 0) s = (uint32_t(rd()) ^ (uint32_t(rd()) << 7)) & netcode::kSecretMask;
-    return s;
 }
 
 } // namespace
@@ -61,69 +52,112 @@ void Network::notify(const std::string& text) {
     if (onEvent_) onEvent_(text);
 }
 
-// ---------------------------------------------------------------- tworzenie / dołączanie
+// ---------------------------------------------------------------- tworzenie / łączenie
+//
+// Sieć nie ma stałego lobby. Kod wyznacza znacznik (tag); przy łączeniu szukamy w Steamie lobby
+// z tym znacznikiem. Jeśli nikogo nie ma, otwieramy nowe lobby z tym samym znacznikiem.
+// Gdyby powstały dwa lobby naraz, wszyscy przechodzą do tego o najmniejszym numerze.
 
 void Network::create(const std::string& name) {
-    if (state_ != State::Idle) {
-        notify("Najpierw opuść obecną sieć.");
-        return;
-    }
-    pendingName_ = name.empty() ? (std::string(SteamFriends()->GetPersonaName()) + " – sieć") : name;
-    state_ = State::Creating;
-    createCall_.Set(SteamMatchmaking()->CreateLobby(k_ELobbyTypeInvisible, kMaxMembers), this,
-                    &Network::onLobbyCreated);
-    notify("Tworzę sieć „" + pendingName_ + "”…");
+    connect(netcode::generate(), name.empty() ? (std::string(SteamFriends()->GetPersonaName()) + " – sieć") : name);
 }
 
-void Network::onLobbyCreated(LobbyCreated_t* r, bool ioFailure) {
-    if (ioFailure || r->m_eResult != k_EResultOK) {
-        state_ = State::Idle;
-        notify("Nie udało się utworzyć sieci (Steam: błąd " + std::to_string(ioFailure ? -1 : int(r->m_eResult)) + ").");
-        return;
-    }
-    lobby_ = CSteamID(uint64(r->m_ulSteamIDLobby));
-    code_ = netcode::NetworkCode{lobby_.GetAccountID(), randomSecret()};
-    if (lobbyIdFromCode(*code_) != lobby_) {
-        // Nie powinno się zdarzyć – oznaczałoby, że kod nie pozwoli nikomu dołączyć.
-        KLOG_ERROR("Numer lobby " << lobby_.ConvertToUint64() << " nie da się odtworzyć z kodu (otrzymano "
-                   << lobbyIdFromCode(*code_).ConvertToUint64() << ")");
-    }
-    SteamMatchmaking()->SetLobbyData(lobby_, kKeyMarker, "1");
-    SteamMatchmaking()->SetLobbyData(lobby_, kKeyName, pendingName_.c_str());
-    SteamMatchmaking()->SetLobbyData(lobby_, kKeyProto, std::to_string(protocol::kVersion).c_str());
-    // Twórca lobby jest w nim od razu – Steam nie wyśle nam osobnego wyniku dołączenia.
-    enterConnected();
-}
-
-void Network::join(const netcode::NetworkCode& code) {
+void Network::connect(const netcode::NetworkCode& code, const std::string& nameHint) {
     if (state_ != State::Idle) {
         notify("Najpierw opuść obecną sieć.");
         return;
     }
     code_ = code;
-    lobby_ = lobbyIdFromCode(code);
-    state_ = State::Joining;
+    tag_ = protocol::lobbyTag(code);
+    nameHint_ = nameHint;
+    joinRetries_ = 0;
+    state_ = State::Connecting;
+    notify("Łączę z siecią " + netcode::format(code) + "…");
+    startSearch(false);
+}
+
+void Network::startSearch(bool merge) {
+    mergeSearch_ = merge;
+    searchPending_ = true;
+    SteamMatchmaking()->AddRequestLobbyListStringFilter(kKeyTag, tag_.c_str(), k_ELobbyComparisonEqual);
+    SteamMatchmaking()->AddRequestLobbyListDistanceFilter(k_ELobbyDistanceFilterWorldwide);
+    SteamMatchmaking()->AddRequestLobbyListResultCountFilter(10);
+    listCall_.Set(SteamMatchmaking()->RequestLobbyList(), this, &Network::onLobbyList);
+}
+
+void Network::onLobbyList(LobbyMatchList_t* r, bool ioFailure) {
+    searchPending_ = false;
+    const bool merge = mergeSearch_;
+    if (!code_) return; // w międzyczasie opuszczono sieć
+
+    // najmniejszy numer lobby z naszym znacznikiem (sprawdzamy znacznik jeszcze raz)
+    uint64_t best = 0;
+    const uint32 count = ioFailure ? 0 : r->m_nLobbiesMatching;
+    for (uint32 i = 0; i < count; ++i) {
+        const CSteamID id = SteamMatchmaking()->GetLobbyByIndex(int(i));
+        if (std::string(SteamMatchmaking()->GetLobbyData(id, kKeyTag)) != tag_) continue;
+        if (best == 0 || id.ConvertToUint64() < best) best = id.ConvertToUint64();
+    }
+
+    if (merge) {
+        if (state_ != State::Connected || best == 0 || best >= lobby_.ConvertToUint64()) return;
+        notify("Łączę się z resztą osób z tej sieci…");
+        leaveLobbyOnly();
+        state_ = State::Connecting;
+        enterLobby(CSteamID(uint64(best)));
+        return;
+    }
+
+    if (state_ != State::Connecting) return;
+    if (best != 0) {
+        enterLobby(CSteamID(uint64(best)));
+    } else {
+        // nikogo nie ma – otwieramy sieć
+        createCall_.Set(SteamMatchmaking()->CreateLobby(k_ELobbyTypeInvisible, kMaxMembers), this,
+                        &Network::onLobbyCreated);
+    }
+}
+
+void Network::onLobbyCreated(LobbyCreated_t* r, bool ioFailure) {
+    if (state_ != State::Connecting || !code_) return;
+    if (ioFailure || r->m_eResult != k_EResultOK) {
+        resetState();
+        notify("Nie udało się otworzyć sieci (Steam: błąd " + std::to_string(ioFailure ? -1 : int(r->m_eResult)) + ").");
+        return;
+    }
+    lobby_ = CSteamID(uint64(r->m_ulSteamIDLobby));
+    SteamMatchmaking()->SetLobbyData(lobby_, kKeyMarker, kMarkerValue);
+    SteamMatchmaking()->SetLobbyData(lobby_, kKeyTag, tag_.c_str());
+    SteamMatchmaking()->SetLobbyData(lobby_, kKeyName, (nameHint_.empty() ? std::string("Sieć KettleLAN") : nameHint_).c_str());
+    SteamMatchmaking()->SetLobbyData(lobby_, kKeyProto, std::to_string(protocol::kVersion).c_str());
+    // Twórca lobby jest w nim od razu – Steam nie wyśle nam osobnego wyniku dołączenia.
+    enterConnected();
+}
+
+void Network::enterLobby(CSteamID id) {
+    lobby_ = id;
     enterCall_.Set(SteamMatchmaking()->JoinLobby(lobby_), this, &Network::onLobbyEntered);
-    notify("Dołączam do sieci " + netcode::format(code) + "…");
 }
 
 void Network::onLobbyEntered(LobbyEnter_t* r, bool ioFailure) {
-    if (state_ != State::Joining) return;
-    if (ioFailure || r->m_EChatRoomEnterResponse != k_EChatRoomEnterResponseSuccess) {
-        const auto resp = ioFailure ? 0u : r->m_EChatRoomEnterResponse;
+    if (state_ != State::Connecting || !code_) return;
+    const bool ok = !ioFailure && r->m_EChatRoomEnterResponse == k_EChatRoomEnterResponseSuccess;
+    if (!ok) {
+        // Lobby mogło zniknąć między wyszukaniem a dołączeniem – szukamy jeszcze raz.
+        lobby_ = CSteamID();
+        if (++joinRetries_ <= kMaxJoinRetries) {
+            startSearch(false);
+            return;
+        }
         resetState();
-        if (resp == k_EChatRoomEnterResponseDoesntExist)
-            notify("Sieć o tym kodzie nie istnieje – sprawdź kod albo poproś o nowy.");
-        else if (resp == k_EChatRoomEnterResponseFull)
-            notify("Sieć jest pełna.");
-        else
-            notify("Nie udało się dołączyć do sieci (Steam: kod " + std::to_string(resp) + ").");
+        notify("Nie udało się połączyć z siecią (Steam: kod " +
+               std::to_string(ioFailure ? 0u : r->m_EChatRoomEnterResponse) + "). Spróbuj ponownie.");
         return;
     }
-    if (std::string(SteamMatchmaking()->GetLobbyData(lobby_, kKeyMarker)) != "1") {
+    if (std::string(SteamMatchmaking()->GetLobbyData(lobby_, kKeyTag)) != tag_) {
         SteamMatchmaking()->LeaveLobby(lobby_);
         resetState();
-        notify("Ten kod nie należy do sieci KettleLAN.");
+        notify("To lobby nie należy do tej sieci KettleLAN.");
         return;
     }
     enterConnected();
@@ -132,20 +166,28 @@ void Network::onLobbyEntered(LobbyEnter_t* r, bool ioFailure) {
 void Network::enterConnected() {
     SteamMatchmaking()->SetLobbyMemberData(lobby_, "ip", selfAddress_.toString().c_str());
     state_ = State::Connected;
+    nextMergeCheck_ = Clock::now() + kFirstMergeCheck;
     syncMembers();
     notify("Połączono z siecią „" + networkName() + "”. Twój adres: " + selfAddress_.toString() +
-         ", kod sieci: " + codeText());
+           ", kod sieci: " + codeText());
+}
+
+void Network::leaveLobbyOnly() {
+    if (lobby_.IsValid()) SteamMatchmaking()->LeaveLobby(lobby_);
+    std::vector<uint64_t> ids;
+    {
+        std::unique_lock lk(mutex_);
+        for (auto& [id, _] : peers_) ids.push_back(id);
+        peers_.clear();
+        routes_.clear();
+    }
+    for (uint64_t id : ids) SteamNetworkingMessages()->CloseSessionWithUser(identityFor(id));
+    lobby_ = CSteamID();
 }
 
 void Network::leave() {
     if (state_ == State::Idle) return;
-    if (lobby_.IsValid()) SteamMatchmaking()->LeaveLobby(lobby_);
-    std::vector<uint64_t> ids;
-    {
-        std::shared_lock lk(mutex_);
-        for (auto& [id, _] : peers_) ids.push_back(id);
-    }
-    for (uint64_t id : ids) SteamNetworkingMessages()->CloseSessionWithUser(identityFor(id));
+    leaveLobbyOnly();
     resetState();
     notify("Opuszczono sieć.");
 }
@@ -156,6 +198,8 @@ void Network::resetState() {
     routes_.clear();
     lobby_ = CSteamID();
     code_.reset();
+    tag_.clear();
+    searchPending_ = false;
     state_ = State::Idle;
 }
 
@@ -360,6 +404,10 @@ void Network::poll() {
 void Network::tick() {
     if (state_ != State::Connected) return;
     const auto now = Clock::now();
+    if (now >= nextMergeCheck_ && !searchPending_) {
+        nextMergeCheck_ = now + kMergeInterval;
+        startSearch(true);
+    }
     std::vector<uint64_t> due;
     {
         std::unique_lock lk(mutex_);

@@ -41,7 +41,7 @@ public:
     void start();     // uruchamia wątek i próbuje połączyć się ze Steamem
     void retry();     // ponowna próba po błędzie
     void create(const std::string& name);
-    void join(const std::string& code);
+    void join(const std::string& code, const std::string& nameHint);
     void leave();
     // Opuszcza sieć, zamyka kartę i rozłącza Steam. Blokuje do zakończenia (maks. kilka sekund).
     void shutdown();

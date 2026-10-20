@@ -27,10 +27,12 @@ class Backend : public QObject {
     Q_PROPERTY(QString networkCode READ networkCode NOTIFY changed)
     Q_PROPERTY(QVariantList peers READ peers NOTIFY changed)
     Q_PROPERTY(int memberCount READ memberCount NOTIFY changed)
+    Q_PROPERTY(QVariantList savedNetworks READ savedNetworks NOTIFY savedChanged)
     // ustawienia
     Q_PROPERTY(bool closeToTray READ closeToTray WRITE setCloseToTray NOTIFY settingsChanged)
     Q_PROPERTY(bool notifications READ notifications WRITE setNotifications NOTIFY settingsChanged)
     Q_PROPERTY(bool autostart READ autostart WRITE setAutostart NOTIFY settingsChanged)
+    Q_PROPERTY(bool autoConnect READ autoConnect WRITE setAutoConnect NOTIFY settingsChanged)
     Q_PROPERTY(QString theme READ theme WRITE setTheme NOTIFY settingsChanged)
     Q_PROPERTY(bool darkMode READ darkMode NOTIFY themeChanged)
     // informacje
@@ -55,6 +57,7 @@ public:
     QString networkCode() const { return networkCode_; }
     QVariantList peers() const { return peers_; }
     int memberCount() const { return memberCount_; }
+    QVariantList savedNetworks() const { return saved_; }
 
     bool closeToTray() const { return closeToTray_; }
     void setCloseToTray(bool v);
@@ -62,6 +65,8 @@ public:
     void setNotifications(bool v);
     bool autostart() const;
     void setAutostart(bool v);
+    bool autoConnect() const { return autoConnect_; }
+    void setAutoConnect(bool v);
     QString theme() const { return theme_; }
     void setTheme(const QString& v);
     bool darkMode() const;
@@ -76,6 +81,8 @@ public:
     Q_INVOKABLE bool isCodeValid(const QString& code) const;
     Q_INVOKABLE void joinNetwork(const QString& code);
     Q_INVOKABLE void leaveNetwork();
+    Q_INVOKABLE void connectSaved(const QString& code);
+    Q_INVOKABLE void forgetNetwork(const QString& code);
     Q_INVOKABLE void copyText(const QString& text, const QString& message);
     Q_INVOKABLE void openUrl(const QString& url);
     Q_INVOKABLE void openLogs();
@@ -86,6 +93,7 @@ public:
 signals:
     void changed();
     void settingsChanged();
+    void savedChanged();
     void themeChanged();
     void toast(const QString& text);
 
@@ -95,6 +103,10 @@ private:
     void setupTray();
     void rebuildTrayMenu();
     void loadDemo();
+    void loadSaved();
+    void storeSaved();
+    void rememberNetwork(const QString& code, const QString& name);
+    QString savedName(const QString& code) const;
 
     bool demo_ = false;
     QString demoPage_;
@@ -114,7 +126,12 @@ private:
     QVariantList peers_;
     int memberCount_ = 0;
 
+    QVariantList saved_;
+    QString lastSavedSignature_;
+    bool autoConnectDone_ = false;
+
     bool closeToTray_ = true;
+    bool autoConnect_ = true;
     bool notifications_ = true;
     QString theme_ = QStringLiteral("system");
 };

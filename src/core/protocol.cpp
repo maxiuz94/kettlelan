@@ -27,11 +27,25 @@ std::optional<HelloMessage> decode(std::span<const uint8_t> d) {
     return msg;
 }
 
+std::string lobbyTag(const netcode::NetworkCode& code) {
+    const crypto::SipKey key{'K', 'e', 't', 't', 'l', 'e', 'L', 'A', 'N', '-', 't', 'a', 'g', '-', 'v', '2'};
+    std::array<uint8_t, 8> msg{};
+    for (int i = 0; i < 4; ++i) {
+        msg[i] = uint8_t(code.networkId >> (8 * i));
+        msg[4 + i] = uint8_t(code.secret >> (8 * i));
+    }
+    const uint64_t h = crypto::siphash24(key, msg);
+    static constexpr char hex[] = "0123456789abcdef";
+    std::string out(16, '0');
+    for (int i = 0; i < 16; ++i) out[15 - i] = hex[(h >> (4 * i)) & 0xF];
+    return out;
+}
+
 uint64_t computeProof(const netcode::NetworkCode& code, uint64_t sender, uint64_t receiver) {
     crypto::SipKey key{'K', 'e', 't', 't', 'l', 'e', 'L', 'A', 0, 0, 0, 0, 0, 0, 0, 0};
     for (int i = 0; i < 4; ++i) {
         key[8 + i] = uint8_t(code.secret >> (8 * i));
-        key[12 + i] = uint8_t(code.lobbyAccountId >> (8 * i));
+        key[12 + i] = uint8_t(code.networkId >> (8 * i));
     }
     std::array<uint8_t, 16> msg{};
     for (int i = 0; i < 8; ++i) {
