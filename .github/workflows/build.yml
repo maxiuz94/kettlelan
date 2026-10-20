@@ -1,0 +1,20 @@
+name: Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  core-tests:
+    name: Testy rdzenia (Linux)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Konfiguracja
+        run: cmake -B build -DKETTLELAN_BUILD_APP=OFF -DCMAKE_BUILD_TYPE=Release
+      - name: Budowanie
+        run: cmake --build build -j"$(nproc)"
+      - name: Testy
+        run: ctest --test-dir build --output-on-failure

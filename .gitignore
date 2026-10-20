@@ -1,0 +1,16 @@
+# budowanie
+/build*/
+/out/
+CMakeUserPresets.json
+
+# Steamworks SDK – licencja Valve zabrania umieszczania go w repozytorium
+steamworks_sdk_*.zip
+/third_party/steamworks/
+/sdk/
+
+# edytory / systemy
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
