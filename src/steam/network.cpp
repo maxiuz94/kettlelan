@@ -79,7 +79,8 @@ void Network::onLobbyCreated(LobbyCreated_t* r, bool ioFailure) {
     SteamMatchmaking()->SetLobbyData(lobby_, kKeyMarker, "1");
     SteamMatchmaking()->SetLobbyData(lobby_, kKeyName, pendingName_.c_str());
     SteamMatchmaking()->SetLobbyData(lobby_, kKeyProto, std::to_string(protocol::kVersion).c_str());
-    // LobbyEnter_t przyjdzie osobno – tam przechodzimy do stanu „połączono”.
+    // Twórca lobby jest w nim od razu – Steam nie wyśle nam osobnego wyniku dołączenia.
+    enterConnected();
 }
 
 void Network::join(const netcode::NetworkCode& code) {

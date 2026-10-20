@@ -2,6 +2,8 @@
 #include <atomic>
 #include <chrono>
 #include <csignal>
+#include <cstdio>
+#include <cstdlib>
 #include <deque>
 #include <iomanip>
 #include <iostream>
@@ -26,7 +28,11 @@ namespace {
 
 std::atomic<bool> g_quit{false};
 
-void onSignal(int) { g_quit = true; }
+void onSignal(int) {
+    // Drugie Ctrl+C zamyka program natychmiast.
+    if (g_quit) std::_Exit(130);
+    g_quit = true;
+}
 
 class CommandQueue {
 public:
@@ -59,6 +65,10 @@ void printHelp() {
 }
 
 void printPeers(const steam::Network& net) {
+    if (net.state() == steam::State::Creating || net.state() == steam::State::Joining) {
+        std::cout << "Łączę się z siecią, chwilę…\n";
+        return;
+    }
     if (net.state() != steam::State::Connected) {
         std::cout << "Nie jesteś w żadnej sieci.\n";
         return;
@@ -152,10 +162,23 @@ int main() {
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 
-    std::cout << "Zamykam KettleLAN…\n";
+    std::cout << "Zamykam KettleLAN…" << std::endl;
+    // Zabezpieczenie: gdyby sprzątanie się zacięło, po 3 s kończymy proces na siłę.
+    std::thread([] {
+        std::this_thread::sleep_for(std::chrono::seconds(3));
+        std::fputs("KettleLAN nie zamknął się w 3 s – wymuszam zamknięcie.\n", stderr);
+        std::_Exit(0);
+    }).detach();
+
     net.leave();
     session.runCallbacks();
     tun->stop();
+    tun.reset();
     session.shutdown();
-    return 0;
+
+    // Kończymy od razu: obiekty powiązane ze Steamem nie mogą być niszczone po SteamAPI_Shutdown(),
+    // a wątek czytający klawiaturę i tak czeka na wpisanie kolejnej linii.
+    std::cout.flush();
+    std::clog.flush();
+    std::_Exit(0);
 }
