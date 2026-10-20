@@ -18,7 +18,7 @@ fi
 [ -x build/kettlelan ] || { echo "Najpierw zbuduj program: ./scripts/build.sh"; exit 1; }
 
 mkdir -p "$DEST" "$APPS" "$ICONS"
-cp build/kettlelan build/kettlelan-cli build/libsteam_api.so build/kettlelan-helper "$DEST/"
+cp --remove-destination build/kettlelan build/kettlelan-cli build/libsteam_api.so build/kettlelan-helper "$DEST/"
 QT_QPA_PLATFORM=offscreen "$DEST/kettlelan" --write-icon "$ICONS/kettlelan.png"
 
 cat > "$APPS/kettlelan.desktop" << DESKTOP
