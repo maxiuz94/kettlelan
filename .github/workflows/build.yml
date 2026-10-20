@@ -11,7 +11,7 @@ jobs:
     name: Testy rdzenia (Linux)
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Konfiguracja
         run: cmake -B build -DKETTLELAN_BUILD_APP=OFF -DCMAKE_BUILD_TYPE=Release
       - name: Budowanie
