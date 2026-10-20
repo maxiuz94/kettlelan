@@ -2,8 +2,10 @@
 
 #include <algorithm>
 
+#include "filter.h"
 #include "log.h"
 #include "protocol.h"
+#include "text.h"
 
 namespace kettle::steam {
 
@@ -33,9 +35,20 @@ SteamNetworkingIdentity identityFor(uint64_t steamId) {
     return id;
 }
 
+// Nick innej osoby – tekst od obcych, więc zawsze oczyszczony ze znaków sterujących.
 std::string nameOf(uint64_t steamId) {
     const char* n = SteamFriends()->GetFriendPersonaName(CSteamID(uint64(steamId)));
-    return (n && *n) ? std::string(n) : std::to_string(steamId);
+    const std::string clean = n ? text::sanitize(n, 32) : std::string();
+    return clean.empty() ? std::to_string(steamId) : clean;
+}
+
+// Porównanie w stałym czasie (nie zdradza, ile bajtów dowodu się zgadza).
+bool equalConstantTime(uint64_t a, uint64_t b) {
+    uint64_t diff = a ^ b;
+    diff |= diff >> 32;
+    diff |= diff >> 16;
+    diff |= diff >> 8;
+    return (diff & 0xFF) == 0;
 }
 
 } // namespace
@@ -128,7 +141,8 @@ void Network::onLobbyCreated(LobbyCreated_t* r, bool ioFailure) {
     lobby_ = CSteamID(uint64(r->m_ulSteamIDLobby));
     SteamMatchmaking()->SetLobbyData(lobby_, kKeyMarker, kMarkerValue);
     SteamMatchmaking()->SetLobbyData(lobby_, kKeyTag, tag_.c_str());
-    SteamMatchmaking()->SetLobbyData(lobby_, kKeyName, (nameHint_.empty() ? std::string("Sieć KettleLAN") : nameHint_).c_str());
+    const std::string name = text::sanitize(nameHint_, 60);
+    SteamMatchmaking()->SetLobbyData(lobby_, kKeyName, (name.empty() ? std::string("Sieć KettleLAN") : name).c_str());
     SteamMatchmaking()->SetLobbyData(lobby_, kKeyProto, std::to_string(protocol::kVersion).c_str());
     // Twórca lobby jest w nim od razu – Steam nie wyśle nam osobnego wyniku dołączenia.
     enterConnected();
@@ -307,7 +321,7 @@ void Network::handleControl(uint64_t from, std::span<const uint8_t> data) {
         if (it == peers_.end()) return; // nie ma go (jeszcze) na liście członków
         Peer& peer = it->second;
 
-        if (msg->proof != protocol::computeProof(*code_, from, selfId_)) {
+        if (!equalConstantTime(msg->proof, protocol::computeProof(*code_, from, selfId_))) {
             if (!peer.badKeyReported) {
                 peer.badKeyReported = true;
                 lk.unlock();
@@ -356,6 +370,9 @@ void Network::sendPacket(std::span<const uint8_t> packet) {
     const auto hdr = ip::parseIPv4(packet);
     if (!hdr || hdr->src != selfAddress_) return;
 
+    if (ip::isGroupDestination(hdr->dst) && protectServices_ && filter::isDiscoveryBroadcast(packet))
+        return; // ogłoszenia usług systemu (nazwa komputera, udostępnione zasoby) zostają u nas
+
     std::shared_lock lk(mutex_);
     if (ip::isGroupDestination(hdr->dst)) {
         for (auto& [addr, id] : routes_) sendTo(id, packet, protocol::kChannelData);
@@ -366,6 +383,7 @@ void Network::sendPacket(std::span<const uint8_t> packet) {
 }
 
 void Network::handleData(uint64_t from, std::span<const uint8_t> data) {
+    if (data.size() > 65535) return;
     const auto hdr = ip::parseIPv4(data);
     if (!hdr) return;
     if (hdr->dst != selfAddress_ && !ip::isGroupDestination(hdr->dst)) return;
@@ -374,6 +392,21 @@ void Network::handleData(uint64_t from, std::span<const uint8_t> data) {
         const auto it = routes_.find(hdr->src.value());
         // nadawca musi być zweryfikowany i nie może podszywać się pod cudzy adres
         if (it == routes_.end() || it->second != from) return;
+    }
+    if (protectServices_) {
+        const auto res = filter::inspectInbound(data);
+        if (res.verdict != filter::Verdict::Allow) {
+            ++blockedPackets_;
+            std::lock_guard lk(blockedLogMutex_);
+            if (blockedLogged_.size() < 1000 && blockedLogged_.insert({from, res.dstPort}).second) {
+                const char* why = res.verdict == filter::Verdict::BlockedService ? "chroniona usługa"
+                                : res.verdict == filter::Verdict::BlockedProtocol ? "niedozwolony protokół"
+                                : "podejrzany fragment pakietu";
+                KLOG_WARN("Zablokowano ruch od " << nameOf(from) << " (" << hdr->src.toString() << ") do "
+                          << filter::serviceName(res.dstPort) << " – " << why);
+            }
+            return;
+        }
     }
     std::lock_guard lk(handlerMutex_);
     if (packetHandler_) packetHandler_(data);
@@ -421,13 +454,35 @@ void Network::tick() {
     for (uint64_t id : due) sendHello(id, false);
 }
 
+// ---------------------------------------------------------------- prywatność
+
+void Network::setHideAddress(bool hide) {
+    // Bez ICE Steam nie wymienia z drugą stroną żadnych adresów IP – zostaje tylko relay Valve.
+    // Wyłączenie przywraca domyślne zachowanie z ustawień klienta Steam.
+    SteamNetworkingUtils()->SetGlobalConfigValueInt32(
+        k_ESteamNetworkingConfig_P2P_Transport_ICE_Enable,
+        hide ? k_nSteamNetworkingConfig_P2P_Transport_ICE_Enable_Disable
+             : k_nSteamNetworkingConfig_P2P_Transport_ICE_Enable_Default);
+    KLOG_INFO((hide ? "Prywatność: połączenia tylko przez relay Steam (adres IP ukryty)"
+                    : "Prywatność: dozwolone połączenia bezpośrednie"));
+    // Istniejące połączenia zestawiamy od nowa, żeby zmiana objęła także je.
+    std::vector<uint64_t> ids;
+    {
+        std::shared_lock lk(mutex_);
+        for (auto& [id, _] : peers_) ids.push_back(id);
+    }
+    for (uint64_t id : ids) SteamNetworkingMessages()->CloseSessionWithUser(identityFor(id));
+}
+
 // ---------------------------------------------------------------- informacje
 
 std::string Network::codeText() const { return code_ ? netcode::format(*code_) : std::string(); }
 
 std::string Network::networkName() const {
     if (!lobby_.IsValid()) return {};
-    return SteamMatchmaking()->GetLobbyData(lobby_, kKeyName);
+    // nazwę ustawia osoba, która otworzyła sieć – tekst od obcych
+    const std::string clean = text::sanitize(SteamMatchmaking()->GetLobbyData(lobby_, kKeyName), 60);
+    return clean.empty() ? std::string("Sieć KettleLAN") : clean;
 }
 
 std::vector<PeerInfo> Network::peers() const {
@@ -437,7 +492,7 @@ std::vector<PeerInfo> Network::peers() const {
 
     PeerInfo self;
     self.steamId = selfId_;
-    self.name = SteamFriends()->GetPersonaName();
+    self.name = text::sanitize(SteamFriends()->GetPersonaName(), 32);
     self.address = selfAddress_;
     self.self = true;
     self.verified = true;

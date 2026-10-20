@@ -28,6 +28,7 @@ struct Snapshot {
     std::string networkName;
     std::string networkCode;
     std::vector<steam::PeerInfo> peers;
+    uint64_t blockedPackets = 0;
 };
 
 class Engine {
@@ -43,6 +44,8 @@ public:
     void create(const std::string& name);
     void join(const std::string& code, const std::string& nameHint);
     void leave();
+    void setHideAddress(bool hide);
+    void setProtectServices(bool protect);
     // Opuszcza sieć, zamyka kartę i rozłącza Steam. Blokuje do zakończenia (maks. kilka sekund).
     void shutdown();
 

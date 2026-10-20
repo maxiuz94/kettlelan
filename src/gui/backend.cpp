@@ -50,6 +50,19 @@ QString normalizeCode(const QString& code) {
     return c ? QString::fromStdString(netcode::format(*c)) : QString();
 }
 
+// Tekst od innych osób w menu Qt: „&” oznacza tam skrót klawiszowy, więc podwajamy go.
+QString menuText(const QString& t) {
+    QString out = t;
+    return out.replace(QLatin1Char('&'), QStringLiteral("&&"));
+}
+
+// Plik z ustawieniami zawiera kody sieci (działają jak hasła) – tylko dla właściciela.
+void restrictSettingsFile() {
+    QSettings s;
+    s.sync();
+    QFile::setPermissions(s.fileName(), QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+}
+
 QVariantMap peerToMap(const QString& name, const QString& address, bool self, bool owner, bool verified,
                       bool conflict, int pingMs, bool relayed) {
     QVariantMap m;
@@ -92,7 +105,10 @@ Backend::Backend(bool demo, QObject* parent) : QObject(parent), demo_(demo) {
     notifications_ = s.value(QStringLiteral("notifications"), true).toBool();
     theme_ = s.value(QStringLiteral("theme"), QStringLiteral("system")).toString();
     autoConnect_ = s.value(QStringLiteral("autoConnect"), true).toBool();
+    hideAddress_ = s.value(QStringLiteral("hideAddress"), true).toBool();
+    protectServices_ = s.value(QStringLiteral("protectServices"), true).toBool();
     loadSaved();
+    restrictSettingsFile();
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
     connect(QGuiApplication::styleHints(), &QStyleHints::colorSchemeChanged, this, &Backend::themeChanged);
@@ -117,6 +133,8 @@ void Backend::startEngine() {
             const QString t = QString::fromStdString(text);
             QMetaObject::invokeMethod(this, [this, t] { handleEvent(t); }, Qt::QueuedConnection);
         });
+    engine_->setHideAddress(hideAddress_);
+    engine_->setProtectServices(protectServices_);
     engine_->start();
 }
 
@@ -130,6 +148,7 @@ void Backend::applySnapshot(const Snapshot& snap) {
     netState_ = netStateName(snap.netState);
     networkName_ = QString::fromStdString(snap.networkName);
     networkCode_ = QString::fromStdString(snap.networkCode);
+    blockedPackets_ = snap.blockedPackets;
 
     peers_.clear();
     memberCount_ = 0;
@@ -166,7 +185,7 @@ void Backend::handleEvent(const QString& text) {
     const bool aboutPeople = text.contains(QStringLiteral("dołączył")) || text.contains(QStringLiteral("opuścił"));
     const bool hidden = !window_ || !window_->isVisible();
     if (notifications_ && aboutPeople && hidden && tray_)
-        tray_->showMessage(QStringLiteral("KettleLAN"), text, makeAppIcon(true), 4000);
+        tray_->showMessage(QStringLiteral("KettleLAN"), text.toHtmlEscaped(), makeAppIcon(true), 4000);
 }
 
 // ---------------------------------------------------------------- akcje
@@ -268,6 +287,22 @@ void Backend::setAutoConnect(bool v) {
     emit settingsChanged();
 }
 
+void Backend::setHideAddress(bool v) {
+    if (v == hideAddress_) return;
+    hideAddress_ = v;
+    QSettings().setValue(QStringLiteral("hideAddress"), v);
+    if (engine_) engine_->setHideAddress(v);
+    emit settingsChanged();
+}
+
+void Backend::setProtectServices(bool v) {
+    if (v == protectServices_) return;
+    protectServices_ = v;
+    QSettings().setValue(QStringLiteral("protectServices"), v);
+    if (engine_) engine_->setProtectServices(v);
+    emit settingsChanged();
+}
+
 // ---------------------------------------------------------------- zapisane sieci
 
 void Backend::loadSaved() {
@@ -278,7 +313,10 @@ void Backend::storeSaved() {
     std::sort(saved_.begin(), saved_.end(), [](const QVariant& a, const QVariant& b) {
         return a.toMap().value(QStringLiteral("lastUsed")).toString() > b.toMap().value(QStringLiteral("lastUsed")).toString();
     });
-    if (!demo_) QSettings().setValue(QStringLiteral("networks"), saved_);
+    if (!demo_) {
+        QSettings().setValue(QStringLiteral("networks"), saved_);
+        restrictSettingsFile();
+    }
     emit savedChanged();
 }
 
@@ -415,7 +453,7 @@ void Backend::rebuildTrayMenu() {
 
     trayMenu_->clear();
     if (connected) {
-        auto* title = trayMenu_->addAction(QStringLiteral("%1 · %2").arg(networkName_, selfAddress_));
+        auto* title = trayMenu_->addAction(menuText(QStringLiteral("%1 · %2").arg(networkName_, selfAddress_)));
         title->setEnabled(false);
         trayMenu_->addSeparator();
         bool anyone = false;
@@ -425,7 +463,7 @@ void Backend::rebuildTrayMenu() {
             anyone = true;
             const QString name = m.value(QStringLiteral("name")).toString();
             const QString addr = m.value(QStringLiteral("address")).toString();
-            trayMenu_->addAction(QStringLiteral("Kopiuj IP: %1  (%2)").arg(name, addr), this, [this, name, addr] {
+            trayMenu_->addAction(menuText(QStringLiteral("Kopiuj IP: %1  (%2)").arg(name, addr)), this, [this, name, addr] {
                 copyText(addr, QStringLiteral("Skopiowano adres %1 (%2)").arg(addr, name));
             });
         }
@@ -440,7 +478,7 @@ void Backend::rebuildTrayMenu() {
         for (const auto& v : saved_) {
             const auto m = v.toMap();
             const QString code = m.value(QStringLiteral("code")).toString();
-            trayMenu_->addAction(QStringLiteral("Połącz: %1").arg(m.value(QStringLiteral("name")).toString()), this,
+            trayMenu_->addAction(menuText(QStringLiteral("Połącz: %1").arg(m.value(QStringLiteral("name")).toString())), this,
                                  [this, code] { connectSaved(code); });
         }
         trayMenu_->addSeparator();
@@ -472,7 +510,7 @@ void Backend::loadDemo() {
               demoEntry(QStringLiteral("Warcraft III ze znajomymi"), QStringLiteral("KTL-7F3Q-9XM2-A4KD"))};
     if (demoPage_ == QLatin1String("network")) {
         netState_ = QStringLiteral("connected");
-        networkName_ = QStringLiteral("Wieczór z Quake");
+        networkName_ = qEnvironmentVariable("KETTLELAN_DEMO_NAME", QStringLiteral("Wieczór z Quake"));
         networkCode_ = QStringLiteral("KTL-50AA-1SZ3-XRK3");
         peers_ = {
             peerToMap(QStringLiteral("maxiuZ"), QStringLiteral("100.80.46.79"), true, true, true, false, -1, false),

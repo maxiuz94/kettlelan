@@ -145,6 +145,9 @@ int main() {
     }
 
     steam::Network net(session.steamId(), nullptr);
+    net.setHideAddress(true);
+    net.setProtectServices(true);
+    std::cout << "Ochrona: adres IP ukryty (relay Steam), usługi komputera chronione.\n";
 
     auto tun = platform::openTun(net.selfAddress(), error);
     if (!tun) {

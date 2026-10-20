@@ -4,10 +4,12 @@
 #include <set>
 #include <vector>
 
+#include "filter.h"
 #include "ip.h"
 #include "netcode.h"
 #include "protocol.h"
 #include "siphash.h"
+#include "text.h"
 
 using namespace kettle;
 
@@ -108,6 +110,60 @@ static void testGenerate() {
     CHECK(netcode::parse(netcode::format(a)) == a);
 }
 
+// Buduje pakiet IPv4 z nagłówkiem TCP/UDP (porty) do testów filtra.
+static std::vector<uint8_t> makePacket(uint8_t proto, uint16_t dstPort, uint16_t frag = 0, size_t l4len = 20) {
+    std::vector<uint8_t> p(20 + l4len, 0);
+    p[0] = 0x45;
+    p[2] = uint8_t(p.size() >> 8);
+    p[3] = uint8_t(p.size());
+    p[6] = uint8_t(frag >> 8);
+    p[7] = uint8_t(frag);
+    p[9] = proto;
+    if (l4len >= 4) {
+        p[20] = 0x9C; p[21] = 0x40; // port źródłowy 40000
+        p[22] = uint8_t(dstPort >> 8);
+        p[23] = uint8_t(dstPort);
+    }
+    return p;
+}
+
+static void testFilter() {
+    using filter::Verdict;
+    CHECK(filter::inspectInbound(makePacket(17, 27960)).verdict == Verdict::Allow);   // Quake 3
+    CHECK(filter::inspectInbound(makePacket(6, 25565)).verdict == Verdict::Allow);    // Minecraft
+    CHECK(filter::inspectInbound(makePacket(6, 22)).verdict == Verdict::BlockedService);     // SSH
+    CHECK(filter::inspectInbound(makePacket(6, 445)).verdict == Verdict::BlockedService);    // SMB
+    CHECK(filter::inspectInbound(makePacket(17, 137)).verdict == Verdict::BlockedService);   // NetBIOS
+    CHECK(filter::inspectInbound(makePacket(6, 1716)).verdict == Verdict::BlockedService);   // KDE Connect
+    CHECK(filter::inspectInbound(makePacket(17, 5353)).verdict == Verdict::BlockedService);  // mDNS
+    CHECK(filter::inspectInbound(makePacket(1, 0)).verdict == Verdict::Allow);        // ICMP (ping)
+    CHECK(filter::inspectInbound(makePacket(47, 0)).verdict == Verdict::BlockedProtocol); // GRE
+    // fragmentacja: przesunięcie 1 (nadpisanie portu) i za krótki pierwszy fragment
+    CHECK(filter::inspectInbound(makePacket(6, 0, 0x0001, 20)).verdict == Verdict::BlockedFragment);
+    CHECK(filter::inspectInbound(makePacket(6, 22, 0x2000, 8)).verdict == Verdict::BlockedFragment);
+    CHECK(filter::inspectInbound(makePacket(17, 27960, 0x2000, 8)).verdict == Verdict::Allow);
+    CHECK(filter::inspectInbound(makePacket(17, 22, 0x2000, 8)).verdict == Verdict::BlockedService);
+    CHECK(filter::inspectInbound(makePacket(6, 0, 0x00B9, 20)).verdict == Verdict::Allow); // dalszy fragment
+    CHECK(filter::inspectInbound(std::span<const uint8_t>()).verdict == Verdict::Malformed);
+    CHECK(filter::serviceName(22) == "SSH");
+
+    CHECK(filter::isDiscoveryBroadcast(makePacket(17, 5353, 0, 8)));   // mDNS
+    CHECK(filter::isDiscoveryBroadcast(makePacket(17, 1716, 0, 8)));   // KDE Connect
+    CHECK(!filter::isDiscoveryBroadcast(makePacket(17, 27960, 0, 8))); // Quake 3 – wykrywanie serwerów
+    CHECK(!filter::isDiscoveryBroadcast(makePacket(6, 5353)));         // TCP – nie dotyczy
+}
+
+static void testSanitize() {
+    CHECK(text::sanitize("maxiuZ") == "maxiuZ");
+    CHECK(text::sanitize("Zażółć gęślą jaźń") == "Zażółć gęślą jaźń");
+    CHECK(text::sanitize("zły\x1b[2Jnick") == "zły[2Jnick");       // ESC usunięty
+    CHECK(text::sanitize("a\xe2\x80\xae" "b") == "ab");               // U+202E (odwrócenie kierunku)
+    CHECK(text::sanitize("\xc2\x9b" "31m") == "31m");                  // znak sterujący C1
+    CHECK(text::sanitize("  spacje  ") == "spacje");
+    CHECK(text::sanitize(std::string(200, 'x')).size() == 64);
+    CHECK(text::sanitize("\xff\xfeok") == "ok");                    // błędne UTF-8
+}
+
 int main() {
     testSiphash();
     testNetcode();
@@ -115,6 +171,8 @@ int main() {
     testIPv4Parse();
     testProtocol();
     testGenerate();
+    testFilter();
+    testSanitize();
     if (failures == 0) std::printf("Wszystkie testy rdzenia OK\n");
     return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }

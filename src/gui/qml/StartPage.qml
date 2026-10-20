@@ -24,7 +24,7 @@ Item {
             Layout.bottomMargin: 10
             spacing: 10
             SvgIcon { name: "kettle"; size: 28; color: Theme.accent }
-            Text { text: "KettleLAN"; color: Theme.text; font.pixelSize: 18; font.weight: Font.Bold; Layout.fillWidth: true }
+            Text { textFormat: Text.PlainText; text: "KettleLAN"; color: Theme.text; font.pixelSize: 18; font.weight: Font.Bold; Layout.fillWidth: true }
             IconButton { iconName: "settings"; label: "Ustawienia"; onClicked: page.openSettings() }
         }
         Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
@@ -51,8 +51,8 @@ Item {
                     Rectangle { width: 10; height: 10; radius: 5; color: Theme.ok }
                     ColumnLayout {
                         spacing: 2
-                        Text { text: "Połączono ze Steam"; color: Theme.text; font.pixelSize: 14; font.weight: Font.DemiBold }
-                        Text { text: "Zalogowano jako " + Backend.personaName; color: Theme.muted; font.pixelSize: 13 }
+                        Text { textFormat: Text.PlainText; text: "Połączono ze Steam"; color: Theme.text; font.pixelSize: 14; font.weight: Font.DemiBold }
+                        Text { textFormat: Text.PlainText; text: "Zalogowano jako " + Backend.personaName; color: Theme.muted; font.pixelSize: 13 }
                     }
                 }
             }
@@ -60,7 +60,7 @@ Item {
             ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 6
-                Text {
+                Text { textFormat: Text.PlainText;
                     Layout.fillWidth: true
                     text: "Zagraj ze znajomymi jak w LAN-ie"
                     color: Theme.text
@@ -68,7 +68,7 @@ Item {
                     font.weight: Font.Bold
                     wrapMode: Text.WordWrap
                 }
-                Text {
+                Text { textFormat: Text.PlainText;
                     Layout.fillWidth: true
                     text: "Utwórz sieć i wyślij znajomym jej kod albo dołącz do istniejącej sieci."
                     color: Theme.muted
@@ -91,7 +91,7 @@ Item {
             ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 8
-                Text { text: "Kod sieci"; color: Theme.muted; font.pixelSize: 13; font.weight: Font.DemiBold }
+                Text { textFormat: Text.PlainText; text: "Kod sieci"; color: Theme.muted; font.pixelSize: 13; font.weight: Font.DemiBold }
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
@@ -124,7 +124,7 @@ Item {
                         onClicked: Backend.joinNetwork(codeField.text)
                     }
                 }
-                Text {
+                Text { textFormat: Text.PlainText;
                     Layout.fillWidth: true
                     text: "Kod dostaniesz od osoby, która utworzyła sieć. Kod się nie zmienia – zapisz go raz."
                     color: Theme.muted
@@ -139,7 +139,7 @@ Item {
                 visible: page.busy
                 spacing: 10
                 BusyIndicator { implicitWidth: 28; implicitHeight: 28; running: page.busy }
-                Text { text: "Łączę z siecią…"; color: Theme.text; font.pixelSize: 14; Layout.fillWidth: true }
+                Text { textFormat: Text.PlainText; text: "Łączę z siecią…"; color: Theme.text; font.pixelSize: 14; Layout.fillWidth: true }
             }
 
             // --- zapisane sieci
@@ -148,7 +148,7 @@ Item {
                 Layout.fillHeight: true
                 spacing: 8
                 visible: Backend.savedNetworks.length > 0 && !page.busy
-                Text { text: "Twoje sieci"; color: Theme.muted; font.pixelSize: 13; font.weight: Font.DemiBold }
+                Text { textFormat: Text.PlainText; text: "Twoje sieci"; color: Theme.muted; font.pixelSize: 13; font.weight: Font.DemiBold }
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
@@ -179,8 +179,8 @@ Item {
                                 ColumnLayout {
                                     Layout.fillWidth: true
                                     spacing: 3
-                                    Text { text: savedRow.modelData.name; color: Theme.text; font.pixelSize: 14; font.weight: Font.DemiBold; elide: Text.ElideRight; Layout.fillWidth: true }
-                                    Text { text: savedRow.modelData.code; color: Theme.muted; font.family: Theme.mono; font.pixelSize: 12 }
+                                    Text { textFormat: Text.PlainText; text: savedRow.modelData.name; color: Theme.text; font.pixelSize: 14; font.weight: Font.DemiBold; elide: Text.ElideRight; Layout.fillWidth: true }
+                                    Text { textFormat: Text.PlainText; text: savedRow.modelData.code; color: Theme.muted; font.family: Theme.mono; font.pixelSize: 12 }
                                 }
                                 AppButton {
                                     kind: "secondary"
@@ -221,7 +221,7 @@ Item {
             Layout.rightMargin: Theme.pad
             Layout.topMargin: 12
             Layout.bottomMargin: 12
-            Text { text: "Wersja " + Backend.version + ", open source (BSD-3)"; color: Theme.muted; font.pixelSize: 12; Layout.fillWidth: true }
+            Text { textFormat: Text.PlainText; text: "Wersja " + Backend.version + ", open source (BSD-3)"; color: Theme.muted; font.pixelSize: 12; Layout.fillWidth: true }
             Text {
                 text: "<a href=\"https://github.com/maxiuz94/kettlelan\">Kod źródłowy</a>"
                 textFormat: Text.StyledText
@@ -248,8 +248,8 @@ Item {
 
         contentItem: ColumnLayout {
             spacing: 14
-            Text { text: "Nowa sieć"; color: Theme.text; font.pixelSize: 18; font.weight: Font.Bold }
-            Text { text: "Nazwa pomoże znajomym rozpoznać sieć."; color: Theme.muted; font.pixelSize: 13; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+            Text { textFormat: Text.PlainText; text: "Nowa sieć"; color: Theme.text; font.pixelSize: 18; font.weight: Font.Bold }
+            Text { textFormat: Text.PlainText; text: "Nazwa pomoże znajomym rozpoznać sieć."; color: Theme.muted; font.pixelSize: 13; Layout.fillWidth: true; wrapMode: Text.WordWrap }
             TextField {
                 id: nameField
                 Layout.fillWidth: true

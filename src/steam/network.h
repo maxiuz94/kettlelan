@@ -12,6 +12,8 @@
 #include <map>
 #include <mutex>
 #include <optional>
+#include <set>
+#include <utility>
 #include <shared_mutex>
 #include <span>
 #include <string>
@@ -60,6 +62,13 @@ public:
     std::string networkName() const;
     std::vector<PeerInfo> peers() const;
     ip::Address4 selfAddress() const { return selfAddress_; }
+
+    // Prywatność i bezpieczeństwo (wątek Steama).
+    // hideAddress: połączenia tylko przez relay Steama – członkowie sieci nie poznają naszego IP.
+    void setHideAddress(bool hide);
+    // protectServices: odrzucanie pakietów do usług systemowych (SSH, SMB, RDP, bazy danych…).
+    void setProtectServices(bool protect) { protectServices_ = protect; }
+    uint64_t blockedPackets() const { return blockedPackets_; }
 
     // --- dowolny wątek ---
     void setPacketHandler(PacketHandler handler); // pakiety do oddania karcie TUN
@@ -117,6 +126,10 @@ private:
     mutable std::shared_mutex mutex_;          // chroni peers_ i routes_
     std::map<uint64_t, Peer> peers_;           // członkowie lobby (bez nas)
     std::map<uint32_t, uint64_t> routes_;      // adres IP → SteamID (tylko zweryfikowani)
+    std::atomic<bool> protectServices_{true};
+    std::atomic<uint64_t> blockedPackets_{0};
+    std::mutex blockedLogMutex_;
+    std::set<std::pair<uint64_t, uint16_t>> blockedLogged_; // (kto, port) – logujemy tylko raz
     std::mutex handlerMutex_;
     PacketHandler packetHandler_;
 };

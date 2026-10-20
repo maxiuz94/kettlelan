@@ -20,7 +20,7 @@ Item {
             size: 44
             color: page.busy ? Theme.accent : Theme.relayFg
         }
-        Text {
+        Text { textFormat: Text.PlainText;
             Layout.fillWidth: true
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.WordWrap
@@ -31,7 +31,7 @@ Item {
                  : Backend.status === "steamMissing" ? "Brak połączenia ze Steamem"
                  : "Nie udało się przygotować karty sieciowej"
         }
-        Text {
+        Text { textFormat: Text.PlainText;
             Layout.fillWidth: true
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.WordWrap

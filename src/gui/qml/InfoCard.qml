@@ -21,7 +21,7 @@ Rectangle {
         anchors.margins: 12
         anchors.leftMargin: 14
         spacing: 4
-        Text {
+        Text { textFormat: Text.PlainText;
             text: card.label
             color: Theme.muted
             font.pixelSize: 12
@@ -30,7 +30,7 @@ Rectangle {
         RowLayout {
             Layout.fillWidth: true
             spacing: 6
-            Text {
+            Text { textFormat: Text.PlainText;
                 Layout.fillWidth: true
                 text: card.value
                 color: Theme.text

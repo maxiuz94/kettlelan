@@ -31,11 +31,11 @@ Item {
             ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 2
-                Text { text: Backend.networkName; color: Theme.text; font.pixelSize: 17; font.weight: Font.Bold; elide: Text.ElideRight; Layout.fillWidth: true }
+                Text { textFormat: Text.PlainText; text: Backend.networkName; color: Theme.text; font.pixelSize: 17; font.weight: Font.Bold; elide: Text.ElideRight; Layout.fillWidth: true }
                 RowLayout {
                     spacing: 6
                     Rectangle { width: 8; height: 8; radius: 4; color: Theme.ok }
-                    Text { text: "Połączono, " + Backend.memberCount + " " + page.personWord(Backend.memberCount); color: Theme.muted; font.pixelSize: 13 }
+                    Text { textFormat: Text.PlainText; text: "Połączono, " + Backend.memberCount + " " + page.personWord(Backend.memberCount); color: Theme.muted; font.pixelSize: 13 }
                 }
             }
             IconButton { iconName: "settings"; label: "Ustawienia"; onClicked: page.openSettings() }
@@ -69,8 +69,8 @@ Item {
 
             RowLayout {
                 Layout.fillWidth: true
-                Text { text: "Członkowie"; color: Theme.muted; font.pixelSize: 13; font.weight: Font.DemiBold; Layout.fillWidth: true }
-                Text { text: "Kliknij osobę, aby skopiować jej adres"; color: Theme.muted; font.pixelSize: 12 }
+                Text { textFormat: Text.PlainText; text: "Członkowie"; color: Theme.muted; font.pixelSize: 13; font.weight: Font.DemiBold; Layout.fillWidth: true }
+                Text { textFormat: Text.PlainText; text: "Kliknij osobę, aby skopiować jej adres"; color: Theme.muted; font.pixelSize: 12 }
             }
 
             Rectangle {
@@ -128,12 +128,12 @@ Item {
                             Rectangle {
                                 width: 36; height: 36; radius: 18
                                 color: Theme.surface2
-                                Text { anchors.centerIn: parent; text: row.modelData.initial; color: Theme.text; font.pixelSize: 14; font.weight: Font.Bold }
+                                Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: row.modelData.initial; color: Theme.text; font.pixelSize: 14; font.weight: Font.Bold }
                             }
                             ColumnLayout {
                                 Layout.fillWidth: true
                                 spacing: 3
-                                Text {
+                                Text { textFormat: Text.PlainText;
                                     Layout.fillWidth: true
                                     text: row.modelData.name + (row.modelData.owner ? "  ★" : "")
                                     color: Theme.text
@@ -141,11 +141,11 @@ Item {
                                     font.weight: Font.DemiBold
                                     elide: Text.ElideRight
                                 }
-                                Text { text: row.modelData.address; color: Theme.muted; font.family: Theme.mono; font.pixelSize: 12 }
+                                Text { textFormat: Text.PlainText; text: row.modelData.address; color: Theme.muted; font.family: Theme.mono; font.pixelSize: 12 }
                             }
                             ColumnLayout {
                                 spacing: 4
-                                Text {
+                                Text { textFormat: Text.PlainText;
                                     Layout.alignment: Qt.AlignRight
                                     text: row.modelData.pingMs >= 0 ? row.modelData.pingMs + " ms" : "—"
                                     color: Theme.text
@@ -158,7 +158,7 @@ Item {
                                     implicitHeight: badge.implicitHeight + 6
                                     radius: height / 2
                                     color: row.badgeBg
-                                    Text { id: badge; anchors.centerIn: parent; text: row.badgeText; color: row.badgeFg; font.pixelSize: 11; font.weight: Font.DemiBold }
+                                    Text { textFormat: Text.PlainText; id: badge; anchors.centerIn: parent; text: row.badgeText; color: row.badgeFg; font.pixelSize: 11; font.weight: Font.DemiBold }
                                 }
                             }
                         }

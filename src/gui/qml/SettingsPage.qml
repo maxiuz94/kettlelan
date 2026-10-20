@@ -9,7 +9,7 @@ Item {
     id: page
     signal back()
 
-    component SectionTitle: Text {
+    component SectionTitle: Text { textFormat: Text.PlainText;
         color: Theme.muted
         font.pixelSize: 13
         font.weight: Font.DemiBold
@@ -36,8 +36,8 @@ Item {
             anchors.fill: parent
             anchors.leftMargin: 14
             anchors.rightMargin: 14
-            Text { text: parent.parent.title; color: Theme.text; font.pixelSize: 14; Layout.fillWidth: true }
-            Text { text: parent.parent.value; color: Theme.muted; font.family: Theme.mono; font.pixelSize: 13 }
+            Text { textFormat: Text.PlainText; text: parent.parent.title; color: Theme.text; font.pixelSize: 14; Layout.fillWidth: true }
+            Text { textFormat: Text.PlainText; text: parent.parent.value; color: Theme.muted; font.family: Theme.mono; font.pixelSize: 13 }
         }
         Rectangle { visible: !parent.last; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.border }
     }
@@ -54,7 +54,7 @@ Item {
             Layout.bottomMargin: 10
             spacing: 6
             IconButton { iconName: "back"; label: "Wróć"; onClicked: page.back() }
-            Text { text: "Ustawienia"; color: Theme.text; font.pixelSize: 17; font.weight: Font.Bold; Layout.fillWidth: true }
+            Text { textFormat: Text.PlainText; text: "Ustawienia"; color: Theme.text; font.pixelSize: 17; font.weight: Font.Bold; Layout.fillWidth: true }
         }
         Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
 
@@ -107,13 +107,32 @@ Item {
                     }
                 }
 
+                SectionTitle { text: "Prywatność i bezpieczeństwo" }
+                Group {
+                    Toggle {
+                        Layout.fillWidth: true
+                        title: "Ukryj mój adres IP"
+                        hint: "Połączenia zawsze przez serwery Steama – nikt z sieci nie pozna Twojego adresu. Ping może wzrosnąć o kilka–kilkanaście ms."
+                        checked: Backend.hideAddress
+                        onUserToggled: (value) => Backend.hideAddress = value
+                    }
+                    Toggle {
+                        Layout.fillWidth: true
+                        last: true
+                        title: "Chroń usługi tego komputera"
+                        hint: "Blokuje dostęp z sieci do SSH, udostępniania plików, zdalnego pulpitu, baz danych i paneli administracyjnych. Gry działają normalnie. Zablokowane próby: " + Backend.blockedCount
+                        checked: Backend.protectServices
+                        onUserToggled: (value) => Backend.protectServices = value
+                    }
+                }
+
                 SectionTitle { text: "Wygląd" }
                 Group {
                     RowLayout {
                         Layout.fillWidth: true
                         Layout.margins: 10
                         Layout.leftMargin: 14
-                        Text { text: "Motyw"; color: Theme.text; font.pixelSize: 14; Layout.fillWidth: true }
+                        Text { textFormat: Text.PlainText; text: "Motyw"; color: Theme.text; font.pixelSize: 14; Layout.fillWidth: true }
                         ComboBox {
                             id: themeBox
                             implicitWidth: 170
@@ -129,7 +148,7 @@ Item {
                             onActivated: Backend.theme = currentValue
                             Accessible.name: "Motyw"
                             background: Rectangle { radius: Theme.smallRadius + 2; color: Theme.bg; border.color: themeBox.visualFocus ? Theme.accent : Theme.border }
-                            contentItem: Text { leftPadding: 12; text: themeBox.displayText; color: Theme.text; font.pixelSize: 14; verticalAlignment: Text.AlignVCenter }
+                            contentItem: Text { textFormat: Text.PlainText; leftPadding: 12; text: themeBox.displayText; color: Theme.text; font.pixelSize: 14; verticalAlignment: Text.AlignVCenter }
                         }
                     }
                 }
@@ -148,7 +167,7 @@ Item {
                     AppButton { Layout.fillWidth: true; kind: "secondary"; text: "Kod źródłowy"; onClicked: Backend.openUrl("https://github.com/maxiuz94/kettlelan") }
                     AppButton { Layout.fillWidth: true; kind: "secondary"; text: "Otwórz dziennik"; onClicked: Backend.openLogs() }
                 }
-                Text {
+                Text { textFormat: Text.PlainText;
                     Layout.fillWidth: true
                     Layout.topMargin: 6
                     horizontalAlignment: Text.AlignHCenter

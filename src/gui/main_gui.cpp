@@ -1,6 +1,7 @@
 // KettleLAN – program z interfejsem graficznym (Qt 6 / QML).
 #include <QApplication>
 #include <QCommandLineParser>
+#include <QFile>
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QQmlApplicationEngine>
@@ -93,11 +94,14 @@ int main(int argc, char** argv) {
             return 0;
         }
         QLocalServer::removeServer(instanceName());
+        server.setSocketOptions(QLocalServer::UserAccessOption); // tylko nasz użytkownik
         server.listen(instanceName());
     }
 
     // Dziennik: terminal + plik.
     std::ofstream logFile(kettle::gui::logFilePath().toStdString(), std::ios::trunc);
+    // dziennik zawiera nicki i adresy członków sieci – tylko dla właściciela
+    QFile::setPermissions(kettle::gui::logFilePath(), QFileDevice::ReadOwner | QFileDevice::WriteOwner);
     TeeBuf tee(std::clog.rdbuf(), logFile.is_open() ? logFile.rdbuf() : nullptr);
     std::clog.rdbuf(&tee);
 

@@ -34,7 +34,7 @@ inline void write(const char* level, const std::string& msg) {
 #define KLOG_IMPL(level, expr)                                                                     \
     do {                                                                                           \
         std::ostringstream kettle_log_ss_;                                                         \
-        kettle_log_ss_ << expr;                                                                    \
+        kettle_log_ss_ << expr; /* wyrażenia z ?: podawaj w nawiasach */                                                                    \
         ::kettle::log::write(level, kettle_log_ss_.str());                                         \
     } while (0)
 

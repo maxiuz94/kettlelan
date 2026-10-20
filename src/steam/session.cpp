@@ -6,6 +6,7 @@
 #include <steam_api.h>
 
 #include "log.h"
+#include "text.h"
 
 namespace kettle::steam {
 
@@ -56,7 +57,7 @@ void Session::shutdown() {
 void Session::runCallbacks() { SteamAPI_RunCallbacks(); }
 
 std::string Session::personaName() const {
-    return initialized_ ? std::string(SteamFriends()->GetPersonaName()) : std::string();
+    return initialized_ ? text::sanitize(SteamFriends()->GetPersonaName(), 32) : std::string();
 }
 
 } // namespace kettle::steam

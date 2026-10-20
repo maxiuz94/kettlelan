@@ -66,11 +66,13 @@ Karta `kettle0` zostaje do restartu komputera. Usunięcie ręczne:
 
 ## Bezpieczeństwo i prywatność
 
-- Program nie działa jako root. Uprawnienia administratora ma wyłącznie krótki skrypt
-  [`scripts/kettlelan-helper`](scripts/kettlelan-helper), który tylko tworzy lub usuwa kartę
-  `kettle0` i ściśle sprawdza argumenty.
-- Pakiety przyjmowane są wyłącznie od zweryfikowanych członków sieci i tylko z ich własnego adresu.
-- KettleLAN nie wysyła żadnych danych poza siecią Steam i nie zbiera statystyk.
+- **Twój adres IP jest domyślnie ukryty** – ruch idzie przez relay Steama, członkowie sieci nie poznają
+  Twojego publicznego adresu (Ustawienia → „Ukryj mój adres IP”).
+- **Usługi komputera są chronione** – członkowie sieci nie dostaną się do SSH, udostępniania plików,
+  zdalnego pulpitu ani baz danych (Ustawienia → „Chroń usługi tego komputera”).
+- Program nie działa jako root, a pakiety przyjmuje tylko od zweryfikowanych członków sieci.
+
+Szczegóły i zgłaszanie luk: [SECURITY.md](SECURITY.md).
 
 ## Licencja
 

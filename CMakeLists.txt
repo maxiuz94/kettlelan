@@ -19,10 +19,12 @@ endif()
 
 # ---------------------------------------------------------------- rdzeń (bez zależności)
 add_library(kettle_core STATIC
+    src/core/filter.cpp
     src/core/ip.cpp
     src/core/netcode.cpp
     src/core/protocol.cpp
     src/core/siphash.cpp
+    src/core/text.cpp
 )
 target_include_directories(kettle_core PUBLIC src/core)
 target_compile_options(kettle_core PRIVATE ${KETTLELAN_WARNINGS})

@@ -33,6 +33,9 @@ class Backend : public QObject {
     Q_PROPERTY(bool notifications READ notifications WRITE setNotifications NOTIFY settingsChanged)
     Q_PROPERTY(bool autostart READ autostart WRITE setAutostart NOTIFY settingsChanged)
     Q_PROPERTY(bool autoConnect READ autoConnect WRITE setAutoConnect NOTIFY settingsChanged)
+    Q_PROPERTY(bool hideAddress READ hideAddress WRITE setHideAddress NOTIFY settingsChanged)
+    Q_PROPERTY(bool protectServices READ protectServices WRITE setProtectServices NOTIFY settingsChanged)
+    Q_PROPERTY(QString blockedCount READ blockedCount NOTIFY changed)
     Q_PROPERTY(QString theme READ theme WRITE setTheme NOTIFY settingsChanged)
     Q_PROPERTY(bool darkMode READ darkMode NOTIFY themeChanged)
     // informacje
@@ -67,6 +70,11 @@ public:
     void setAutostart(bool v);
     bool autoConnect() const { return autoConnect_; }
     void setAutoConnect(bool v);
+    bool hideAddress() const { return hideAddress_; }
+    void setHideAddress(bool v);
+    bool protectServices() const { return protectServices_; }
+    void setProtectServices(bool v);
+    QString blockedCount() const { return QString::number(blockedPackets_); }
     QString theme() const { return theme_; }
     void setTheme(const QString& v);
     bool darkMode() const;
@@ -132,6 +140,9 @@ private:
 
     bool closeToTray_ = true;
     bool autoConnect_ = true;
+    bool hideAddress_ = true;
+    bool protectServices_ = true;
+    qulonglong blockedPackets_ = 0;
     bool notifications_ = true;
     QString theme_ = QStringLiteral("system");
 };

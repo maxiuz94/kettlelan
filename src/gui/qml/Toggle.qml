@@ -25,8 +25,8 @@ Rectangle {
             id: texts
             Layout.fillWidth: true
             spacing: 2
-            Text { text: row.title; color: Theme.text; font.pixelSize: 14; font.weight: Font.Medium; Layout.fillWidth: true; wrapMode: Text.WordWrap }
-            Text { text: row.hint; color: Theme.muted; font.pixelSize: 12; visible: row.hint !== ""; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+            Text { textFormat: Text.PlainText; text: row.title; color: Theme.text; font.pixelSize: 14; font.weight: Font.Medium; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+            Text { textFormat: Text.PlainText; text: row.hint; color: Theme.muted; font.pixelSize: 12; visible: row.hint !== ""; Layout.fillWidth: true; wrapMode: Text.WordWrap }
         }
         Switch {
             id: sw

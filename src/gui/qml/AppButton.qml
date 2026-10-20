@@ -31,7 +31,7 @@ Button {
                 color: label.color
                 anchors.verticalCenter: parent.verticalCenter
             }
-            Text {
+            Text { textFormat: Text.PlainText;
                 id: label
                 text: b.text
                 font: b.font

@@ -20,7 +20,7 @@ Rectangle {
     visible: opacity > 0
     Behavior on opacity { NumberAnimation { duration: 160 } }
 
-    Text {
+    Text { textFormat: Text.PlainText;
         id: label
         anchors.centerIn: parent
         width: Math.min(implicitWidth, toast.parent ? toast.parent.width - 72 : 330)

@@ -18,6 +18,8 @@ struct Engine::State {
     EngineStatus status = EngineStatus::Starting;
     std::string error;
     bool dirty = true;
+    bool hideAddress = true;
+    bool protectServices = true;
 };
 
 Engine::Engine(SnapshotHandler onSnapshot, EventHandler onEvent)
@@ -66,6 +68,21 @@ void Engine::leave() {
     });
 }
 
+void Engine::setHideAddress(bool hide) {
+    post([this, hide] {
+        st_->hideAddress = hide;
+        if (st_->net) st_->net->setHideAddress(hide);
+        st_->dirty = true;
+    });
+}
+
+void Engine::setProtectServices(bool protect) {
+    post([this, protect] {
+        st_->protectServices = protect;
+        if (st_->net) st_->net->setProtectServices(protect);
+    });
+}
+
 void Engine::initialize() {
     auto& s = *st_;
     s.error.clear();
@@ -81,6 +98,8 @@ void Engine::initialize() {
             st_->dirty = true;
             if (onEvent_) onEvent_(text);
         });
+        s.net->setHideAddress(s.hideAddress);
+        s.net->setProtectServices(s.protectServices);
     }
     if (!s.tun) {
         s.status = EngineStatus::Starting;
@@ -109,6 +128,7 @@ void Engine::publish() {
     if (s.net) {
         snap.selfAddress = s.net->selfAddress().toString();
         snap.netState = s.net->state();
+        snap.blockedPackets = s.net->blockedPackets();
         if (snap.netState == steam::State::Connected) {
             snap.networkName = s.net->networkName();
             snap.networkCode = s.net->codeText();
