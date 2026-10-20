@@ -19,7 +19,7 @@ fi
 
 mkdir -p "$DEST" "$APPS" "$ICONS"
 cp build/kettlelan build/kettlelan-cli build/libsteam_api.so build/kettlelan-helper "$DEST/"
-"$DEST/kettlelan" --write-icon "$ICONS/kettlelan.png"
+QT_QPA_PLATFORM=offscreen "$DEST/kettlelan" --write-icon "$ICONS/kettlelan.png"
 
 cat > "$APPS/kettlelan.desktop" << DESKTOP
 [Desktop Entry]
