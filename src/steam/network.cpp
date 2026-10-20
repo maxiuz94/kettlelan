@@ -33,6 +33,13 @@ std::string nameOf(uint64_t steamId) {
     return (n && *n) ? std::string(n) : std::to_string(steamId);
 }
 
+// Numer lobby odtwarzany z kodu sieci. Lobby Steama mają zawsze typ „chat” i dwie flagi
+// instancji: Lobby + MMSLobby (numer zaczyna się od 0x0186…).
+CSteamID lobbyIdFromCode(const netcode::NetworkCode& code) {
+    return CSteamID(code.lobbyAccountId, k_EChatInstanceFlagLobby | k_EChatInstanceFlagMMSLobby,
+                    SteamUtils()->GetConnectedUniverse(), k_EAccountTypeChat);
+}
+
 uint32_t randomSecret() {
     std::random_device rd;
     uint32_t s = 0;
@@ -76,6 +83,11 @@ void Network::onLobbyCreated(LobbyCreated_t* r, bool ioFailure) {
     }
     lobby_ = CSteamID(uint64(r->m_ulSteamIDLobby));
     code_ = netcode::NetworkCode{lobby_.GetAccountID(), randomSecret()};
+    if (lobbyIdFromCode(*code_) != lobby_) {
+        // Nie powinno się zdarzyć – oznaczałoby, że kod nie pozwoli nikomu dołączyć.
+        KLOG_ERROR("Numer lobby " << lobby_.ConvertToUint64() << " nie da się odtworzyć z kodu (otrzymano "
+                   << lobbyIdFromCode(*code_).ConvertToUint64() << ")");
+    }
     SteamMatchmaking()->SetLobbyData(lobby_, kKeyMarker, "1");
     SteamMatchmaking()->SetLobbyData(lobby_, kKeyName, pendingName_.c_str());
     SteamMatchmaking()->SetLobbyData(lobby_, kKeyProto, std::to_string(protocol::kVersion).c_str());
@@ -89,8 +101,7 @@ void Network::join(const netcode::NetworkCode& code) {
         return;
     }
     code_ = code;
-    lobby_ = CSteamID(code.lobbyAccountId, k_EChatInstanceFlagLobby, SteamUtils()->GetConnectedUniverse(),
-                      k_EAccountTypeChat);
+    lobby_ = lobbyIdFromCode(code);
     state_ = State::Joining;
     enterCall_.Set(SteamMatchmaking()->JoinLobby(lobby_), this, &Network::onLobbyEntered);
     notify("Dołączam do sieci " + netcode::format(code) + "…");
