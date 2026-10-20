@@ -91,7 +91,7 @@ private:
     void sendTo(uint64_t steamId, std::span<const uint8_t> data, int channel);
     void removePeer(uint64_t steamId);
     void resetState();
-    void emit(const std::string& text);
+    void notify(const std::string& text);
 
     const uint64_t selfId_;
     const ip::Address4 selfAddress_;

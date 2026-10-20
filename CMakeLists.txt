@@ -36,33 +36,87 @@ if(KETTLELAN_BUILD_TESTS)
 endif()
 
 # ---------------------------------------------------------------- program
+option(KETTLELAN_BUILD_GUI "Buduj wersję z interfejsem graficznym (Qt 6)" ON)
+
 if(KETTLELAN_BUILD_APP)
     include(cmake/Steamworks.cmake)
     find_package(Threads REQUIRED)
 
-    add_executable(kettlelan
-        src/app/main_cli.cpp
+    # Wspólna część: Steam + karta sieciowa (używana przez GUI i wersję konsolową).
+    add_library(kettle_net STATIC
         src/steam/session.cpp
         src/steam/network.cpp
     )
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        target_sources(kettlelan PRIVATE src/platform/linux/tun_linux.cpp)
-        # libsteam_api.so leży obok programu
-        set_target_properties(kettlelan PROPERTIES BUILD_RPATH "$ORIGIN" INSTALL_RPATH "$ORIGIN")
+        target_sources(kettle_net PRIVATE src/platform/linux/tun_linux.cpp)
     elseif(WIN32)
         message(FATAL_ERROR "Wersja dla Windowsa powstaje w etapie 2.")
     else()
         message(FATAL_ERROR "Nieobsługiwany system: ${CMAKE_SYSTEM_NAME}")
     endif()
+    target_include_directories(kettle_net PUBLIC src/platform src/steam)
+    target_compile_options(kettle_net PRIVATE ${KETTLELAN_WARNINGS})
+    target_link_libraries(kettle_net PUBLIC kettle_core Steamworks::api Threads::Threads)
 
-    target_include_directories(kettlelan PRIVATE src/platform src/steam)
-    target_compile_definitions(kettlelan PRIVATE KETTLELAN_VERSION="${PROJECT_VERSION}")
-    target_compile_options(kettlelan PRIVATE ${KETTLELAN_WARNINGS})
-    target_link_libraries(kettlelan PRIVATE kettle_core Steamworks::api Threads::Threads)
+    # Wersja konsolowa – przydatna do diagnostyki.
+    add_executable(kettlelan-cli src/app/main_cli.cpp)
+    target_compile_definitions(kettlelan-cli PRIVATE KETTLELAN_VERSION="${PROJECT_VERSION}")
+    target_compile_options(kettlelan-cli PRIVATE ${KETTLELAN_WARNINGS})
+    target_link_libraries(kettlelan-cli PRIVATE kettle_net)
+    set(KETTLELAN_TARGETS kettlelan-cli)
 
-    add_custom_command(TARGET kettlelan POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${STEAMWORKS_REDIST}" "$<TARGET_FILE_DIR:kettlelan>"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/scripts/kettlelan-helper" "$<TARGET_FILE_DIR:kettlelan>"
-        COMMENT "Kopiuję bibliotekę Steama i pomocnika obok programu"
-    )
+    if(KETTLELAN_BUILD_GUI)
+        find_package(Qt6 6.4 REQUIRED COMPONENTS Quick QuickControls2 Widgets Network)
+        qt_standard_project_setup()
+
+        qt_add_executable(kettlelan
+            src/gui/main_gui.cpp
+            src/gui/backend.cpp
+            src/gui/engine.cpp
+            src/gui/util.cpp
+        )
+        set(KETTLELAN_QML
+            src/gui/qml/Main.qml
+            src/gui/qml/Theme.qml
+            src/gui/qml/SvgIcon.qml
+            src/gui/qml/AppButton.qml
+            src/gui/qml/IconButton.qml
+            src/gui/qml/InfoCard.qml
+            src/gui/qml/Toggle.qml
+            src/gui/qml/Toast.qml
+            src/gui/qml/StatusPage.qml
+            src/gui/qml/StartPage.qml
+            src/gui/qml/NetworkPage.qml
+            src/gui/qml/SettingsPage.qml
+        )
+        # pliki QML trafiają do qrc:/qt/qml/KettleLAN/<nazwa>.qml
+        foreach(f ${KETTLELAN_QML})
+            get_filename_component(n "${f}" NAME)
+            set_source_files_properties("${f}" PROPERTIES QT_RESOURCE_ALIAS "${n}")
+        endforeach()
+        set_source_files_properties(src/gui/qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+        qt_add_qml_module(kettlelan
+            URI KettleLAN
+            VERSION 1.0
+            RESOURCE_PREFIX /qt/qml
+            QML_FILES ${KETTLELAN_QML}
+        )
+        target_include_directories(kettlelan PRIVATE src/gui)
+        target_compile_definitions(kettlelan PRIVATE KETTLELAN_VERSION="${PROJECT_VERSION}")
+        target_compile_options(kettlelan PRIVATE ${KETTLELAN_WARNINGS})
+        target_link_libraries(kettlelan PRIVATE kettle_net Qt6::Quick Qt6::QuickControls2 Qt6::Widgets Qt6::Network)
+        set_target_properties(kettlelan PROPERTIES WIN32_EXECUTABLE ON)
+        list(APPEND KETTLELAN_TARGETS kettlelan)
+    endif()
+
+    foreach(t ${KETTLELAN_TARGETS})
+        if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+            # libsteam_api.so leży obok programu
+            set_target_properties(${t} PROPERTIES BUILD_RPATH "$ORIGIN" INSTALL_RPATH "$ORIGIN")
+        endif()
+        add_custom_command(TARGET ${t} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${STEAMWORKS_REDIST}" "$<TARGET_FILE_DIR:${t}>"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/scripts/kettlelan-helper" "$<TARGET_FILE_DIR:${t}>"
+        )
+    endforeach()
 endif()

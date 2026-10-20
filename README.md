@@ -4,7 +4,7 @@
 Unreal Tournament, Counter-Strike 1.6, Warcraft III…) tak, jakbyście siedzieli przy jednym routerze.
 Bez limitu osób, bez przekierowywania portów i bez własnego serwera.
 
-> Status: **etap 1 – wersja konsolowa dla Linuksa.** Windows i interfejs graficzny są w drodze.
+> Status: **Linux – program z interfejsem graficznym.** Wersja dla Windowsa jest w drodze.
 
 ## Jak to działa
 
@@ -24,9 +24,9 @@ Potrzebne pakiety:
 
 | Dystrybucja    | Polecenie |
 |----------------|-----------|
-| Arch / Manjaro | `sudo pacman -S --needed base-devel cmake git polkit iproute2` |
-| Ubuntu / Debian | `sudo apt install build-essential cmake git pkexec iproute2` |
-| Fedora         | `sudo dnf install gcc-c++ cmake git polkit iproute` |
+| Arch / Manjaro | `sudo pacman -S --needed base-devel cmake git polkit iproute2 qt6-base qt6-declarative` |
+| Ubuntu 24.04+ / Debian 13+ | `sudo apt install build-essential cmake git pkexec iproute2 qt6-base-dev qt6-declarative-dev qml6-module-qtquick-controls qml6-module-qtquick-layouts qml6-module-qtquick-shapes qml6-module-qtquick-window qml6-module-qtqml-workerscript` |
+| Fedora         | `sudo dnf install gcc-c++ cmake git polkit iproute qt6-qtbase-devel qt6-qtdeclarative-devel` |
 
 Potem:
 
@@ -44,12 +44,18 @@ wymagają.
 ## Uruchamianie
 
 1. Włącz Steama i zaloguj się.
-2. Uruchom `./build/kettlelan`. Przy pierwszym uruchomieniu (i po każdym restarcie komputera)
-   system poprosi o hasło administratora – to tworzenie karty sieciowej `kettle0`.
-   Sam program działa jako zwykły użytkownik.
-3. Wpisz `utworz Wieczór z Quake` i wyślij znajomym pokazany kod
-   albo dołącz do cudzej sieci: `dolacz KTL-XXXX-XXXX-XXXX`.
-4. `lista` pokazuje członków, ich adresy, ping i rodzaj połączenia.
+2. Uruchom `./build/kettlelan` albo dodaj program do menu aplikacji: `./scripts/install-local.sh`.
+   Przy pierwszym uruchomieniu (i po każdym restarcie komputera) system poprosi o hasło
+   administratora – to tworzenie karty sieciowej `kettle0`. Sam program działa jako zwykły użytkownik.
+3. Kliknij **Utwórz sieć** i wyślij znajomym kod (przycisk **Zaproś znajomych** kopiuje go do schowka)
+   albo wklej cudzy kod w pole **Kod sieci** i kliknij **Dołącz**.
+4. Na liście członków kliknij osobę, żeby skopiować jej adres – wpisz go w grze przy łączeniu z serwerem.
+
+Zamknięcie okna chowa KettleLAN do zasobnika (sieć działa dalej). Całkowite zamknięcie:
+menu ikony w zasobniku → **Zakończ KettleLAN**.
+
+Wersja w terminalu, przydatna do diagnostyki: `./build/kettlelan-cli` (polecenia: `utworz`, `dolacz`,
+`lista`, `kod`, `opusc`, `koniec`).
 
 Karta `kettle0` zostaje do restartu komputera. Usunięcie ręczne:
 `pkexec ./build/kettlelan-helper down`.

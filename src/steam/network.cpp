@@ -49,7 +49,7 @@ Network::~Network() {
     if (state_ != State::Idle) leave();
 }
 
-void Network::emit(const std::string& text) {
+void Network::notify(const std::string& text) {
     KLOG_INFO(text);
     if (onEvent_) onEvent_(text);
 }
@@ -58,20 +58,20 @@ void Network::emit(const std::string& text) {
 
 void Network::create(const std::string& name) {
     if (state_ != State::Idle) {
-        emit("Najpierw opuść obecną sieć.");
+        notify("Najpierw opuść obecną sieć.");
         return;
     }
     pendingName_ = name.empty() ? (std::string(SteamFriends()->GetPersonaName()) + " – sieć") : name;
     state_ = State::Creating;
     createCall_.Set(SteamMatchmaking()->CreateLobby(k_ELobbyTypeInvisible, kMaxMembers), this,
                     &Network::onLobbyCreated);
-    emit("Tworzę sieć „" + pendingName_ + "”…");
+    notify("Tworzę sieć „" + pendingName_ + "”…");
 }
 
 void Network::onLobbyCreated(LobbyCreated_t* r, bool ioFailure) {
     if (ioFailure || r->m_eResult != k_EResultOK) {
         state_ = State::Idle;
-        emit("Nie udało się utworzyć sieci (Steam: błąd " + std::to_string(ioFailure ? -1 : int(r->m_eResult)) + ").");
+        notify("Nie udało się utworzyć sieci (Steam: błąd " + std::to_string(ioFailure ? -1 : int(r->m_eResult)) + ").");
         return;
     }
     lobby_ = CSteamID(uint64(r->m_ulSteamIDLobby));
@@ -85,7 +85,7 @@ void Network::onLobbyCreated(LobbyCreated_t* r, bool ioFailure) {
 
 void Network::join(const netcode::NetworkCode& code) {
     if (state_ != State::Idle) {
-        emit("Najpierw opuść obecną sieć.");
+        notify("Najpierw opuść obecną sieć.");
         return;
     }
     code_ = code;
@@ -93,7 +93,7 @@ void Network::join(const netcode::NetworkCode& code) {
                       k_EAccountTypeChat);
     state_ = State::Joining;
     enterCall_.Set(SteamMatchmaking()->JoinLobby(lobby_), this, &Network::onLobbyEntered);
-    emit("Dołączam do sieci " + netcode::format(code) + "…");
+    notify("Dołączam do sieci " + netcode::format(code) + "…");
 }
 
 void Network::onLobbyEntered(LobbyEnter_t* r, bool ioFailure) {
@@ -102,17 +102,17 @@ void Network::onLobbyEntered(LobbyEnter_t* r, bool ioFailure) {
         const auto resp = ioFailure ? 0u : r->m_EChatRoomEnterResponse;
         resetState();
         if (resp == k_EChatRoomEnterResponseDoesntExist)
-            emit("Sieć o tym kodzie nie istnieje – sprawdź kod albo poproś o nowy.");
+            notify("Sieć o tym kodzie nie istnieje – sprawdź kod albo poproś o nowy.");
         else if (resp == k_EChatRoomEnterResponseFull)
-            emit("Sieć jest pełna.");
+            notify("Sieć jest pełna.");
         else
-            emit("Nie udało się dołączyć do sieci (Steam: kod " + std::to_string(resp) + ").");
+            notify("Nie udało się dołączyć do sieci (Steam: kod " + std::to_string(resp) + ").");
         return;
     }
     if (std::string(SteamMatchmaking()->GetLobbyData(lobby_, kKeyMarker)) != "1") {
         SteamMatchmaking()->LeaveLobby(lobby_);
         resetState();
-        emit("Ten kod nie należy do sieci KettleLAN.");
+        notify("Ten kod nie należy do sieci KettleLAN.");
         return;
     }
     enterConnected();
@@ -122,7 +122,7 @@ void Network::enterConnected() {
     SteamMatchmaking()->SetLobbyMemberData(lobby_, "ip", selfAddress_.toString().c_str());
     state_ = State::Connected;
     syncMembers();
-    emit("Połączono z siecią „" + networkName() + "”. Twój adres: " + selfAddress_.toString() +
+    notify("Połączono z siecią „" + networkName() + "”. Twój adres: " + selfAddress_.toString() +
          ", kod sieci: " + codeText());
 }
 
@@ -136,7 +136,7 @@ void Network::leave() {
     }
     for (uint64_t id : ids) SteamNetworkingMessages()->CloseSessionWithUser(identityFor(id));
     resetState();
-    emit("Opuszczono sieć.");
+    notify("Opuszczono sieć.");
 }
 
 void Network::resetState() {
@@ -194,7 +194,7 @@ void Network::removePeer(uint64_t steamId) {
         peers_.erase(it);
     }
     SteamNetworkingMessages()->CloseSessionWithUser(identityFor(steamId));
-    if (wasVerified) emit(nameOf(steamId) + " opuścił(a) sieć.");
+    if (wasVerified) notify(nameOf(steamId) + " opuścił(a) sieć.");
 }
 
 void Network::onLobbyChatUpdate(LobbyChatUpdate_t* ev) {
@@ -256,7 +256,7 @@ void Network::handleControl(uint64_t from, std::span<const uint8_t> data) {
             if (!peer.badKeyReported) {
                 peer.badKeyReported = true;
                 lk.unlock();
-                emit(nameOf(from) + " jest w lobby, ale nie zna klucza sieci – ignoruję.");
+                notify(nameOf(from) + " jest w lobby, ale nie zna klucza sieci – ignoruję.");
             }
             return;
         }
@@ -264,7 +264,7 @@ void Network::handleControl(uint64_t from, std::span<const uint8_t> data) {
             if (!peer.badKeyReported) {
                 peer.badKeyReported = true;
                 lk.unlock();
-                emit(nameOf(from) + " używa innej wersji KettleLAN – zaktualizujcie program.");
+                notify(nameOf(from) + " używa innej wersji KettleLAN – zaktualizujcie program.");
             }
             return;
         }
@@ -284,7 +284,7 @@ void Network::handleControl(uint64_t from, std::span<const uint8_t> data) {
         }
     }
     if (reply) sendHello(from, true);
-    if (!announce.empty()) emit(announce);
+    if (!announce.empty()) notify(announce);
 }
 
 // ---------------------------------------------------------------- dane

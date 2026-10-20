@@ -164,7 +164,10 @@ std::unique_ptr<Tun> openTun(ip::Address4 address, std::string& error) {
     ifr.ifr_flags = IFF_TUN | IFF_NO_PI;
     std::strncpy(ifr.ifr_name, kIfName, IFNAMSIZ - 1);
     if (::ioctl(fd, TUNSETIFF, &ifr) < 0) {
-        error = std::string("Nie można podłączyć się do karty kettle0: ") + std::strerror(errno);
+        if (errno == EBUSY)
+            error = "KettleLAN jest już uruchomiony w innym oknie lub terminalu – zamknij go i spróbuj ponownie.";
+        else
+            error = std::string("Nie można podłączyć się do karty kettle0: ") + std::strerror(errno);
         ::close(fd);
         return nullptr;
     }

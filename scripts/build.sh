@@ -38,4 +38,7 @@ cmake --build build -j"$(nproc)"
 ctest --test-dir build --output-on-failure
 
 echo
-echo "Gotowe. Uruchom:  ./build/kettlelan"
+echo "Gotowe."
+echo "  ./build/kettlelan                okno programu"
+echo "  ./build/kettlelan-cli            wersja w terminalu (diagnostyka)"
+echo "  ./scripts/install-local.sh       dodaje KettleLAN do menu aplikacji"
