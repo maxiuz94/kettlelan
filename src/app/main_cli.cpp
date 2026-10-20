@@ -61,7 +61,13 @@ void printHelp() {
                  "  kod              – pokazuje kod obecnej sieci\n"
                  "  opusc            – opuszcza sieć\n"
                  "  koniec           – zamyka KettleLAN\n"
-                 "(działają też angielskie: create, join, list, code, leave, quit)\n\n";
+                 "(działają też angielskie: create, join, list, code, leave, quit)\n";
+#ifdef KETTLELAN_SECURITY_TESTS
+    std::cout << "\nTryb testów bezpieczeństwa (symulacja intruza):\n"
+                 "  test-zly-klucz <kod>   – wchodzi do lobby sieci, ale podaje fałszywy dowód klucza\n"
+                 "  test-podszyj <adres>   – wysyła członkom ping z podrobionym adresem nadawcy\n";
+#endif
+    std::cout << "\n";
 }
 
 void printPeers(const steam::Network& net) {
@@ -126,6 +132,22 @@ void handleCommand(const std::string& rawLine, steam::Network& net) {
     } else if (cmd == "opusc" || cmd == "opuść" || cmd == "leave") net.leave();
     else if (cmd == "koniec" || cmd == "quit" || cmd == "exit") g_quit = true;
     else if (cmd == "pomoc" || cmd == "help" || cmd == "?") printHelp();
+#ifdef KETTLELAN_SECURITY_TESTS
+    else if (cmd == "test-zly-klucz") {
+        const auto code = netcode::parse(rest);
+        if (!code) std::cout << "Podaj kod sieci.\n";
+        else {
+            std::cout << "TEST: łączę z siecią, udając, że nie znam klucza. Druga strona powinna mnie zignorować.\n";
+            net.setDebugWrongKey(true);
+            net.connect(*code, "");
+        }
+    } else if (cmd == "test-podszyj") {
+        const auto fake = ip::Address4::parse(rest);
+        if (!fake) std::cout << "Podaj adres do podrobienia, np. test-podszyj 100.65.115.91\n";
+        else std::cout << "TEST: wysłano podrobiony ping (nadawca " << fake->toString() << ") do "
+                       << net.debugSendSpoofed(*fake) << " osób. Powinien zostać odrzucony.\n";
+    }
+#endif
     else std::cout << "Nieznane polecenie „" << cmd << "”. Wpisz „pomoc”.\n";
 }
 

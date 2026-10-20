@@ -23,6 +23,7 @@
 
 #include "ip.h"
 #include "netcode.h"
+#include "router.h"
 
 namespace kettle::steam {
 
@@ -67,7 +68,14 @@ public:
     // hideAddress: połączenia tylko przez relay Steama – członkowie sieci nie poznają naszego IP.
     void setHideAddress(bool hide);
     // protectServices: odrzucanie pakietów do usług systemowych (SSH, SMB, RDP, bazy danych…).
-    void setProtectServices(bool protect) { protectServices_ = protect; }
+    void setProtectServices(bool protect) { router_.setProtectServices(protect); }
+#ifdef KETTLELAN_SECURITY_TESTS
+    // Tylko do testów bezpieczeństwa: wysyłaj dowody z błędnym kluczem (udawany intruz).
+    void setDebugWrongKey(bool on) { debugWrongKey_ = on; }
+    // Tylko do testów bezpieczeństwa: wysyła do wszystkich członków ping z podrobionym adresem nadawcy.
+    // Zwraca liczbę osób, do których wysłano.
+    int debugSendSpoofed(ip::Address4 fakeSource);
+#endif
     uint64_t blockedPackets() const { return blockedPackets_; }
 
     // --- dowolny wątek ---
@@ -75,15 +83,6 @@ public:
     void sendPacket(std::span<const uint8_t> packet);
 
 private:
-    struct Peer {
-        bool verified = false;
-        bool conflict = false;
-        bool badKeyReported = false;
-        int hellosSent = 0;
-        std::chrono::steady_clock::time_point nextHello{};
-        ip::Address4 address;
-    };
-
     STEAM_CALLBACK(Network, onLobbyChatUpdate, LobbyChatUpdate_t);
     STEAM_CALLBACK(Network, onSessionRequest, SteamNetworkingMessagesSessionRequest_t);
     STEAM_CALLBACK(Network, onSessionFailed, SteamNetworkingMessagesSessionFailed_t);
@@ -105,7 +104,7 @@ private:
     void handleControl(uint64_t from, std::span<const uint8_t> data);
     void handleData(uint64_t from, std::span<const uint8_t> data);
     void sendTo(uint64_t steamId, std::span<const uint8_t> data, int channel);
-    void removePeer(uint64_t steamId);
+    void closeAllSessions();
     void resetState();
     void notify(const std::string& text);
 
@@ -123,10 +122,11 @@ private:
     int joinRetries_ = 0;
     std::chrono::steady_clock::time_point nextMergeCheck_{};
 
-    mutable std::shared_mutex mutex_;          // chroni peers_ i routes_
-    std::map<uint64_t, Peer> peers_;           // członkowie lobby (bez nas)
-    std::map<uint32_t, uint64_t> routes_;      // adres IP → SteamID (tylko zweryfikowani)
-    std::atomic<bool> protectServices_{true};
+    router::Router router_;                    // kto jest zweryfikowany i jakie pakiety przyjmujemy
+    std::set<uint64_t> reportedBad_;           // komu już zgłosiliśmy problem (bez zalewania dziennika)
+#ifdef KETTLELAN_SECURITY_TESTS
+    bool debugWrongKey_ = false;
+#endif
     std::atomic<uint64_t> blockedPackets_{0};
     std::mutex blockedLogMutex_;
     std::set<std::pair<uint64_t, uint16_t>> blockedLogged_; // (kto, port) – logujemy tylko raz

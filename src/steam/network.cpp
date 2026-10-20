@@ -42,19 +42,11 @@ std::string nameOf(uint64_t steamId) {
     return clean.empty() ? std::to_string(steamId) : clean;
 }
 
-// Porównanie w stałym czasie (nie zdradza, ile bajtów dowodu się zgadza).
-bool equalConstantTime(uint64_t a, uint64_t b) {
-    uint64_t diff = a ^ b;
-    diff |= diff >> 32;
-    diff |= diff >> 16;
-    diff |= diff >> 8;
-    return (diff & 0xFF) == 0;
-}
-
 } // namespace
 
 Network::Network(uint64_t selfSteamId, EventHandler onEvent)
-    : selfId_(selfSteamId), selfAddress_(ip::addressForSteamId(selfSteamId)), onEvent_(std::move(onEvent)) {}
+    : selfId_(selfSteamId), selfAddress_(ip::addressForSteamId(selfSteamId)), onEvent_(std::move(onEvent)),
+      router_(selfSteamId) {}
 
 Network::~Network() {
     if (state_ != State::Idle) leave();
@@ -178,6 +170,7 @@ void Network::onLobbyEntered(LobbyEnter_t* r, bool ioFailure) {
 }
 
 void Network::enterConnected() {
+    router_.setCode(code_);
     SteamMatchmaking()->SetLobbyMemberData(lobby_, "ip", selfAddress_.toString().c_str());
     state_ = State::Connected;
     nextMergeCheck_ = Clock::now() + kFirstMergeCheck;
@@ -186,16 +179,16 @@ void Network::enterConnected() {
            ", kod sieci: " + codeText());
 }
 
+void Network::closeAllSessions() {
+    for (const auto& peer : router_.peers()) SteamNetworkingMessages()->CloseSessionWithUser(identityFor(peer.steamId));
+}
+
 void Network::leaveLobbyOnly() {
     if (lobby_.IsValid()) SteamMatchmaking()->LeaveLobby(lobby_);
-    std::vector<uint64_t> ids;
-    {
-        std::unique_lock lk(mutex_);
-        for (auto& [id, _] : peers_) ids.push_back(id);
-        peers_.clear();
-        routes_.clear();
-    }
-    for (uint64_t id : ids) SteamNetworkingMessages()->CloseSessionWithUser(identityFor(id));
+    closeAllSessions();
+    const auto code = router_.code();
+    router_.clear();
+    router_.setCode(code); // przy łączeniu dwóch lobby kod zostaje ten sam
     lobby_ = CSteamID();
 }
 
@@ -207,9 +200,8 @@ void Network::leave() {
 }
 
 void Network::resetState() {
-    std::unique_lock lk(mutex_);
-    peers_.clear();
-    routes_.clear();
+    router_.clear();
+    reportedBad_.clear();
     lobby_ = CSteamID();
     code_.reset();
     tag_.clear();
@@ -231,39 +223,17 @@ void Network::syncMembers() {
     if (state_ != State::Connected) return;
     std::vector<uint64_t> current;
     const int n = SteamMatchmaking()->GetNumLobbyMembers(lobby_);
-    for (int i = 0; i < n; ++i) {
-        const uint64_t id = SteamMatchmaking()->GetLobbyMemberByIndex(lobby_, i).ConvertToUint64();
-        if (id != selfId_) current.push_back(id);
-    }
-    std::vector<uint64_t> gone;
-    {
-        std::unique_lock lk(mutex_);
-        for (uint64_t id : current) {
-            auto [it, inserted] = peers_.try_emplace(id);
-            if (inserted) {
-                it->second.address = ip::addressForSteamId(id);
-                it->second.nextHello = Clock::now();
-            }
-        }
-        for (auto& [id, _] : peers_)
-            if (std::find(current.begin(), current.end(), id) == current.end()) gone.push_back(id);
-    }
-    for (uint64_t id : gone) removePeer(id);
-}
+    for (int i = 0; i < n; ++i) current.push_back(SteamMatchmaking()->GetLobbyMemberByIndex(lobby_, i).ConvertToUint64());
 
-void Network::removePeer(uint64_t steamId) {
-    bool wasVerified = false;
-    {
-        std::unique_lock lk(mutex_);
-        auto it = peers_.find(steamId);
-        if (it == peers_.end()) return;
-        wasVerified = it->second.verified;
-        auto r = routes_.find(it->second.address.value());
-        if (r != routes_.end() && r->second == steamId) routes_.erase(r);
-        peers_.erase(it);
+    std::set<uint64_t> verifiedBefore;
+    for (const auto& p : router_.peers())
+        if (p.verified) verifiedBefore.insert(p.steamId);
+
+    for (uint64_t id : router_.syncMembers(current)) {
+        SteamNetworkingMessages()->CloseSessionWithUser(identityFor(id));
+        reportedBad_.erase(id);
+        if (verifiedBefore.count(id)) notify(nameOf(id) + " opuścił(a) sieć.");
     }
-    SteamNetworkingMessages()->CloseSessionWithUser(identityFor(steamId));
-    if (wasVerified) notify(nameOf(steamId) + " opuścił(a) sieć.");
 }
 
 void Network::onLobbyChatUpdate(LobbyChatUpdate_t* ev) {
@@ -288,75 +258,57 @@ void Network::onSessionFailed(SteamNetworkingMessagesSessionFailed_t* ev) {
               << " przerwane: " << ev->m_info.m_szEndDebug);
 }
 
-// ---------------------------------------------------------------- HELLO
+// ---------------------------------------------------------------- HELLO (logika w router::Router)
 
 void Network::sendHello(uint64_t to, bool ack) {
-    if (!code_) return;
-    protocol::HelloMessage msg;
-    msg.type = ack ? protocol::MessageType::HelloAck : protocol::MessageType::Hello;
-    msg.address = selfAddress_;
-    msg.proof = protocol::computeProof(*code_, selfId_, to);
-    const auto bytes = protocol::encode(msg);
-    sendTo(to, bytes, protocol::kChannelControl);
+    auto msg = router_.makeHello(to, ack);
+    if (!msg) return;
+#ifdef KETTLELAN_SECURITY_TESTS
+    if (debugWrongKey_) msg->proof ^= 0x5A5A5A5A5A5A5A5Aull; // test: udajemy, że nie znamy klucza
+#endif
+    sendTo(to, protocol::encode(*msg), protocol::kChannelControl);
 }
 
 void Network::handleControl(uint64_t from, std::span<const uint8_t> data) {
-    if (state_ != State::Connected || !code_) return;
+    if (state_ != State::Connected) return;
     const auto msg = protocol::decode(data);
     if (!msg) return;
 
     // HELLO może przyjść, zanim Steam powiadomi nas o nowym członku lobby.
-    bool known;
-    {
-        std::shared_lock lk(mutex_);
-        known = peers_.count(from) != 0;
+    if (!router_.isMember(from) && isLobbyMember(from)) syncMembers();
+
+    using router::HelloResult;
+    const HelloResult res = router_.onHello(from, *msg);
+    switch (res) {
+    case HelloResult::Verified:
+        notify(nameOf(from) + " dołączył(a) – adres " + ip::addressForSteamId(from).toString());
+        break;
+    case HelloResult::Conflict:
+        if (reportedBad_.insert(from).second)
+            notify(nameOf(from) + " ma ten sam adres co ktoś inny w sieci – ruch do tej osoby nie będzie działał.");
+        break;
+    case HelloResult::BadProof:
+        if (reportedBad_.insert(from).second)
+            notify(nameOf(from) + " jest w lobby, ale nie zna klucza sieci – ignoruję.");
+        return;
+    case HelloResult::BadVersion:
+        if (reportedBad_.insert(from).second)
+            notify(nameOf(from) + " używa innej wersji KettleLAN – zaktualizujcie program.");
+        return;
+    case HelloResult::BadAddress:
+        if (reportedBad_.insert(from).second)
+            KLOG_WARN(nameOf(from) << " podał(a) cudzy adres przy weryfikacji – ignoruję.");
+        return;
+    case HelloResult::Repeated:
+        break;
+    case HelloResult::UnknownPeer:
+    case HelloResult::NoNetwork:
+        return;
     }
-    if (!known && isLobbyMember(from)) syncMembers();
-
-    bool reply = false;
-    std::string announce;
-    {
-        std::unique_lock lk(mutex_);
-        auto it = peers_.find(from);
-        if (it == peers_.end()) return; // nie ma go (jeszcze) na liście członków
-        Peer& peer = it->second;
-
-        if (!equalConstantTime(msg->proof, protocol::computeProof(*code_, from, selfId_))) {
-            if (!peer.badKeyReported) {
-                peer.badKeyReported = true;
-                lk.unlock();
-                notify(nameOf(from) + " jest w lobby, ale nie zna klucza sieci – ignoruję.");
-            }
-            return;
-        }
-        if (msg->version != protocol::kVersion) {
-            if (!peer.badKeyReported) {
-                peer.badKeyReported = true;
-                lk.unlock();
-                notify(nameOf(from) + " używa innej wersji KettleLAN – zaktualizujcie program.");
-            }
-            return;
-        }
-        if (msg->address != peer.address) return; // adres musi wynikać z jego SteamID
-
-        reply = msg->type == protocol::MessageType::Hello;
-        if (!peer.verified) {
-            peer.verified = true;
-            const auto existing = routes_.find(peer.address.value());
-            if (peer.address == selfAddress_ || (existing != routes_.end() && existing->second != from)) {
-                peer.conflict = true;
-                announce = nameOf(from) + " ma ten sam adres co ktoś inny w sieci – ruch do tej osoby nie będzie działał.";
-            } else {
-                routes_[peer.address.value()] = from;
-                announce = nameOf(from) + " dołączył(a) – adres " + peer.address.toString();
-            }
-        }
-    }
-    if (reply) sendHello(from, true);
-    if (!announce.empty()) notify(announce);
+    if (msg->type == protocol::MessageType::Hello) sendHello(from, true);
 }
 
-// ---------------------------------------------------------------- dane
+// ---------------------------------------------------------------- dane (logika w router::Router)
 
 void Network::sendTo(uint64_t steamId, std::span<const uint8_t> data, int channel) {
     const EResult r = SteamNetworkingMessages()->SendMessageToUser(
@@ -367,47 +319,31 @@ void Network::sendTo(uint64_t steamId, std::span<const uint8_t> data, int channe
 
 void Network::sendPacket(std::span<const uint8_t> packet) {
     if (state_ != State::Connected) return;
-    const auto hdr = ip::parseIPv4(packet);
-    if (!hdr || hdr->src != selfAddress_) return;
-
-    if (ip::isGroupDestination(hdr->dst) && protectServices_ && filter::isDiscoveryBroadcast(packet))
-        return; // ogłoszenia usług systemu (nazwa komputera, udostępnione zasoby) zostają u nas
-
-    std::shared_lock lk(mutex_);
-    if (ip::isGroupDestination(hdr->dst)) {
-        for (auto& [addr, id] : routes_) sendTo(id, packet, protocol::kChannelData);
-        return;
-    }
-    const auto it = routes_.find(hdr->dst.value());
-    if (it != routes_.end()) sendTo(it->second, packet, protocol::kChannelData);
+    for (uint64_t id : router_.recipients(packet)) sendTo(id, packet, protocol::kChannelData);
 }
 
 void Network::handleData(uint64_t from, std::span<const uint8_t> data) {
-    if (data.size() > 65535) return;
-    const auto hdr = ip::parseIPv4(data);
-    if (!hdr) return;
-    if (hdr->dst != selfAddress_ && !ip::isGroupDestination(hdr->dst)) return;
-    {
-        std::shared_lock lk(mutex_);
-        const auto it = routes_.find(hdr->src.value());
-        // nadawca musi być zweryfikowany i nie może podszywać się pod cudzy adres
-        if (it == routes_.end() || it->second != from) return;
-    }
-    if (protectServices_) {
-        const auto res = filter::inspectInbound(data);
-        if (res.verdict != filter::Verdict::Allow) {
-            ++blockedPackets_;
-            std::lock_guard lk(blockedLogMutex_);
-            if (blockedLogged_.size() < 1000 && blockedLogged_.insert({from, res.dstPort}).second) {
-                const char* why = res.verdict == filter::Verdict::BlockedService ? "chroniona usługa"
-                                : res.verdict == filter::Verdict::BlockedProtocol ? "niedozwolony protokół"
-                                : "podejrzany fragment pakietu";
-                KLOG_WARN("Zablokowano ruch od " << nameOf(from) << " (" << hdr->src.toString() << ") do "
-                          << filter::serviceName(res.dstPort) << " – " << why);
-            }
-            return;
+    filter::Result fr;
+    const auto res = router_.onData(from, data, &fr);
+    if (res == router::InboundResult::Filtered) {
+        ++blockedPackets_;
+        std::lock_guard lk(blockedLogMutex_);
+        if (blockedLogged_.size() < 1000 && blockedLogged_.insert({from, fr.dstPort}).second) {
+            const char* why = fr.verdict == filter::Verdict::BlockedService ? "chroniona usługa"
+                            : fr.verdict == filter::Verdict::BlockedProtocol ? "niedozwolony protokół"
+                            : "podejrzany fragment pakietu";
+            KLOG_WARN("Zablokowano ruch od " << nameOf(from) << " do " << filter::serviceName(fr.dstPort) << " – " << why);
         }
+        return;
     }
+    if (res == router::InboundResult::Spoofed) {
+        ++blockedPackets_;
+        std::lock_guard lk(blockedLogMutex_);
+        if (blockedLogged_.insert({from, 0xFFFF}).second)
+            KLOG_WARN("Odrzucono pakiety od " << nameOf(from) << " z cudzym adresem nadawcy (podszywanie się)");
+        return;
+    }
+    if (res != router::InboundResult::Deliver) return;
     std::lock_guard lk(handlerMutex_);
     if (packetHandler_) packetHandler_(data);
 }
@@ -441,18 +377,37 @@ void Network::tick() {
         nextMergeCheck_ = now + kMergeInterval;
         startSearch(true);
     }
-    std::vector<uint64_t> due;
-    {
-        std::unique_lock lk(mutex_);
-        for (auto& [id, peer] : peers_) {
-            if (peer.verified || peer.hellosSent >= kHelloAttempts || now < peer.nextHello) continue;
-            peer.hellosSent++;
-            peer.nextHello = now + kHelloInterval;
-            due.push_back(id);
-        }
-    }
-    for (uint64_t id : due) sendHello(id, false);
+    for (uint64_t id : router_.dueHellos(now, kHelloInterval, kHelloAttempts)) sendHello(id, false);
 }
+
+#ifdef KETTLELAN_SECURITY_TESTS
+int Network::debugSendSpoofed(ip::Address4 fakeSource) {
+    int sent = 0;
+    for (const auto& peer : router_.peers()) {
+        if (!peer.verified) continue;
+        // ICMP echo request: nagłówek IPv4 (20 B) + ICMP (8 B)
+        std::vector<uint8_t> p(28, 0);
+        p[0] = 0x45; p[3] = 28; p[8] = 64; p[9] = 1;
+        const auto s = fakeSource.bytes(), d = peer.address.bytes();
+        for (int i = 0; i < 4; ++i) { p[12 + i] = s[i]; p[16 + i] = d[i]; }
+        auto checksum = [](const uint8_t* b, size_t n) {
+            uint32_t sum = 0;
+            for (size_t i = 0; i + 1 < n; i += 2) sum += uint32_t(b[i] << 8 | b[i + 1]);
+            while (sum >> 16) sum = (sum & 0xFFFF) + (sum >> 16);
+            return uint16_t(~sum);
+        };
+        const uint16_t ipSum = checksum(p.data(), 20);
+        p[10] = uint8_t(ipSum >> 8); p[11] = uint8_t(ipSum);
+        p[20] = 8; // echo request
+        p[24] = 0x4B; p[25] = 0x4C; // identyfikator „KL”
+        const uint16_t icmpSum = checksum(p.data() + 20, 8);
+        p[22] = uint8_t(icmpSum >> 8); p[23] = uint8_t(icmpSum);
+        sendTo(peer.steamId, p, protocol::kChannelData);
+        ++sent;
+    }
+    return sent;
+}
+#endif
 
 // ---------------------------------------------------------------- prywatność
 
@@ -465,13 +420,7 @@ void Network::setHideAddress(bool hide) {
              : k_nSteamNetworkingConfig_P2P_Transport_ICE_Enable_Default);
     KLOG_INFO((hide ? "Prywatność: połączenia tylko przez relay Steam (adres IP ukryty)"
                     : "Prywatność: dozwolone połączenia bezpośrednie"));
-    // Istniejące połączenia zestawiamy od nowa, żeby zmiana objęła także je.
-    std::vector<uint64_t> ids;
-    {
-        std::shared_lock lk(mutex_);
-        for (auto& [id, _] : peers_) ids.push_back(id);
-    }
-    for (uint64_t id : ids) SteamNetworkingMessages()->CloseSessionWithUser(identityFor(id));
+    closeAllSessions(); // istniejące połączenia zestawią się od nowa z nowym ustawieniem
 }
 
 // ---------------------------------------------------------------- informacje
@@ -499,18 +448,17 @@ std::vector<PeerInfo> Network::peers() const {
     self.owner = owner == selfId_;
     out.push_back(self);
 
-    std::shared_lock lk(mutex_);
-    for (const auto& [id, peer] : peers_) {
+    for (const auto& peer : router_.peers()) {
         PeerInfo p;
-        p.steamId = id;
-        p.name = nameOf(id);
+        p.steamId = peer.steamId;
+        p.name = nameOf(peer.steamId);
         p.address = peer.address;
-        p.owner = owner == id;
+        p.owner = owner == peer.steamId;
         p.verified = peer.verified;
         p.conflict = peer.conflict;
         SteamNetConnectionInfo_t info{};
         SteamNetConnectionRealTimeStatus_t status{};
-        const auto st = SteamNetworkingMessages()->GetSessionConnectionInfo(identityFor(id), &info, &status);
+        const auto st = SteamNetworkingMessages()->GetSessionConnectionInfo(identityFor(peer.steamId), &info, &status);
         if (st == k_ESteamNetworkingConnectionState_Connected) {
             p.pingMs = status.m_nPing;
             p.relayed = (info.m_nFlags & k_nSteamNetworkConnectionInfoFlags_Relayed) != 0;

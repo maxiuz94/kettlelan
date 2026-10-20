@@ -52,6 +52,43 @@ zakładka **Security → Report a vulnerability** w repozytorium.
   działający na Twoim koncie mógłby go podmienić. Paczka `.deb` instaluje pomocnika w katalogu
   systemowym należącym do roota.
 
+## Jak to jest testowane
+
+Wszystkie poniższe testy uruchamia `ctest --test-dir build`, a GitHub Actions powtarza je przy każdej
+zmianie w repozytorium – także w wersji z AddressSanitizer i UndefinedBehaviorSanitizer, które
+przerywają test przy każdym błędzie pamięci lub niezdefiniowanym zachowaniu.
+
+- **`tests/test_security.cpp`** – scenariusze ataków na logikę sieci (moduł `src/core/router.cpp`,
+  tej samej, której używa program): osoba bez klucza, odtworzenie cudzego dowodu, obcy spoza lobby,
+  przejęcie cudzego adresu, podszywanie się pod innych członków, router domowy i localhost, próby
+  dostania się przez Ciebie do sieci domowej i internetu, dostęp do usług komputera, wycieki przez
+  rozgłaszanie, kolizje adresów, uszkodzone i za duże pakiety, zalewanie wiadomościami HELLO.
+- **`tests/fuzz_core.cpp`** – miliony losowych i celowo zepsutych pakietów, wiadomości, kodów sieci
+  i nicków podawanych do wszystkich funkcji, które czytają dane od innych osób.
+- **`tests/test_helper.sh`** – złośliwe argumenty dla pomocnika działającego jako root: wstrzykiwanie
+  poleceń (`;`, `$(...)`, nowa linia), adresy spoza sieci, zapis ósemkowy, uid roota i kont systemowych.
+- **`tests/test_core.cpp`** – filtr usług (w tym sztuczki z fragmentacją IP), czyszczenie tekstu,
+  kody sieci, dowody i znaczniki.
+- **Utwardzenie programu** – kompilacja z ochroną stosu, PIE, pełnym RELRO i niewykonywalnym stosem.
+
+### Testy na dwóch komputerach
+
+Ataków przez prawdziwą sieć Steam nie da się sprawdzić na jednym komputerze. Do tego służy wersja
+konsolowa zbudowana w trybie testów:
+
+```sh
+cmake -B build-test -DKETTLELAN_SECURITY_TESTS=ON -DKETTLELAN_BUILD_GUI=OFF
+cmake --build build-test --parallel
+./build-test/kettlelan-cli
+```
+
+- `test-zly-klucz <kod>` – wchodzi do lobby sieci z fałszywym dowodem klucza. Druga strona powinna
+  zapisać w dzienniku „nie zna klucza sieci – ignoruję”, a ping do niej nie może działać.
+- `test-podszyj <adres>` – wysyła członkom ping z podrobionym adresem nadawcy. Druga strona powinna
+  zapisać „z cudzym adresem nadawcy (podszywanie się)” i zwiększyć licznik zablokowanych prób.
+
+Te polecenia nigdy nie trafiają do zwykłych paczek.
+
 ---
 
 **English summary:** KettleLAN runs unprivileged (only a tiny, strictly validated helper creates the
