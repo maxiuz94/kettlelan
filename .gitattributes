@@ -1,0 +1,4 @@
+# LF line endings everywhere – shell scripts and checksum files break with CRLF on Windows.
+* text=auto eol=lf
+*.png binary
+*.ico binary
