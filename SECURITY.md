@@ -49,8 +49,24 @@ zakładka **Security → Report a vulnerability** w repozytorium.
 - Ochrona usług opiera się na liście portów. Usługa na nietypowym porcie (np. własny serwer na 8123)
   jest dostępna dla członków sieci – zamknij ją albo zablokuj w firewallu dla karty `kettle0`.
 - Instalacja przez `scripts/install-local.sh` umieszcza pomocnika w katalogu domowym. Złośliwy program
-  działający na Twoim koncie mógłby go podmienić. Paczka `.deb` instaluje pomocnika w katalogu
-  systemowym należącym do roota.
+  działający na Twoim koncie mógłby go podmienić. **Paczka `.deb` tego problemu nie ma**: pomocnik leży
+  w `/usr/lib/kettlelan/` (własność roota), a okno hasła ma własny opis (reguła polkit
+  `io.github.maxiuz94.kettlelan.helper`).
+- **AppImage** to jeden plik należący do Ciebie – ma ten sam poziom zaufania co każdy inny program, który
+  uruchamiasz ze swojego konta. Przed utworzeniem karty pomocnik jest kopiowany do świeżego, prywatnego
+  katalogu (`0700`), bo root nie ma dostępu do wnętrza zamontowanego pliku AppImage.
+
+## Skąd pochodzą gotowe pliki
+
+- Paczki buduje GitHub Actions z publicznego kodu ([`.github/workflows/release.yml`](.github/workflows/release.yml)),
+  a log budowania jest publiczny.
+- Przy każdym wydaniu: sumy `SHA256SUMS.txt` i atestacja pochodzenia –
+  `gh attestation verify NAZWA_PLIKU -R maxiuz94/kettlelan` potwierdza, że plik powstał w tym
+  repozytorium z konkretnego commita.
+- Narzędzia do budowania AppImage (linuxdeploy) są pobierane w przypiętych wersjach i sprawdzane sumą SHA256.
+- Jedyny niepubliczny składnik to oficjalne Steamworks SDK od Valve (licencja zabrania jego
+  publikowania). Workflow sprawdza jego sumę SHA256 z [`cmake/steamworks-sdk.sha256`](cmake/steamworks-sdk.sha256)
+  i przerywa budowanie, jeśli plik jest inny.
 
 ## Jak to jest testowane
 

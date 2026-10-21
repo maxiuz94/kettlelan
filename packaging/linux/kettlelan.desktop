@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=KettleLAN
+GenericName=Wirtualny LAN
+GenericName[en]=Virtual LAN
+Comment=Graj ze znajomymi w gry LAN przez sieć Steam
+Comment[en]=Play LAN games with friends over the Steam network
+Exec=kettlelan
+Icon=kettlelan
+Terminal=false
+Categories=Network;Game;
+Keywords=lan;vpn;hamachi;steam;multiplayer;
+StartupWMClass=kettlelan

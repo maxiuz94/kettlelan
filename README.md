@@ -4,7 +4,23 @@
 Unreal Tournament, Counter-Strike 1.6, Warcraft III…) tak, jakbyście siedzieli przy jednym routerze.
 Bez limitu osób, bez przekierowywania portów i bez własnego serwera.
 
-> Status: **Linux – program z interfejsem graficznym.** Wersja dla Windowsa jest w drodze.
+> Status: **Linux – gotowe paczki AppImage i .deb.** Wersja dla Windowsa jest w drodze.
+
+## Pobieranie
+
+Gotowe pliki są na stronie [**Releases**](https://github.com/maxiuz94/kettlelan/releases):
+
+| System | Plik | Instalacja |
+|--------|------|------------|
+| Każda dystrybucja Linuksa | `KettleLAN-…-x86_64.AppImage` | `chmod +x KettleLAN-*.AppImage`, potem uruchom (bez instalacji) |
+| Ubuntu 24.04+, Mint 22+, Pop!_OS, Debian 13 | `kettlelan_…_ubuntu24.04_amd64.deb` | `sudo apt install ./kettlelan_…_ubuntu24.04_amd64.deb` |
+| Debian 12, MX Linux 23 | `kettlelan_…_debian12_amd64.deb` | `sudo apt install ./kettlelan_…_debian12_amd64.deb` |
+
+Potrzebny jest zainstalowany i zalogowany **Steam** (zwykła wersja z repozytorium dystrybucji albo ze
+strony Valve; wersje Flatpak/Snap mogą nie współpracować).
+
+Pliki buduje GitHub Actions z publicznego kodu. Przy każdym wydaniu są sumy SHA256 i atestacja
+pochodzenia – sprawdzisz je poleceniem `gh attestation verify NAZWA_PLIKU -R maxiuz94/kettlelan`.
 
 ## Jak to działa
 
@@ -37,7 +53,12 @@ cd kettlelan
 ```
 
 Do kompilacji potrzebne jest **Steamworks SDK** (darmowe, wymaga konta Steam). Licencja Valve nie
-pozwala dołączyć go do repozytorium. Skrypt `build.sh` sam zaproponuje otwarcie strony pobierania
+pozwala dołączyć go do repozytorium.
+
+**Skąd pochodzi SDK:** oficjalna strona Valve https://partner.steamgames.com/downloads/list
+(dokumentacja: https://partner.steamgames.com/doc/sdk). Wydania KettleLAN budowane są z pliku
+`steamworks_sdk_165.zip` o sumie SHA256 zapisanej w [`cmake/steamworks-sdk.sha256`](cmake/steamworks-sdk.sha256) –
+po pobraniu możesz ją sprawdzić: `sha256sum steamworks_sdk_165.zip`. Skrypt `build.sh` sam zaproponuje otwarcie strony pobierania
 i znajdzie plik `steamworks_sdk_XXX.zip` w folderze Pobrane. Gotowe paczki KettleLAN SDK nie
 wymagają.
 

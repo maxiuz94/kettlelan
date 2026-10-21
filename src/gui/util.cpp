@@ -76,6 +76,8 @@ static QPixmap renderIcon(int size, bool connected) {
     return pm;
 }
 
+QPixmap renderAppIcon(int size, bool connected) { return renderIcon(size, connected); }
+
 QIcon makeAppIcon(bool connected) {
     QIcon icon;
     for (int s : {16, 22, 24, 32, 48, 64, 128, 256}) icon.addPixmap(renderIcon(s, connected));

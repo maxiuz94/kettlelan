@@ -14,6 +14,7 @@
 #include <unistd.h>
 
 #include <atomic>
+#include <cstdlib>
 #include <cerrno>
 #include <cstring>
 #include <filesystem>
@@ -112,12 +113,47 @@ fs::path findHelper() {
     return {};
 }
 
+// AppImage działa z katalogu zamontowanego przez FUSE, do którego root domyślnie nie ma dostępu.
+// Kopiujemy wtedy pomocnika do świeżego, prywatnego katalogu (0700) tylko na czas uruchomienia.
+struct HelperCopy {
+    fs::path dir;
+    ~HelperCopy() {
+        std::error_code ec;
+        if (!dir.empty()) fs::remove_all(dir, ec);
+    }
+};
+
+fs::path prepareHelper(const fs::path& helper, HelperCopy& copy, std::string& error) {
+    if (std::getenv("APPIMAGE") == nullptr) return helper;
+    const char* runtime = std::getenv("XDG_RUNTIME_DIR");
+    std::string tmpl = std::string(runtime && *runtime ? runtime : "/tmp") + "/kettlelan-helper-XXXXXX";
+    std::vector<char> buf(tmpl.begin(), tmpl.end());
+    buf.push_back('\0');
+    if (!::mkdtemp(buf.data())) {
+        error = std::string("Nie można utworzyć katalogu tymczasowego: ") + std::strerror(errno);
+        return {};
+    }
+    copy.dir = buf.data();
+    const fs::path target = copy.dir / "kettlelan-helper";
+    std::error_code ec;
+    fs::copy_file(helper, target, ec);
+    if (!ec) fs::permissions(target, fs::perms::owner_all, fs::perm_options::replace, ec);
+    if (ec) {
+        error = "Nie można przygotować pomocnika: " + ec.message();
+        return {};
+    }
+    return target;
+}
+
 bool runHelper(ip::Address4 address, std::string& error) {
-    const fs::path helper = findHelper();
-    if (helper.empty()) {
+    const fs::path found = findHelper();
+    if (found.empty()) {
         error = "Nie znaleziono pomocnika kettlelan-helper (powinien leżeć obok programu).";
         return false;
     }
+    HelperCopy copy;
+    const fs::path helper = prepareHelper(found, copy, error);
+    if (helper.empty()) return false;
     const std::string uid = std::to_string(::getuid());
     const std::string addr = address.toString();
     KLOG_INFO("Tworzę kartę " << kIfName << " (" << addr << "/10) – system poprosi o hasło administratora.");

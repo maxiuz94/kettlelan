@@ -1,5 +1,7 @@
 # budowanie
 /build*/
+*.AppImage
+squashfs-root/
 /out/
 CMakeUserPresets.json
 

@@ -161,3 +161,61 @@ if(KETTLELAN_BUILD_APP)
         )
     endforeach()
 endif()
+
+# ---------------------------------------------------------------- instalacja i paczki
+#   .deb:      cmake -B build -DKETTLELAN_PACKAGE=deb -DKETTLELAN_DEB_DISTRO=debian12 && cpack --config build/CPackConfig.cmake
+#   AppImage:  packaging/linux/build-appimage.sh (układ katalogów AppImage: -DKETTLELAN_PACKAGE=appimage)
+set(KETTLELAN_PACKAGE "" CACHE STRING "Układ instalacji: deb, appimage albo puste (bez reguł instalacji)")
+
+if(KETTLELAN_BUILD_APP AND KETTLELAN_BUILD_GUI AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND KETTLELAN_PACKAGE)
+    set(KETTLELAN_ICON_SIZES 16 24 32 48 64 128 256 512)
+    foreach(sz ${KETTLELAN_ICON_SIZES})
+        install(FILES packaging/linux/icons/kettlelan-${sz}.png
+                DESTINATION share/icons/hicolor/${sz}x${sz}/apps RENAME kettlelan.png)
+    endforeach()
+    install(FILES packaging/linux/kettlelan.desktop DESTINATION share/applications)
+
+    if(KETTLELAN_PACKAGE STREQUAL "deb")
+        # Programy, biblioteka Steama i pomocnik w /usr/lib/kettlelan (własność roota).
+        install(TARGETS kettlelan kettlelan-cli RUNTIME DESTINATION lib/kettlelan)
+        install(FILES "${STEAMWORKS_REDIST}" DESTINATION lib/kettlelan)
+        install(PROGRAMS scripts/kettlelan-helper DESTINATION lib/kettlelan)
+        install(PROGRAMS packaging/linux/kettlelan.sh DESTINATION bin RENAME kettlelan)
+        install(PROGRAMS packaging/linux/kettlelan-cli.sh DESTINATION bin RENAME kettlelan-cli)
+        install(FILES packaging/linux/io.github.maxiuz94.kettlelan.policy DESTINATION share/polkit-1/actions)
+        install(FILES LICENSE DESTINATION share/doc/kettlelan RENAME copyright)
+        install(FILES README.md SECURITY.md DESTINATION share/doc/kettlelan)
+
+        set(KETTLELAN_DEB_DISTRO "" CACHE STRING "Dopisek do nazwy pliku .deb, np. debian12 albo ubuntu24.04")
+        set(CPACK_GENERATOR DEB)
+        set(CPACK_PACKAGE_NAME kettlelan)
+        set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+        set(CPACK_PACKAGE_VENDOR "KettleLAN")
+        set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Open-source virtual LAN over the Steam network")
+        set(CPACK_PACKAGING_INSTALL_PREFIX /usr)
+        set(CPACK_DEBIAN_PACKAGE_MAINTAINER "maxiuz94 <maxiuz94@users.noreply.github.com>")
+        set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "https://github.com/maxiuz94/kettlelan")
+        set(CPACK_DEBIAN_PACKAGE_SECTION net)
+        set(CPACK_DEBIAN_PACKAGE_PRIORITY optional)
+        set(CPACK_DEBIAN_PACKAGE_DESCRIPTION "Play classic LAN games (Quake 3, Unreal Tournament, Counter-Strike 1.6,
+Warcraft III...) with friends as if you were on the same router.
+No player limit, no port forwarding and no own server - traffic goes
+through the encrypted Steam network. Wirtualny LAN przez siec Steam.")
+        set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+        set(CPACK_DEBIAN_PACKAGE_DEPENDS "pkexec | policykit-1, iproute2, qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtquick-layouts, qml6-module-qtquick-shapes, qml6-module-qtquick-templates, qml6-module-qtquick-window, qml6-module-qtqml-workerscript")
+        set(CPACK_DEBIAN_PACKAGE_SUGGESTS "steam-installer | steam-launcher | steam")
+        if(KETTLELAN_DEB_DISTRO)
+            set(CPACK_DEBIAN_FILE_NAME "kettlelan_${PROJECT_VERSION}_${KETTLELAN_DEB_DISTRO}_amd64.deb")
+        else()
+            set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+        endif()
+        include(CPack)
+    elseif(KETTLELAN_PACKAGE STREQUAL "appimage")
+        # AppImage: wszystko w usr/bin, biblioteki Qt dołoży linuxdeploy.
+        install(TARGETS kettlelan kettlelan-cli RUNTIME DESTINATION bin)
+        install(FILES "${STEAMWORKS_REDIST}" DESTINATION bin)
+        install(PROGRAMS scripts/kettlelan-helper DESTINATION bin)
+    else()
+        message(FATAL_ERROR "KETTLELAN_PACKAGE musi być „deb” albo „appimage”.")
+    endif()
+endif()

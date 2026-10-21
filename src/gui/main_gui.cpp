@@ -10,6 +10,7 @@
 #include <QTimer>
 #include <QtQml>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -73,10 +74,14 @@ int main(int argc, char** argv) {
     QCommandLineOption writeIcon(QStringLiteral("write-icon"), QStringLiteral("Zapisz ikonę programu do pliku PNG."),
                                  QStringLiteral("plik"));
     parser.addOption(writeIcon);
+    QCommandLineOption iconSize(QStringLiteral("icon-size"), QStringLiteral("Rozmiar ikony w pikselach (domyślnie 256)."),
+                                QStringLiteral("px"), QStringLiteral("256"));
+    parser.addOption(iconSize);
     parser.process(app);
 
     if (parser.isSet(writeIcon)) {
-        const bool ok = kettle::gui::makeAppIcon(false).pixmap(256, 256).save(parser.value(writeIcon));
+        const int size = std::clamp(parser.value(iconSize).toInt(), 16, 1024);
+        const bool ok = kettle::gui::renderAppIcon(size, false).save(parser.value(writeIcon));
         return ok ? 0 : 1;
     }
 
