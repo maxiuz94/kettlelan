@@ -8,6 +8,8 @@ Before tagging a release add a `## [x.y.z] – date` section (see [docs/RELEASIN
 
 ## [Unreleased]
 
+## [0.2.0] – 2026-10-22
+
 - Windows: add a Windows 10/11 (64-bit) version – portable zip with the official signed Wintun driver
 - Windows: run as administrator (needed by Wintun), start with the system through Task Scheduler
 - Windows: allow incoming game traffic with a firewall rule limited to the KettleLAN adapter and 100.64.0.0/10
