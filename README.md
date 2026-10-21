@@ -143,9 +143,28 @@ The interface is translated with Qt Linguist files in [`translations/`](translat
 copy `kettlelan_pl.ts`, translate it (with Qt Linguist or a text editor) and add it to `CMakeLists.txt`.
 After changing texts in the code run `cmake --build build --target update_translations`.
 
+## Built with AI assistance
+
+KettleLAN is developed with the help of **Claude**, an AI assistant made by
+[Anthropic](https://www.anthropic.com). Most of the code, tests and documentation were written by Claude
+following the maintainer's requirements and decisions. Every change was built, tested on real hardware
+(Arch Linux with KDE Plasma, MX Linux with Xfce, two computers playing over KettleLAN) and checked by the
+automated tests before being published.
+
+If you find a bug or a security problem, please report it – see [SECURITY.md](SECURITY.md).
+
 ## License
 
-BSD-3-Clause, see [LICENSE](LICENSE). Based on [PartyLAN](https://github.com/gyf304/partylan) by Yifan Gu.
+KettleLAN is licensed under the **BSD 3-Clause License** – see [LICENSE](LICENSE).
+It started as a fork of [PartyLAN](https://github.com/gyf304/partylan) by Yifan Gu (also BSD 3-Clause).
+
+Components by other authors keep their own licenses – details in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md):
+
+| Component | License |
+|-----------|---------|
+| Steam library (`libsteam_api.so`) | Valve proprietary, shipped under the Steamworks SDK Access Agreement |
+| Qt 6 | LGPL-3.0 – system library in the .deb packages, bundled in the AppImage |
+| Libraries bundled in the AppImage | their own open-source licenses, listed inside the AppImage |
 
 Steam and the Steam logo are trademarks of Valve Corporation. KettleLAN is not affiliated with or
-endorsed by Valve.
+endorsed by Valve. Game names are trademarks of their respective owners.

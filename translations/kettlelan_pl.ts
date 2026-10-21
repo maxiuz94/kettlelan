@@ -401,12 +401,19 @@
         <message>
             <location line="+9" />
             <source>KettleLAN %1 · BSD-3 license · based on PartyLAN.
+Developed with the help of Claude (Anthropic).
 Steam is a trademark of Valve Corporation.</source>
             <translation>KettleLAN %1 · licencja BSD-3 · na bazie PartyLAN.
+Tworzony z pomocą Claude (Anthropic).
 Steam jest znakiem towarowym Valve Corporation.</translation>
         </message>
         <message>
-            <location line="+6" />
+            <location line="+5" />
+            <source>Licenses of third-party components</source>
+            <translation>Licencje składników innych autorów</translation>
+        </message>
+        <message>
+            <location line="+11" />
             <source>Quit KettleLAN</source>
             <translation>Zakończ KettleLAN</translation>
         </message>

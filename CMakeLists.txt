@@ -192,7 +192,7 @@ if(KETTLELAN_BUILD_APP AND KETTLELAN_BUILD_GUI AND CMAKE_SYSTEM_NAME STREQUAL "L
         install(PROGRAMS packaging/linux/kettlelan-cli.sh DESTINATION bin RENAME kettlelan-cli)
         install(FILES packaging/linux/io.github.maxiuz94.kettlelan.policy DESTINATION share/polkit-1/actions)
         install(FILES LICENSE DESTINATION share/doc/kettlelan RENAME copyright)
-        install(FILES README.md SECURITY.md DESTINATION share/doc/kettlelan)
+        install(FILES README.md SECURITY.md THIRD-PARTY-NOTICES.md DESTINATION share/doc/kettlelan)
 
         set(KETTLELAN_DEB_DISTRO "" CACHE STRING "Suffix for the .deb file name, e.g. debian12 or ubuntu24.04")
         set(CPACK_GENERATOR DEB)

@@ -200,7 +200,17 @@ Item {
                     wrapMode: Text.WordWrap
                     color: Theme.muted
                     font.pixelSize: 12
-                    text: qsTr("KettleLAN %1 · BSD-3 license · based on PartyLAN.\nSteam is a trademark of Valve Corporation.").arg(Backend.version)
+                    text: qsTr("KettleLAN %1 · BSD-3 license · based on PartyLAN.\nDeveloped with the help of Claude (Anthropic).\nSteam is a trademark of Valve Corporation.").arg(Backend.version)
+                }
+                Text {
+                    Layout.alignment: Qt.AlignHCenter
+                    // fixed link, only the label comes from the translation
+                    text: "<a href=\"https://github.com/maxiuz94/kettlelan/blob/main/THIRD-PARTY-NOTICES.md\">" + qsTr("Licenses of third-party components") + "</a>"
+                    textFormat: Text.StyledText
+                    linkColor: Theme.muted
+                    font.pixelSize: 12
+                    onLinkActivated: (link) => Backend.openUrl(link)
+                    HoverHandler { cursorShape: Qt.PointingHandCursor }
                 }
                 AppButton {
                     Layout.fillWidth: true

@@ -41,7 +41,8 @@ DESTDIR="$APPDIR" cmake --install "$BUILD" --prefix /usr
 # QML used by the program (QtQuick, Controls, Layouts, Shapes… modules)
 export QML_SOURCES_PATHS="$ROOT/src/gui/qml"
 # Wayland next to X11 – only together with the shell integration plugins, without which Qt falls back to X11 anyway.
-QT_PLUGINS="$("${QMAKE:-qmake6}" -query QT_INSTALL_PLUGINS)"
+export QMAKE="${QMAKE:-qmake6}"
+QT_PLUGINS="$("$QMAKE" -query QT_INSTALL_PLUGINS)"
 WAYLAND_ARGS=()
 if [ -f "$QT_PLUGINS/platforms/libqwayland-generic.so" ] && [ -d "$QT_PLUGINS/wayland-shell-integration" ]; then
     export EXTRA_PLATFORM_PLUGINS="libqwayland-generic.so"
@@ -56,11 +57,11 @@ if [ -f "$QT_PLUGINS/platforms/libqwayland-generic.so" ] && [ -d "$QT_PLUGINS/wa
 else
     echo "Wayland: no shell integrations in this Qt install – the AppImage will use X11 (XWayland)"
 fi
-export QMAKE="${QMAKE:-qmake6}"
 export APPIMAGE_EXTRACT_AND_RUN=1   # without FUSE (e.g. on GitHub Actions)
 export LDAI_OUTPUT="KettleLAN-${VERSION}-x86_64.AppImage"
 
 cd "$BUILD"
+# Pass 1: deploy the program, Qt and all needed libraries into the AppDir.
 PATH="$TOOLS:$PATH" "$TOOLS/linuxdeploy-x86_64.AppImage" \
     --appdir "$APPDIR" \
     --executable "$APPDIR/usr/bin/kettlelan" \
@@ -68,8 +69,43 @@ PATH="$TOOLS:$PATH" "$TOOLS/linuxdeploy-x86_64.AppImage" \
     --desktop-file "$APPDIR/usr/share/applications/kettlelan.desktop" \
     --icon-file "$APPDIR/usr/share/icons/hicolor/256x256/apps/kettlelan.png" \
     "${WAYLAND_ARGS[@]}" \
-    --plugin qt \
-    --output appimage
+    --plugin qt
+
+# Licenses of everything inside the AppImage (LGPL and the libraries' own licenses require it).
+DOC="$APPDIR/usr/share/doc/kettlelan"
+mkdir -p "$DOC/licenses"
+cp "$ROOT/LICENSE" "$ROOT/THIRD-PARTY-NOTICES.md" "$DOC/"
+cp "$ROOT"/packaging/licenses/*.txt "$DOC/licenses/"
+QT_VERSION="$("$QMAKE" -query QT_VERSION)"
+QT_LIBS="$("$QMAKE" -query QT_INSTALL_LIBS)"
+{
+    echo "Libraries bundled in KettleLAN-${VERSION}-x86_64.AppImage (generated at build time)."
+    echo "Format: file  <-  origin. License files: *.copyright in this folder; Qt: LGPL-3.0.txt."
+    echo
+    find "$APPDIR/usr/lib" "$APPDIR/usr/plugins" "$APPDIR/usr/bin" -name '*.so*' -type f 2>/dev/null | sort |
+    while read -r f; do
+        name="$(basename "$f")"
+        rel="${f#"$APPDIR"/}"
+        pkg="$(dpkg -S "*/$name" 2>/dev/null | head -n1 | cut -d: -f1 | cut -d, -f1 || true)"
+        if [ "$name" = "libsteam_api.so" ]; then
+            echo "$rel  <-  Steamworks SDK (Valve, Steamworks SDK Access Agreement)"
+        elif [[ "$name" == libQt6* || "$rel" == usr/plugins/* || "$pkg" == libqt6* || "$pkg" == qt6-* || "$pkg" == qml6-* ]]; then
+            echo "$rel  <-  Qt $QT_VERSION (LGPL-3.0)"
+        elif [ -n "$pkg" ]; then
+            echo "$rel  <-  package $pkg"
+            [ -f "/usr/share/doc/$pkg/copyright" ] && cp "/usr/share/doc/$pkg/copyright" "$DOC/licenses/$pkg.copyright"
+        elif [ -e "$QT_LIBS/$name" ]; then
+            # shipped with the official Qt binaries (e.g. ICU) – covered by Qt's licensing documentation
+            echo "$rel  <-  shipped with Qt $QT_VERSION"
+        else
+            echo "$rel  <-  unknown origin"
+        fi
+    done
+} > "$DOC/licenses/bundled-libraries.txt"
+echo "Licenses: $(grep -c '  <-  ' "$DOC/licenses/bundled-libraries.txt") bundled libraries listed, $(ls "$DOC/licenses" | grep -c '\.copyright$') license files"
+
+# Pass 2: pack the AppDir into a single AppImage file.
+PATH="$TOOLS:$PATH" "$TOOLS/linuxdeploy-x86_64.AppImage" --appdir "$APPDIR" --output appimage
 
 echo
 echo "Done: $BUILD/$LDAI_OUTPUT"

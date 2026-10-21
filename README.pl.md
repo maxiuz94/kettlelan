@@ -128,9 +128,28 @@ umieścić go w repozytorium – `build.sh` zaproponuje otwarcie strony pobieran
 `steamworks_sdk_XXX.zip` w folderze Pobrane. Wydania budowane są z oficjalnego pliku SDK o sumie zapisanej w
 [`cmake/steamworks-sdk.sha256`](cmake/steamworks-sdk.sha256) (źródło: https://partner.steamgames.com/downloads/list).
 
+## Tworzony z pomocą AI
+
+KettleLAN powstaje z pomocą **Claude** – asystenta AI firmy [Anthropic](https://www.anthropic.com).
+Większość kodu, testów i dokumentacji napisał Claude według wymagań i decyzji opiekuna projektu.
+Każda zmiana przed publikacją była budowana, testowana na prawdziwym sprzęcie (Arch Linux z KDE Plasma,
+MX Linux z Xfce, dwa komputery grające przez KettleLAN) i sprawdzana testami automatycznymi.
+
+Jeśli znajdziesz błąd albo problem z bezpieczeństwem, zgłoś go – zobacz [SECURITY.pl.md](SECURITY.pl.md).
+
 ## Licencja
 
-BSD-3-Clause, zobacz [LICENSE](LICENSE). Projekt bazuje na [PartyLAN](https://github.com/gyf304/partylan)
-autorstwa Yifan Gu.
+KettleLAN jest udostępniany na licencji **BSD 3-Clause** – zobacz [LICENSE](LICENSE).
+Projekt zaczął się jako fork [PartyLAN](https://github.com/gyf304/partylan) autorstwa Yifan Gu (również BSD 3-Clause).
+
+Składniki innych autorów mają własne licencje – szczegóły w [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)
+(po angielsku):
+
+| Składnik | Licencja |
+|----------|----------|
+| Biblioteka Steama (`libsteam_api.so`) | własność Valve, rozpowszechniana na warunkach Steamworks SDK Access Agreement |
+| Qt 6 | LGPL-3.0 – biblioteka systemowa w paczkach .deb, dołączona do AppImage |
+| Biblioteki dołączone do AppImage | własne licencje open source, spisane wewnątrz AppImage |
 
 Steam i logo Steam są znakami towarowymi Valve Corporation. KettleLAN nie jest powiązany z Valve.
+Nazwy gier są znakami towarowymi ich właścicieli.

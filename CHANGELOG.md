@@ -18,6 +18,11 @@ Before tagging a release add a `## [x.y.z] – date` section (see [docs/RELEASIN
 - AppImage: run natively on Wayland
 - Docs: translate README, SECURITY and CHANGELOG to English, add Polish README and SECURITY
 - CI: use only the CHANGELOG entry as the release description
+- Docs: state that KettleLAN is developed with the help of Claude (Anthropic)
+- Docs: add THIRD-PARTY-NOTICES.md with the licenses of all third-party components
+- AppImage: include LGPL/GPL texts, a list of bundled libraries and their license files
+- Packaging: include THIRD-PARTY-NOTICES.md in the .deb packages
+- GUI: add a Licenses link and an AI-assistance note to Settings
 
 ## [0.1.0] – 2026-10-21
 

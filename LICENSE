@@ -33,3 +33,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 Steam and the Steam logo are trademarks of Valve Corporation. KettleLAN is not
 affiliated with or endorsed by Valve. The Steamworks SDK is not part of this
 repository and is licensed separately under the Steamworks SDK Access Agreement.
+
+This license covers KettleLAN's own code. Components by other authors that are
+used or shipped with KettleLAN (the Steam library, Qt and others) keep their own
+licenses - see THIRD-PARTY-NOTICES.md.
