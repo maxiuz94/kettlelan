@@ -4,23 +4,17 @@ import QtQuick.Layouts
 import KettleLAN
 import KettleLAN.Core
 
-// Ekran aktywnej sieci: adres, kod i lista członków.
+// Active network screen: address, code and member list.
 Item {
     id: page
     signal openSettings()
 
-    function personWord(n) {
-        if (n === 1) return "osoba"
-        const last = n % 10, lastTwo = n % 100
-        if (last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14)) return "osoby"
-        return "osób"
-    }
 
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
 
-        // --- nagłówek
+        // --- header
         RowLayout {
             Layout.fillWidth: true
             Layout.leftMargin: Theme.pad
@@ -35,10 +29,10 @@ Item {
                 RowLayout {
                     spacing: 6
                     Rectangle { width: 8; height: 8; radius: 4; color: Theme.ok }
-                    Text { textFormat: Text.PlainText; text: "Połączono, " + Backend.memberCount + " " + page.personWord(Backend.memberCount); color: Theme.muted; font.pixelSize: 13 }
+                    Text { textFormat: Text.PlainText; text: qsTr("Connected · %n member(s)", "", Backend.memberCount); color: Theme.muted; font.pixelSize: 13 }
                 }
             }
-            IconButton { iconName: "settings"; label: "Ustawienia"; onClicked: page.openSettings() }
+            IconButton { iconName: "settings"; label: qsTr("Settings"); onClicked: page.openSettings() }
         }
         Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
 
@@ -55,22 +49,22 @@ Item {
                 rowSpacing: 10
                 InfoCard {
                     Layout.fillWidth: true
-                    label: "Twój adres"
+                    label: qsTr("Your address")
                     value: Backend.selfAddress
-                    onCopyRequested: Backend.copyText(Backend.selfAddress, "Skopiowano Twój adres")
+                    onCopyRequested: Backend.copyText(Backend.selfAddress, qsTr("Your address was copied"))
                 }
                 InfoCard {
                     Layout.fillWidth: true
-                    label: "Kod sieci"
+                    label: qsTr("Network code")
                     value: Backend.networkCode
-                    onCopyRequested: Backend.copyText(Backend.networkCode, "Skopiowano kod sieci – wyślij go znajomym")
+                    onCopyRequested: Backend.copyText(Backend.networkCode, qsTr("Network code copied – send it to your friends"))
                 }
             }
 
             RowLayout {
                 Layout.fillWidth: true
-                Text { textFormat: Text.PlainText; text: "Członkowie"; color: Theme.muted; font.pixelSize: 13; font.weight: Font.DemiBold; Layout.fillWidth: true }
-                Text { textFormat: Text.PlainText; text: "Kliknij osobę, aby skopiować jej adres"; color: Theme.muted; font.pixelSize: 12 }
+                Text { textFormat: Text.PlainText; text: qsTr("Members"); color: Theme.muted; font.pixelSize: 13; font.weight: Font.DemiBold; Layout.fillWidth: true }
+                Text { textFormat: Text.PlainText; text: qsTr("Click a person to copy their address"); color: Theme.muted; font.pixelSize: 12 }
             }
 
             Rectangle {
@@ -99,18 +93,18 @@ Item {
                         enabled: true
                         Accessible.name: modelData.name + ", " + modelData.address
 
-                        readonly property string badgeText: modelData.self ? "To Ty"
-                            : modelData.conflict ? "Konflikt adresu"
-                            : !modelData.verified ? "Łączenie…"
-                            : modelData.pingMs < 0 ? "Połączono"
-                            : modelData.relayed ? "Relay Steam" : "Bezpośrednio"
+                        readonly property string badgeText: modelData.self ? qsTr("You")
+                            : modelData.conflict ? qsTr("Address conflict")
+                            : !modelData.verified ? qsTr("Connecting…")
+                            : modelData.pingMs < 0 ? qsTr("Connected")
+                            : modelData.relayed ? qsTr("Steam relay") : qsTr("Direct")
                         readonly property color badgeBg: (modelData.self || !modelData.verified || modelData.pingMs < 0) ? Theme.surface2
                             : (modelData.relayed || modelData.conflict) ? Theme.relayBg : Theme.directBg
                         readonly property color badgeFg: (modelData.self || !modelData.verified || modelData.pingMs < 0) ? Theme.muted
                             : (modelData.relayed || modelData.conflict) ? Theme.relayFg : Theme.directFg
 
                         onClicked: if (!modelData.self && modelData.verified)
-                                       Backend.copyText(modelData.address, "Skopiowano adres " + modelData.address + " (" + modelData.name + ")")
+                                       Backend.copyText(modelData.address, qsTr("Copied address %1 (%2)").arg(modelData.address).arg(modelData.name))
 
                         background: Rectangle {
                             color: row.down ? Theme.border : (row.hovered && !row.modelData.self ? Theme.surface2 : "transparent")
@@ -173,13 +167,13 @@ Item {
                     Layout.fillWidth: true
                     kind: "primary"
                     iconName: "userPlus"
-                    text: "Zaproś znajomych"
-                    onClicked: Backend.copyText(Backend.networkCode, "Skopiowano kod sieci – wyślij go znajomym")
+                    text: qsTr("Invite friends")
+                    onClicked: Backend.copyText(Backend.networkCode, qsTr("Network code copied – send it to your friends"))
                 }
                 AppButton {
                     kind: "secondary"
                     iconName: "leave"
-                    text: "Opuść"
+                    text: qsTr("Leave")
                     onClicked: Backend.leaveNetwork()
                 }
             }

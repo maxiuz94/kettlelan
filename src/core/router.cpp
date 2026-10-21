@@ -127,7 +127,7 @@ std::vector<uint64_t> Router::recipients(std::span<const uint8_t> packet) const 
     std::vector<uint64_t> out;
     if (packet.size() > 65535) return out;
     const auto hdr = ip::parseIPv4(packet);
-    if (!hdr || hdr->src != selfAddress_) return out; // wysyłamy tylko jako my
+    if (!hdr || hdr->src != selfAddress_) return out; // we only send as ourselves
     const bool group = ip::isGroupDestination(hdr->dst);
     if (group && protect_ && filter::isDiscoveryBroadcast(packet)) return out;
 

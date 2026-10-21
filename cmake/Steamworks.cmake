@@ -1,17 +1,17 @@
-# KettleLAN – wyszukiwanie Steamworks SDK.
+# KettleLAN – locating the Steamworks SDK.
 #
-# SDK jest potrzebne tylko do KOMPILACJI. Licencja Valve nie pozwala trzymać go w repozytorium,
-# dlatego trzeba je pobrać samemu (za darmo, po zalogowaniu kontem Steam):
+# The SDK is only needed to BUILD the program. Valve's license does not allow keeping it in the
+# repository, so you need to download it yourself (free, after signing in with a Steam account):
 #   https://partner.steamgames.com/downloads/list
 #
-# Kolejność szukania:
-#   1. -DSTEAMWORKS_SDK_DIR=<folder z podfolderem public/steam>
-#   2. -DSTEAMWORKS_SDK_ZIP=<plik steamworks_sdk_XXX.zip>
-#   3. zmienna środowiskowa STEAMWORKS_SDK_URL (używana przez GitHub Actions)
-#   4. najnowszy steamworks_sdk_*.zip w ~/Downloads, ~/Pobrane lub w folderze projektu
+# Search order:
+#   1. -DSTEAMWORKS_SDK_DIR=<folder with a public/steam subfolder>
+#   2. -DSTEAMWORKS_SDK_ZIP=<steamworks_sdk_XXX.zip file>
+#   3. STEAMWORKS_SDK_URL environment variable
+#   4. the newest steamworks_sdk_*.zip in ~/Downloads, ~/Pobrane or the project folder
 
-set(STEAMWORKS_SDK_DIR "" CACHE PATH "Folder rozpakowanego Steamworks SDK")
-set(STEAMWORKS_SDK_ZIP "" CACHE FILEPATH "Plik steamworks_sdk_XXX.zip")
+set(STEAMWORKS_SDK_DIR "" CACHE PATH "Folder of the extracted Steamworks SDK")
+set(STEAMWORKS_SDK_ZIP "" CACHE FILEPATH "steamworks_sdk_XXX.zip file")
 
 set(_sw_extract "${CMAKE_BINARY_DIR}/_deps/steamworks")
 
@@ -24,7 +24,7 @@ function(_sw_is_sdk dir out)
 endfunction()
 
 function(_sw_extract_zip zip)
-    message(STATUS "Steamworks SDK: rozpakowuję ${zip}")
+    message(STATUS "Steamworks SDK: extracting ${zip}")
     file(REMOVE_RECURSE "${_sw_extract}")
     file(ARCHIVE_EXTRACT INPUT "${zip}" DESTINATION "${_sw_extract}")
 endfunction()
@@ -34,7 +34,7 @@ set(_sw_root "")
 if(STEAMWORKS_SDK_DIR)
     _sw_is_sdk("${STEAMWORKS_SDK_DIR}" _ok)
     if(NOT _ok)
-        message(FATAL_ERROR "STEAMWORKS_SDK_DIR=${STEAMWORKS_SDK_DIR} nie zawiera public/steam/steam_api.h")
+        message(FATAL_ERROR "STEAMWORKS_SDK_DIR=${STEAMWORKS_SDK_DIR} does not contain public/steam/steam_api.h")
     endif()
     set(_sw_root "${STEAMWORKS_SDK_DIR}")
 endif()
@@ -53,11 +53,11 @@ if(NOT _sw_root)
     set(_sw_zip "${STEAMWORKS_SDK_ZIP}")
     if(NOT _sw_zip AND DEFINED ENV{STEAMWORKS_SDK_URL} AND NOT "$ENV{STEAMWORKS_SDK_URL}" STREQUAL "")
         set(_sw_zip "${CMAKE_BINARY_DIR}/_deps/steamworks_sdk.zip")
-        message(STATUS "Steamworks SDK: pobieram z adresu podanego w STEAMWORKS_SDK_URL")
+        message(STATUS "Steamworks SDK: downloading from STEAMWORKS_SDK_URL")
         file(DOWNLOAD "$ENV{STEAMWORKS_SDK_URL}" "${_sw_zip}" STATUS _st)
         list(GET _st 0 _code)
         if(NOT _code EQUAL 0)
-            message(FATAL_ERROR "Nie udało się pobrać SDK: ${_st}")
+            message(FATAL_ERROR "Could not download the SDK: ${_st}")
         endif()
     endif()
     if(NOT _sw_zip)
@@ -91,18 +91,18 @@ if(NOT _sw_root)
             endif()
         endforeach()
         if(NOT _sw_root)
-            message(FATAL_ERROR "Plik ${_sw_zip} nie wygląda na Steamworks SDK.")
+            message(FATAL_ERROR "${_sw_zip} does not look like the Steamworks SDK.")
         endif()
     endif()
 endif()
 
 if(NOT _sw_root)
     message(FATAL_ERROR
-        "\nNie znaleziono Steamworks SDK – jest potrzebne do kompilacji (gotowe paczki go nie wymagają).\n"
-        "  1. Wejdź na https://partner.steamgames.com/downloads/list i zaloguj się kontem Steam.\n"
-        "  2. Pobierz najnowsze „Steamworks SDK” (plik steamworks_sdk_XXX.zip) do folderu Pobrane.\n"
-        "  3. Uruchom budowanie ponownie – plik zostanie znaleziony automatycznie.\n"
-        "Najprościej: ./scripts/build.sh (przeprowadzi Cię przez to krok po kroku).\n")
+        "\nSteamworks SDK not found – it is needed to build KettleLAN (ready-made packages do not need it).\n"
+        "  1. Go to https://partner.steamgames.com/downloads/list and sign in with your Steam account.\n"
+        "  2. Download the latest \"Steamworks SDK\" (steamworks_sdk_XXX.zip) to your Downloads folder.\n"
+        "  3. Run the build again – the file will be found automatically.\n"
+        "Easiest: ./scripts/build.sh (guides you step by step).\n")
 endif()
 
 message(STATUS "Steamworks SDK: ${_sw_root}")
@@ -113,11 +113,11 @@ if(WIN32)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(STEAMWORKS_REDIST "${_sw_root}/redistributable_bin/linux64/libsteam_api.so")
 else()
-    message(FATAL_ERROR "Steamworks: nieobsługiwany system ${CMAKE_SYSTEM_NAME}")
+    message(FATAL_ERROR "Steamworks: unsupported system ${CMAKE_SYSTEM_NAME}")
 endif()
 
 if(NOT EXISTS "${STEAMWORKS_REDIST}")
-    message(FATAL_ERROR "Brak biblioteki ${STEAMWORKS_REDIST} w SDK.")
+    message(FATAL_ERROR "${STEAMWORKS_REDIST} is missing from the SDK.")
 endif()
 
 add_library(Steamworks::api SHARED IMPORTED)

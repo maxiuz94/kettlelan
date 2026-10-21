@@ -4,7 +4,7 @@
 
 namespace kettle::protocol {
 
-// Format: 'K' 'T' 'L' typ wersja adres[4] dowód[8, little-endian]  = 17 bajtów
+// Format: 'K' 'T' 'L' type version address[4] proof[8, little-endian]  = 17 bytes
 static constexpr size_t kHelloSize = 17;
 
 std::vector<uint8_t> encode(const HelloMessage& msg) {

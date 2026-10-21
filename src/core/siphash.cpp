@@ -1,4 +1,4 @@
-// KettleLAN – SipHash-2-4, implementacja wg specyfikacji referencyjnej.
+// KettleLAN – SipHash-2-4, implemented after the reference specification.
 #include "siphash.h"
 
 namespace kettle::crypto {

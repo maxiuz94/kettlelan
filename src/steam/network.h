@@ -1,8 +1,8 @@
-// KettleLAN – sieć: lobby Steama + przesyłanie pakietów między członkami.
+// KettleLAN – network: Steam lobby + packet exchange between members.
 //
-// Wątki:
-//  * wątek Steama – wywołuje create/join/leave/poll/tick/peers i obsługuje zdarzenia Steama,
-//  * wątek karty TUN – wywołuje wyłącznie sendPacket() (bezpieczne wielowątkowo).
+// Threads:
+//  * Steam thread – calls create/connect/leave/poll/tick/peers and handles Steam callbacks,
+//  * TUN adapter thread – only calls sendPacket() (thread-safe).
 #pragma once
 
 #include <atomic>
@@ -22,6 +22,7 @@
 #include <steam_api.h>
 
 #include "ip.h"
+#include "messages.h"
 #include "netcode.h"
 #include "router.h"
 
@@ -35,28 +36,28 @@ struct PeerInfo {
     ip::Address4 address;
     bool self = false;
     bool owner = false;
-    bool verified = false;   // potwierdził znajomość klucza sieci
-    bool conflict = false;   // adres koliduje z kimś innym (bardzo rzadkie)
+    bool verified = false;   // proved knowledge of the network key
+    bool conflict = false;   // address clashes with someone else (very rare)
     int pingMs = -1;
     bool relayed = false;
 };
 
 class Network {
 public:
-    using EventHandler = std::function<void(const std::string&)>;
+    using EventHandler = std::function<void(const Message&)>;
     using PacketHandler = std::function<void(std::span<const uint8_t>)>;
 
     Network(uint64_t selfSteamId, EventHandler onEvent);
     ~Network();
 
-    // --- wątek Steama ---
-    void create(const std::string& name);  // nowa sieć z nowym kodem
-    // Łączy z siecią o danym kodzie: dołącza do osób, które już w niej są, albo otwiera ją,
-    // jeśli nikogo nie ma. `nameHint` – nazwa używana, gdy to my otwieramy sieć.
+    // --- Steam thread ---
+    void create(const std::string& name);  // new network with a new code
+    // Connects to the network with this code: joins the people already in it, or opens it if
+    // nobody is there. `nameHint` – name used when we are the ones opening the network.
     void connect(const netcode::NetworkCode& code, const std::string& nameHint);
     void leave();
-    void poll();   // odbiór wiadomości – wywoływać jak najczęściej
-    void tick();   // zadania okresowe – co ~0,5 s
+    void poll();   // receive messages – call as often as possible
+    void tick();   // periodic work – every ~0.5 s
 
     State state() const { return state_; }
     std::string codeText() const;
@@ -64,22 +65,22 @@ public:
     std::vector<PeerInfo> peers() const;
     ip::Address4 selfAddress() const { return selfAddress_; }
 
-    // Prywatność i bezpieczeństwo (wątek Steama).
-    // hideAddress: połączenia tylko przez relay Steama – członkowie sieci nie poznają naszego IP.
+    // Privacy and security (Steam thread).
+    // hideAddress: Steam relay only – network members never learn our IP address.
     void setHideAddress(bool hide);
-    // protectServices: odrzucanie pakietów do usług systemowych (SSH, SMB, RDP, bazy danych…).
+    // protectServices: drop packets to system services (SSH, SMB, RDP, databases…).
     void setProtectServices(bool protect) { router_.setProtectServices(protect); }
 #ifdef KETTLELAN_SECURITY_TESTS
-    // Tylko do testów bezpieczeństwa: wysyłaj dowody z błędnym kluczem (udawany intruz).
+    // Security tests only: send proofs made with a wrong key (simulated intruder).
     void setDebugWrongKey(bool on) { debugWrongKey_ = on; }
-    // Tylko do testów bezpieczeństwa: wysyła do wszystkich członków ping z podrobionym adresem nadawcy.
-    // Zwraca liczbę osób, do których wysłano.
+    // Security tests only: sends every member a ping with a forged source address.
+    // Returns the number of people it was sent to.
     int debugSendSpoofed(ip::Address4 fakeSource);
 #endif
     uint64_t blockedPackets() const { return blockedPackets_; }
 
-    // --- dowolny wątek ---
-    void setPacketHandler(PacketHandler handler); // pakiety do oddania karcie TUN
+    // --- any thread ---
+    void setPacketHandler(PacketHandler handler); // packets to hand over to the TUN adapter
     void sendPacket(std::span<const uint8_t> packet);
 
 private:
@@ -106,7 +107,7 @@ private:
     void sendTo(uint64_t steamId, std::span<const uint8_t> data, int channel);
     void closeAllSessions();
     void resetState();
-    void notify(const std::string& text);
+    void notify(Msg id, std::vector<std::string> args = {});
 
     const uint64_t selfId_;
     const ip::Address4 selfAddress_;
@@ -122,14 +123,14 @@ private:
     int joinRetries_ = 0;
     std::chrono::steady_clock::time_point nextMergeCheck_{};
 
-    router::Router router_;                    // kto jest zweryfikowany i jakie pakiety przyjmujemy
-    std::set<uint64_t> reportedBad_;           // komu już zgłosiliśmy problem (bez zalewania dziennika)
+    router::Router router_;                    // who is verified and which packets we accept
+    std::set<uint64_t> reportedBad_;           // whom we already reported (no log flooding)
 #ifdef KETTLELAN_SECURITY_TESTS
     bool debugWrongKey_ = false;
 #endif
     std::atomic<uint64_t> blockedPackets_{0};
     std::mutex blockedLogMutex_;
-    std::set<std::pair<uint64_t, uint16_t>> blockedLogged_; // (kto, port) – logujemy tylko raz
+    std::set<std::pair<uint64_t, uint16_t>> blockedLogged_; // (who, port) – logged only once
     std::mutex handlerMutex_;
     PacketHandler packetHandler_;
 };

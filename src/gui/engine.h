@@ -1,7 +1,7 @@
-// KettleLAN – silnik sieci działający we własnym wątku (Steam + karta TUN).
+// KettleLAN – network engine running on its own thread (Steam + TUN adapter).
 //
-// Wszystkie wywołania Steamworks odbywają się w tym jednym wątku. Interfejs graficzny
-// wysyła tu polecenia (post) i dostaje z powrotem migawki stanu (onSnapshot).
+// All Steamworks calls happen on this single thread. The GUI posts commands here and receives
+// state snapshots back (onSnapshot).
 #pragma once
 
 #include <atomic>
@@ -21,7 +21,7 @@ enum class EngineStatus { Starting, SteamMissing, TunError, Ready };
 
 struct Snapshot {
     EngineStatus status = EngineStatus::Starting;
-    std::string error;
+    Message error;
     std::string personaName;
     std::string selfAddress;
     steam::State netState = steam::State::Idle;
@@ -34,19 +34,19 @@ struct Snapshot {
 class Engine {
 public:
     using SnapshotHandler = std::function<void(const Snapshot&)>;
-    using EventHandler = std::function<void(const std::string&)>;
+    using EventHandler = std::function<void(const Message&)>;
 
     Engine(SnapshotHandler onSnapshot, EventHandler onEvent);
     ~Engine();
 
-    void start();     // uruchamia wątek i próbuje połączyć się ze Steamem
-    void retry();     // ponowna próba po błędzie
+    void start();     // starts the thread and tries to connect to Steam
+    void retry();     // retry after an error
     void create(const std::string& name);
     void join(const std::string& code, const std::string& nameHint);
     void leave();
     void setHideAddress(bool hide);
     void setProtectServices(bool protect);
-    // Opuszcza sieć, zamyka kartę i rozłącza Steam. Blokuje do zakończenia (maks. kilka sekund).
+    // Leaves the network, closes the adapter and disconnects Steam. Blocks until done (a few seconds at most).
     void shutdown();
 
 private:
@@ -63,7 +63,7 @@ private:
     std::mutex queueMutex_;
     std::deque<std::function<void()>> queue_;
 
-    // stan wątku silnika
+    // engine thread state
     struct State;
     std::unique_ptr<State> st_;
 };

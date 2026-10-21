@@ -1,7 +1,7 @@
-// KettleLAN – decyzje bezpieczeństwa sieci: kto jest członkiem, komu wierzymy, które pakiety
-// przyjmujemy i dokąd wysyłamy. Bez zależności od Steama, więc w pełni testowalne.
+// KettleLAN – the network's security decisions: who is a member, whom we trust, which packets
+// we accept and where we send them. No Steam dependency, so it is fully testable.
 //
-// Wątki: wszystkie metody są bezpieczne wielowątkowo (wątek Steama + wątek karty TUN).
+// Threads: all methods are thread-safe (Steam thread + TUN adapter thread).
 #pragma once
 
 #include <atomic>
@@ -21,23 +21,23 @@
 namespace kettle::router {
 
 enum class HelloResult {
-    Verified,     // poprawny dowód – osoba właśnie została zweryfikowana
-    Repeated,     // poprawny dowód od osoby już zweryfikowanej
-    Conflict,     // poprawny dowód, ale adres koliduje z kimś innym – bez ruchu
-    UnknownPeer,  // nie ma jej w lobby
-    BadProof,     // nie zna klucza sieci
-    BadVersion,   // inna wersja protokołu
-    BadAddress,   // adres nie wynika z jej SteamID (próba przejęcia cudzego adresu)
-    NoNetwork,    // nie jesteśmy w żadnej sieci
+    Verified,     // valid proof – the person has just been verified
+    Repeated,     // valid proof from someone already verified
+    Conflict,     // valid proof, but the address clashes with someone else – no traffic
+    UnknownPeer,  // not in the lobby
+    BadProof,     // does not know the network key
+    BadVersion,   // different protocol version
+    BadAddress,   // the address does not match their SteamID (attempt to take over someone's address)
+    NoNetwork,    // we are not in a network
 };
 
 enum class InboundResult {
-    Deliver,       // oddajemy systemowi
-    Malformed,     // to nie jest poprawny pakiet IPv4
-    NotForUs,      // adres docelowy nie jest nasz ani rozgłoszeniowy
-    UnknownSender, // nadawca nie jest zweryfikowanym członkiem
-    Spoofed,       // adres źródłowy nie należy do nadawcy
-    Filtered,      // zablokowane przez ochronę usług (szczegóły w `filter`)
+    Deliver,       // hand over to the system
+    Malformed,     // not a valid IPv4 packet
+    NotForUs,      // destination is neither our address nor a broadcast
+    UnknownSender, // the sender is not a verified member
+    Spoofed,       // the source address does not belong to the sender
+    Filtered,      // blocked by service protection (details in `filter`)
 };
 
 struct PeerState {
@@ -61,22 +61,22 @@ public:
     void setProtectServices(bool on) { protect_ = on; }
     bool protectServices() const { return protect_; }
 
-    // --- członkowie lobby (z listy Steama)
-    // Ustawia aktualną listę członków; zwraca SteamID osób, które z niej zniknęły.
+    // --- lobby members (from Steam's list)
+    // Sets the current member list; returns the SteamIDs of people who disappeared from it.
     std::vector<uint64_t> syncMembers(const std::vector<uint64_t>& members);
     bool isMember(uint64_t steamId) const;
     void clear();
 
-    // --- weryfikacja
+    // --- verification
     HelloResult onHello(uint64_t from, const protocol::HelloMessage& msg);
-    // Dowód, który wysyłamy osobie `to`. Pusty, gdy nie jesteśmy w sieci.
+    // The proof we send to `to`. Empty when we are not in a network.
     std::optional<protocol::HelloMessage> makeHello(uint64_t to, bool ack) const;
-    // Komu należy (ponownie) wysłać HELLO – osoby niezweryfikowane, z odstępem między próbami.
+    // Who should get a (repeated) HELLO – unverified people, with a delay between attempts.
     std::vector<uint64_t> dueHellos(Clock::time_point now, std::chrono::milliseconds interval, int maxAttempts);
 
-    // --- pakiety
+    // --- packets
     InboundResult onData(uint64_t from, std::span<const uint8_t> packet, filter::Result* filterResult = nullptr) const;
-    // Do kogo wysłać pakiet z naszego systemu (pusto = nie wysyłamy).
+    // Where to send a packet from our system (empty = do not send).
     std::vector<uint64_t> recipients(std::span<const uint8_t> packet) const;
 
     std::vector<PeerState> peers() const;
@@ -97,10 +97,10 @@ private:
     mutable std::shared_mutex mutex_;
     std::optional<netcode::NetworkCode> code_;
     std::map<uint64_t, Peer> peers_;
-    std::map<uint32_t, uint64_t> routes_; // adres → SteamID (tylko zweryfikowani, bez konfliktów)
+    std::map<uint32_t, uint64_t> routes_; // address → SteamID (verified members without conflicts only)
 };
 
-// Porównanie w stałym czasie.
+// Constant-time comparison.
 bool equalConstantTime(uint64_t a, uint64_t b);
 
 } // namespace kettle::router

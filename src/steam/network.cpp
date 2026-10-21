@@ -15,7 +15,7 @@ namespace {
 
 constexpr int kMaxMembers = 250;
 constexpr auto kHelloInterval = std::chrono::seconds(2);
-constexpr int kHelloAttempts = 15; // ok. 30 s prób
+constexpr int kHelloAttempts = 15; // about 30 s of attempts
 constexpr int kDataFlags = k_nSteamNetworkingSend_UnreliableNoNagle | k_nSteamNetworkingSend_AutoRestartBrokenSession;
 constexpr int kControlFlags = k_nSteamNetworkingSend_Reliable | k_nSteamNetworkingSend_AutoRestartBrokenSession;
 
@@ -35,7 +35,7 @@ SteamNetworkingIdentity identityFor(uint64_t steamId) {
     return id;
 }
 
-// Nick innej osoby – tekst od obcych, więc zawsze oczyszczony ze znaków sterujących.
+// Another person's name – text from strangers, so always cleaned of control characters.
 std::string nameOf(uint64_t steamId) {
     const char* n = SteamFriends()->GetFriendPersonaName(CSteamID(uint64(steamId)));
     const std::string clean = n ? text::sanitize(n, 32) : std::string();
@@ -52,24 +52,25 @@ Network::~Network() {
     if (state_ != State::Idle) leave();
 }
 
-void Network::notify(const std::string& text) {
-    KLOG_INFO(text);
-    if (onEvent_) onEvent_(text);
+void Network::notify(Msg id, std::vector<std::string> args) {
+    const Message message{id, std::move(args)};
+    KLOG_INFO(english(message));
+    if (onEvent_) onEvent_(message);
 }
 
-// ---------------------------------------------------------------- tworzenie / łączenie
+// ---------------------------------------------------------------- creating / connecting
 //
-// Sieć nie ma stałego lobby. Kod wyznacza znacznik (tag); przy łączeniu szukamy w Steamie lobby
-// z tym znacznikiem. Jeśli nikogo nie ma, otwieramy nowe lobby z tym samym znacznikiem.
-// Gdyby powstały dwa lobby naraz, wszyscy przechodzą do tego o najmniejszym numerze.
+// A network has no permanent lobby. The code defines a tag; when connecting we search Steam for a
+// lobby with that tag. If nobody is there, we open a new lobby with the same tag.
+// If two lobbies are created at once, everyone moves to the one with the lowest id.
 
 void Network::create(const std::string& name) {
-    connect(netcode::generate(), name.empty() ? (std::string(SteamFriends()->GetPersonaName()) + " – sieć") : name);
+    connect(netcode::generate(), name.empty() ? (std::string(SteamFriends()->GetPersonaName()) + "'s network") : name);
 }
 
 void Network::connect(const netcode::NetworkCode& code, const std::string& nameHint) {
     if (state_ != State::Idle) {
-        notify("Najpierw opuść obecną sieć.");
+        notify(Msg::AlreadyInNetwork);
         return;
     }
     code_ = code;
@@ -77,7 +78,7 @@ void Network::connect(const netcode::NetworkCode& code, const std::string& nameH
     nameHint_ = nameHint;
     joinRetries_ = 0;
     state_ = State::Connecting;
-    notify("Łączę z siecią " + netcode::format(code) + "…");
+    notify(Msg::Connecting, {netcode::format(code)});
     startSearch(false);
 }
 
@@ -93,9 +94,9 @@ void Network::startSearch(bool merge) {
 void Network::onLobbyList(LobbyMatchList_t* r, bool ioFailure) {
     searchPending_ = false;
     const bool merge = mergeSearch_;
-    if (!code_) return; // w międzyczasie opuszczono sieć
+    if (!code_) return; // the network was left in the meantime
 
-    // najmniejszy numer lobby z naszym znacznikiem (sprawdzamy znacznik jeszcze raz)
+    // lowest lobby id with our tag (the tag is checked again)
     uint64_t best = 0;
     const uint32 count = ioFailure ? 0 : r->m_nLobbiesMatching;
     for (uint32 i = 0; i < count; ++i) {
@@ -106,7 +107,7 @@ void Network::onLobbyList(LobbyMatchList_t* r, bool ioFailure) {
 
     if (merge) {
         if (state_ != State::Connected || best == 0 || best >= lobby_.ConvertToUint64()) return;
-        notify("Łączę się z resztą osób z tej sieci…");
+        notify(Msg::Merging);
         leaveLobbyOnly();
         state_ = State::Connecting;
         enterLobby(CSteamID(uint64(best)));
@@ -117,7 +118,7 @@ void Network::onLobbyList(LobbyMatchList_t* r, bool ioFailure) {
     if (best != 0) {
         enterLobby(CSteamID(uint64(best)));
     } else {
-        // nikogo nie ma – otwieramy sieć
+        // nobody is there – open the network
         createCall_.Set(SteamMatchmaking()->CreateLobby(k_ELobbyTypeInvisible, kMaxMembers), this,
                         &Network::onLobbyCreated);
     }
@@ -127,16 +128,16 @@ void Network::onLobbyCreated(LobbyCreated_t* r, bool ioFailure) {
     if (state_ != State::Connecting || !code_) return;
     if (ioFailure || r->m_eResult != k_EResultOK) {
         resetState();
-        notify("Nie udało się otworzyć sieci (Steam: błąd " + std::to_string(ioFailure ? -1 : int(r->m_eResult)) + ").");
+        notify(Msg::OpenFailed, {std::to_string(ioFailure ? -1 : int(r->m_eResult))});
         return;
     }
     lobby_ = CSteamID(uint64(r->m_ulSteamIDLobby));
     SteamMatchmaking()->SetLobbyData(lobby_, kKeyMarker, kMarkerValue);
     SteamMatchmaking()->SetLobbyData(lobby_, kKeyTag, tag_.c_str());
     const std::string name = text::sanitize(nameHint_, 60);
-    SteamMatchmaking()->SetLobbyData(lobby_, kKeyName, (name.empty() ? std::string("Sieć KettleLAN") : name).c_str());
+    SteamMatchmaking()->SetLobbyData(lobby_, kKeyName, (name.empty() ? std::string("KettleLAN network") : name).c_str());
     SteamMatchmaking()->SetLobbyData(lobby_, kKeyProto, std::to_string(protocol::kVersion).c_str());
-    // Twórca lobby jest w nim od razu – Steam nie wyśle nam osobnego wyniku dołączenia.
+    // The creator is in the lobby right away – Steam does not send a separate join result.
     enterConnected();
 }
 
@@ -149,21 +150,20 @@ void Network::onLobbyEntered(LobbyEnter_t* r, bool ioFailure) {
     if (state_ != State::Connecting || !code_) return;
     const bool ok = !ioFailure && r->m_EChatRoomEnterResponse == k_EChatRoomEnterResponseSuccess;
     if (!ok) {
-        // Lobby mogło zniknąć między wyszukaniem a dołączeniem – szukamy jeszcze raz.
+        // The lobby may have disappeared between search and join – search again.
         lobby_ = CSteamID();
         if (++joinRetries_ <= kMaxJoinRetries) {
             startSearch(false);
             return;
         }
         resetState();
-        notify("Nie udało się połączyć z siecią (Steam: kod " +
-               std::to_string(ioFailure ? 0u : r->m_EChatRoomEnterResponse) + "). Spróbuj ponownie.");
+        notify(Msg::JoinFailed, {std::to_string(ioFailure ? 0u : r->m_EChatRoomEnterResponse)});
         return;
     }
     if (std::string(SteamMatchmaking()->GetLobbyData(lobby_, kKeyTag)) != tag_) {
         SteamMatchmaking()->LeaveLobby(lobby_);
         resetState();
-        notify("To lobby nie należy do tej sieci KettleLAN.");
+        notify(Msg::WrongLobby);
         return;
     }
     enterConnected();
@@ -175,8 +175,7 @@ void Network::enterConnected() {
     state_ = State::Connected;
     nextMergeCheck_ = Clock::now() + kFirstMergeCheck;
     syncMembers();
-    notify("Połączono z siecią „" + networkName() + "”. Twój adres: " + selfAddress_.toString() +
-           ", kod sieci: " + codeText());
+    notify(Msg::Connected, {networkName(), selfAddress_.toString(), codeText()});
 }
 
 void Network::closeAllSessions() {
@@ -188,7 +187,7 @@ void Network::leaveLobbyOnly() {
     closeAllSessions();
     const auto code = router_.code();
     router_.clear();
-    router_.setCode(code); // przy łączeniu dwóch lobby kod zostaje ten sam
+    router_.setCode(code); // when merging two lobbies the code stays the same
     lobby_ = CSteamID();
 }
 
@@ -196,7 +195,7 @@ void Network::leave() {
     if (state_ == State::Idle) return;
     leaveLobbyOnly();
     resetState();
-    notify("Opuszczono sieć.");
+    notify(Msg::Left);
 }
 
 void Network::resetState() {
@@ -209,7 +208,7 @@ void Network::resetState() {
     state_ = State::Idle;
 }
 
-// ---------------------------------------------------------------- członkowie
+// ---------------------------------------------------------------- members
 
 bool Network::isLobbyMember(uint64_t steamId) const {
     if (!lobby_.IsValid()) return false;
@@ -232,7 +231,7 @@ void Network::syncMembers() {
     for (uint64_t id : router_.syncMembers(current)) {
         SteamNetworkingMessages()->CloseSessionWithUser(identityFor(id));
         reportedBad_.erase(id);
-        if (verifiedBefore.count(id)) notify(nameOf(id) + " opuścił(a) sieć.");
+        if (verifiedBefore.count(id)) notify(Msg::PeerLeft, {nameOf(id)});
     }
 }
 
@@ -241,30 +240,30 @@ void Network::onLobbyChatUpdate(LobbyChatUpdate_t* ev) {
     syncMembers();
 }
 
-// ---------------------------------------------------------------- sesje Steam Networking
+// ---------------------------------------------------------------- Steam Networking sessions
 
 void Network::onSessionRequest(SteamNetworkingMessagesSessionRequest_t* ev) {
     const uint64_t from = ev->m_identityRemote.GetSteamID64();
-    // Przyjmujemy połączenia wyłącznie od osób z naszego lobby.
+    // Accept connections only from people in our lobby.
     if (state_ == State::Connected && isLobbyMember(from)) {
         SteamNetworkingMessages()->AcceptSessionWithUser(ev->m_identityRemote);
     } else {
-        KLOG_DEBUG("Odrzucono sesję od " << from);
+        KLOG_DEBUG("Rejected session from " << from);
     }
 }
 
 void Network::onSessionFailed(SteamNetworkingMessagesSessionFailed_t* ev) {
-    KLOG_WARN("Połączenie z " << nameOf(ev->m_info.m_identityRemote.GetSteamID64())
-              << " przerwane: " << ev->m_info.m_szEndDebug);
+    KLOG_WARN("Connection to " << nameOf(ev->m_info.m_identityRemote.GetSteamID64())
+              << " lost: " << ev->m_info.m_szEndDebug);
 }
 
-// ---------------------------------------------------------------- HELLO (logika w router::Router)
+// ---------------------------------------------------------------- HELLO (logic in router::Router)
 
 void Network::sendHello(uint64_t to, bool ack) {
     auto msg = router_.makeHello(to, ack);
     if (!msg) return;
 #ifdef KETTLELAN_SECURITY_TESTS
-    if (debugWrongKey_) msg->proof ^= 0x5A5A5A5A5A5A5A5Aull; // test: udajemy, że nie znamy klucza
+    if (debugWrongKey_) msg->proof ^= 0x5A5A5A5A5A5A5A5Aull; // test: pretend we do not know the key
 #endif
     sendTo(to, protocol::encode(*msg), protocol::kChannelControl);
 }
@@ -274,30 +273,30 @@ void Network::handleControl(uint64_t from, std::span<const uint8_t> data) {
     const auto msg = protocol::decode(data);
     if (!msg) return;
 
-    // HELLO może przyjść, zanim Steam powiadomi nas o nowym członku lobby.
+    // HELLO may arrive before Steam tells us about a new lobby member.
     if (!router_.isMember(from) && isLobbyMember(from)) syncMembers();
 
     using router::HelloResult;
     const HelloResult res = router_.onHello(from, *msg);
     switch (res) {
     case HelloResult::Verified:
-        notify(nameOf(from) + " dołączył(a) – adres " + ip::addressForSteamId(from).toString());
+        notify(Msg::PeerJoined, {nameOf(from), ip::addressForSteamId(from).toString()});
         break;
     case HelloResult::Conflict:
         if (reportedBad_.insert(from).second)
-            notify(nameOf(from) + " ma ten sam adres co ktoś inny w sieci – ruch do tej osoby nie będzie działał.");
+            notify(Msg::PeerConflict, {nameOf(from)});
         break;
     case HelloResult::BadProof:
         if (reportedBad_.insert(from).second)
-            notify(nameOf(from) + " jest w lobby, ale nie zna klucza sieci – ignoruję.");
+            notify(Msg::PeerBadKey, {nameOf(from)});
         return;
     case HelloResult::BadVersion:
         if (reportedBad_.insert(from).second)
-            notify(nameOf(from) + " używa innej wersji KettleLAN – zaktualizujcie program.");
+            notify(Msg::PeerBadVersion, {nameOf(from)});
         return;
     case HelloResult::BadAddress:
         if (reportedBad_.insert(from).second)
-            KLOG_WARN(nameOf(from) << " podał(a) cudzy adres przy weryfikacji – ignoruję.");
+            KLOG_WARN(nameOf(from) << " announced someone else's address during verification – ignoring.");
         return;
     case HelloResult::Repeated:
         break;
@@ -308,13 +307,13 @@ void Network::handleControl(uint64_t from, std::span<const uint8_t> data) {
     if (msg->type == protocol::MessageType::Hello) sendHello(from, true);
 }
 
-// ---------------------------------------------------------------- dane (logika w router::Router)
+// ---------------------------------------------------------------- data (logic in router::Router)
 
 void Network::sendTo(uint64_t steamId, std::span<const uint8_t> data, int channel) {
     const EResult r = SteamNetworkingMessages()->SendMessageToUser(
         identityFor(steamId), data.data(), uint32(data.size()),
         channel == protocol::kChannelData ? kDataFlags : kControlFlags, channel);
-    if (r != k_EResultOK && r != k_EResultNoConnection) KLOG_DEBUG("Wysyłka do " << steamId << ": " << int(r));
+    if (r != k_EResultOK && r != k_EResultNoConnection) KLOG_DEBUG("Send to " << steamId << " failed: " << int(r));
 }
 
 void Network::sendPacket(std::span<const uint8_t> packet) {
@@ -329,10 +328,10 @@ void Network::handleData(uint64_t from, std::span<const uint8_t> data) {
         ++blockedPackets_;
         std::lock_guard lk(blockedLogMutex_);
         if (blockedLogged_.size() < 1000 && blockedLogged_.insert({from, fr.dstPort}).second) {
-            const char* why = fr.verdict == filter::Verdict::BlockedService ? "chroniona usługa"
-                            : fr.verdict == filter::Verdict::BlockedProtocol ? "niedozwolony protokół"
-                            : "podejrzany fragment pakietu";
-            KLOG_WARN("Zablokowano ruch od " << nameOf(from) << " do " << filter::serviceName(fr.dstPort) << " – " << why);
+            const char* why = fr.verdict == filter::Verdict::BlockedService ? "protected service"
+                            : fr.verdict == filter::Verdict::BlockedProtocol ? "protocol not allowed"
+                            : "suspicious IP fragment";
+            KLOG_WARN("Blocked traffic from " << nameOf(from) << " to " << filter::serviceName(fr.dstPort) << " – " << why);
         }
         return;
     }
@@ -340,7 +339,7 @@ void Network::handleData(uint64_t from, std::span<const uint8_t> data) {
         ++blockedPackets_;
         std::lock_guard lk(blockedLogMutex_);
         if (blockedLogged_.insert({from, 0xFFFF}).second)
-            KLOG_WARN("Odrzucono pakiety od " << nameOf(from) << " z cudzym adresem nadawcy (podszywanie się)");
+            KLOG_WARN("Dropped packets from " << nameOf(from) << " with a forged source address (spoofing)");
         return;
     }
     if (res != router::InboundResult::Deliver) return;
@@ -385,7 +384,7 @@ int Network::debugSendSpoofed(ip::Address4 fakeSource) {
     int sent = 0;
     for (const auto& peer : router_.peers()) {
         if (!peer.verified) continue;
-        // ICMP echo request: nagłówek IPv4 (20 B) + ICMP (8 B)
+        // ICMP echo request: IPv4 header (20 B) + ICMP (8 B)
         std::vector<uint8_t> p(28, 0);
         p[0] = 0x45; p[3] = 28; p[8] = 64; p[9] = 1;
         const auto s = fakeSource.bytes(), d = peer.address.bytes();
@@ -399,7 +398,7 @@ int Network::debugSendSpoofed(ip::Address4 fakeSource) {
         const uint16_t ipSum = checksum(p.data(), 20);
         p[10] = uint8_t(ipSum >> 8); p[11] = uint8_t(ipSum);
         p[20] = 8; // echo request
-        p[24] = 0x4B; p[25] = 0x4C; // identyfikator „KL”
+        p[24] = 0x4B; p[25] = 0x4C; // identifier "KL"
         const uint16_t icmpSum = checksum(p.data() + 20, 8);
         p[22] = uint8_t(icmpSum >> 8); p[23] = uint8_t(icmpSum);
         sendTo(peer.steamId, p, protocol::kChannelData);
@@ -409,29 +408,29 @@ int Network::debugSendSpoofed(ip::Address4 fakeSource) {
 }
 #endif
 
-// ---------------------------------------------------------------- prywatność
+// ---------------------------------------------------------------- privacy
 
 void Network::setHideAddress(bool hide) {
-    // Bez ICE Steam nie wymienia z drugą stroną żadnych adresów IP – zostaje tylko relay Valve.
-    // Wyłączenie przywraca domyślne zachowanie z ustawień klienta Steam.
+    // Without ICE, Steam exchanges no IP addresses with the other side – only Valve's relay is used.
+    // Turning it off restores the default behaviour from the Steam client's settings.
     SteamNetworkingUtils()->SetGlobalConfigValueInt32(
         k_ESteamNetworkingConfig_P2P_Transport_ICE_Enable,
         hide ? k_nSteamNetworkingConfig_P2P_Transport_ICE_Enable_Disable
              : k_nSteamNetworkingConfig_P2P_Transport_ICE_Enable_Default);
-    KLOG_INFO((hide ? "Prywatność: połączenia tylko przez relay Steam (adres IP ukryty)"
-                    : "Prywatność: dozwolone połączenia bezpośrednie"));
-    closeAllSessions(); // istniejące połączenia zestawią się od nowa z nowym ustawieniem
+    KLOG_INFO((hide ? "Privacy: Steam relay only (IP address hidden)"
+                    : "Privacy: direct connections allowed"));
+    closeAllSessions(); // existing connections are re-established with the new setting
 }
 
-// ---------------------------------------------------------------- informacje
+// ---------------------------------------------------------------- information
 
 std::string Network::codeText() const { return code_ ? netcode::format(*code_) : std::string(); }
 
 std::string Network::networkName() const {
     if (!lobby_.IsValid()) return {};
-    // nazwę ustawia osoba, która otworzyła sieć – tekst od obcych
+    // the name is set by whoever opened the network – text from strangers
     const std::string clean = text::sanitize(SteamMatchmaking()->GetLobbyData(lobby_, kKeyName), 60);
-    return clean.empty() ? std::string("Sieć KettleLAN") : clean;
+    return clean.empty() ? std::string("KettleLAN network") : clean;
 }
 
 std::vector<PeerInfo> Network::peers() const {

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# KettleLAN – budowanie na Linuksie. Użycie: ./scripts/build.sh [dodatkowe opcje cmake]
+# KettleLAN – build on Linux. Usage: ./scripts/build.sh [extra cmake options]
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -17,28 +17,28 @@ have_sdk() {
 }
 
 if ! have_sdk && [[ " $* " != *"STEAMWORKS_SDK_"* ]]; then
-    echo "Do kompilacji potrzebne jest Steamworks SDK (darmowe, wymaga konta Steam)."
-    echo "Gotowe paczki KettleLAN go nie potrzebują – tylko budowanie ze źródeł."
-    read -rp "Otworzyć stronę pobierania w przeglądarce? [T/n] " answer
+    echo "Building needs the Steamworks SDK (free, requires a Steam account)."
+    echo "Ready-made KettleLAN packages do not need it – only building from source does."
+    read -rp "Open the download page in your browser? [Y/n] " answer
     if [[ ! "$answer" =~ ^[nN] ]]; then
-        (xdg-open "$SDK_URL" >/dev/null 2>&1 &) || echo "Otwórz ręcznie: $SDK_URL"
+        (xdg-open "$SDK_URL" >/dev/null 2>&1 &) || echo "Open it manually: $SDK_URL"
     fi
     echo
-    echo "1. Zaloguj się kontem Steam i zaakceptuj licencję."
-    echo "2. Pobierz najnowsze „Steamworks SDK” (plik steamworks_sdk_XXX.zip) do folderu Pobrane."
+    echo "1. Sign in with your Steam account and accept the license."
+    echo "2. Download the latest \"Steamworks SDK\" (steamworks_sdk_XXX.zip) to your Downloads folder."
     until have_sdk; do
-        read -rp "Naciśnij Enter, gdy pobieranie się zakończy (Ctrl+C przerywa)… " _
-        have_sdk || echo "Nadal nie widzę pliku steamworks_sdk_*.zip w Pobranych."
+        read -rp "Press Enter when the download has finished (Ctrl+C to cancel)… " _
+        have_sdk || echo "Still no steamworks_sdk_*.zip in your Downloads folder."
     done
-    echo "Znaleziono: $(find_sdk_zip)"
+    echo "Found: $(find_sdk_zip)"
 fi
 
 cmake -B build -DCMAKE_BUILD_TYPE=Release "$@"
-cmake --build build -j"$(nproc)"
+cmake --build build --parallel "${JOBS:-$(nproc)}"   # JOBS=2 on low-memory computers
 ctest --test-dir build --output-on-failure
 
 echo
-echo "Gotowe."
-echo "  ./build/kettlelan                okno programu"
-echo "  ./build/kettlelan-cli            wersja w terminalu (diagnostyka)"
-echo "  ./scripts/install-local.sh       dodaje KettleLAN do menu aplikacji"
+echo "Done."
+echo "  ./build/kettlelan                the application window"
+echo "  ./build/kettlelan-cli            command-line version (diagnostics)"
+echo "  ./scripts/install-local.sh       adds KettleLAN to your application menu"

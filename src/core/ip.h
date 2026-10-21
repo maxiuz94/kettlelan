@@ -1,5 +1,5 @@
-// KettleLAN – adresy i pakiety IPv4.
-// Na podstawie ip.h/ip.cpp z PartyLAN (c) 2023 Yifan Gu, licencja BSD-3.
+// KettleLAN – IPv4 addresses and packets.
+// Based on ip.h/ip.cpp from PartyLAN (c) 2023 Yifan Gu, BSD-3 license.
 #pragma once
 
 #include <array>
@@ -50,16 +50,16 @@ private:
     uint8_t prefix_;
 };
 
-// Wirtualna sieć KettleLAN: 100.64.0.0/10 (zakres CGNAT, nie koliduje z domowymi LAN-ami).
+// KettleLAN virtual network: 100.64.0.0/10 (CGNAT range, does not clash with home LANs).
 inline constexpr Subnet4 kVirtualNet{Address4(100, 64, 0, 0), 10};
 
-// Stały adres wyliczany z 64-bitowego SteamID (ten sam przy każdym uruchomieniu).
+// Stable address derived from the 64-bit SteamID (the same on every start).
 Address4 addressForSteamId(uint64_t steamId);
 
-// Czy adres docelowy oznacza „wszyscy w sieci” (broadcast, multicast, broadcast podsieci).
+// Whether the destination means "everyone in the network" (broadcast, multicast, subnet broadcast).
 bool isGroupDestination(Address4 dst);
 
-// Minimalny widok nagłówka IPv4 – bez kopiowania i bez modyfikowania pakietu.
+// Minimal view of an IPv4 header – no copying and no modification of the packet.
 struct Packet4View {
     Address4 src;
     Address4 dst;

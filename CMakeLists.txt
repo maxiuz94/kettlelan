@@ -5,14 +5,14 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
-    set(CMAKE_BUILD_TYPE Release CACHE STRING "Typ budowania" FORCE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
-option(KETTLELAN_BUILD_APP "Buduj program KettleLAN (wymaga Steamworks SDK)" ON)
-option(KETTLELAN_BUILD_TESTS "Buduj testy rdzenia (bez Steamworks SDK)" ON)
+option(KETTLELAN_BUILD_APP "Build the KettleLAN program (needs the Steamworks SDK)" ON)
+option(KETTLELAN_BUILD_TESTS "Build the core tests (no Steamworks SDK needed)" ON)
 
-option(KETTLELAN_SANITIZE "Buduj z AddressSanitizer i UndefinedBehaviorSanitizer (testy)" OFF)
-option(KETTLELAN_SECURITY_TESTS "Dodaj do kettlelan-cli polecenia symulujące ataki (tylko do testów)" OFF)
+option(KETTLELAN_SANITIZE "Build with AddressSanitizer and UndefinedBehaviorSanitizer (tests)" OFF)
+option(KETTLELAN_SECURITY_TESTS "Add attack-simulating commands to kettlelan-cli (testing only)" OFF)
 
 if(MSVC)
     set(KETTLELAN_WARNINGS /W4 /utf-8)
@@ -20,8 +20,8 @@ else()
     set(KETTLELAN_WARNINGS -Wall -Wextra -Wpedantic)
 endif()
 
-# Utwardzenie programu: ochrona stosu, kontrola przepełnień buforów, adresy losowe (PIE),
-# tablice adresów tylko do odczytu (RELRO) i niewykonywalny stos.
+# Hardening: stack protection, buffer overflow checks, randomised addresses (PIE),
+# read-only relocations (RELRO) and a non-executable stack.
 if(NOT MSVC AND NOT KETTLELAN_SANITIZE)
     set(CMAKE_POSITION_INDEPENDENT_CODE ON)
     include(CheckPIESupported)
@@ -39,10 +39,11 @@ if(KETTLELAN_SANITIZE)
     add_link_options(-fsanitize=address,undefined)
 endif()
 
-# ---------------------------------------------------------------- rdzeń (bez zależności)
+# ---------------------------------------------------------------- core (no dependencies)
 add_library(kettle_core STATIC
     src/core/filter.cpp
     src/core/ip.cpp
+    src/core/messages.cpp
     src/core/netcode.cpp
     src/core/protocol.cpp
     src/core/router.cpp
@@ -74,13 +75,13 @@ if(KETTLELAN_BUILD_TESTS)
 endif()
 
 # ---------------------------------------------------------------- program
-option(KETTLELAN_BUILD_GUI "Buduj wersję z interfejsem graficznym (Qt 6)" ON)
+option(KETTLELAN_BUILD_GUI "Build the graphical version (Qt 6)" ON)
 
 if(KETTLELAN_BUILD_APP)
     include(cmake/Steamworks.cmake)
     find_package(Threads REQUIRED)
 
-    # Wspólna część: Steam + karta sieciowa (używana przez GUI i wersję konsolową).
+    # Shared part: Steam + network adapter (used by the GUI and the command-line version).
     add_library(kettle_net STATIC
         src/steam/session.cpp
         src/steam/network.cpp
@@ -88,9 +89,9 @@ if(KETTLELAN_BUILD_APP)
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         target_sources(kettle_net PRIVATE src/platform/linux/tun_linux.cpp)
     elseif(WIN32)
-        message(FATAL_ERROR "Wersja dla Windowsa powstaje w etapie 2.")
+        message(FATAL_ERROR "The Windows version is not available yet.")
     else()
-        message(FATAL_ERROR "Nieobsługiwany system: ${CMAKE_SYSTEM_NAME}")
+        message(FATAL_ERROR "Unsupported system: ${CMAKE_SYSTEM_NAME}")
     endif()
     target_include_directories(kettle_net PUBLIC src/platform src/steam)
     if(KETTLELAN_SECURITY_TESTS)
@@ -99,7 +100,7 @@ if(KETTLELAN_BUILD_APP)
     target_compile_options(kettle_net PRIVATE ${KETTLELAN_WARNINGS})
     target_link_libraries(kettle_net PUBLIC kettle_core Steamworks::api Threads::Threads)
 
-    # Wersja konsolowa – przydatna do diagnostyki.
+    # Command-line version – useful for diagnostics.
     add_executable(kettlelan-cli src/app/main_cli.cpp)
     target_compile_definitions(kettlelan-cli PRIVATE KETTLELAN_VERSION="${PROJECT_VERSION}")
     target_compile_options(kettlelan-cli PRIVATE ${KETTLELAN_WARNINGS})
@@ -107,7 +108,7 @@ if(KETTLELAN_BUILD_APP)
     set(KETTLELAN_TARGETS kettlelan-cli)
 
     if(KETTLELAN_BUILD_GUI)
-        find_package(Qt6 6.4 REQUIRED COMPONENTS Quick QuickControls2 Widgets Network)
+        find_package(Qt6 6.4 REQUIRED COMPONENTS Quick QuickControls2 Widgets Network LinguistTools)
         qt_standard_project_setup()
 
         qt_add_executable(kettlelan
@@ -130,7 +131,7 @@ if(KETTLELAN_BUILD_APP)
             src/gui/qml/NetworkPage.qml
             src/gui/qml/SettingsPage.qml
         )
-        # pliki QML trafiają do qrc:/qt/qml/KettleLAN/<nazwa>.qml
+        # QML files end up at qrc:/qt/qml/KettleLAN/<name>.qml
         foreach(f ${KETTLELAN_QML})
             get_filename_component(n "${f}" NAME)
             set_source_files_properties("${f}" PROPERTIES QT_RESOURCE_ALIAS "${n}")
@@ -142,6 +143,13 @@ if(KETTLELAN_BUILD_APP)
             RESOURCE_PREFIX /qt/qml
             QML_FILES ${KETTLELAN_QML}
         )
+        # Translations: translations/*.ts (edit with Qt Linguist or a text editor).
+        # Refresh after changing texts in the code: cmake --build build --target update_translations
+        qt_add_translations(kettlelan
+            TS_FILES translations/kettlelan_en.ts translations/kettlelan_pl.ts
+            SOURCES ${KETTLELAN_QML} src/gui/backend.cpp src/gui/main_gui.cpp src/core/messages.cpp
+            LUPDATE_OPTIONS -locations relative
+        )
         target_include_directories(kettlelan PRIVATE src/gui)
         target_compile_definitions(kettlelan PRIVATE KETTLELAN_VERSION="${PROJECT_VERSION}")
         target_compile_options(kettlelan PRIVATE ${KETTLELAN_WARNINGS})
@@ -152,7 +160,7 @@ if(KETTLELAN_BUILD_APP)
 
     foreach(t ${KETTLELAN_TARGETS})
         if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-            # libsteam_api.so leży obok programu
+            # libsteam_api.so sits next to the program
             set_target_properties(${t} PROPERTIES BUILD_RPATH "$ORIGIN" INSTALL_RPATH "$ORIGIN")
         endif()
         add_custom_command(TARGET ${t} POST_BUILD
@@ -162,10 +170,10 @@ if(KETTLELAN_BUILD_APP)
     endforeach()
 endif()
 
-# ---------------------------------------------------------------- instalacja i paczki
+# ---------------------------------------------------------------- installation and packages
 #   .deb:      cmake -B build -DKETTLELAN_PACKAGE=deb -DKETTLELAN_DEB_DISTRO=debian12 && cpack --config build/CPackConfig.cmake
-#   AppImage:  packaging/linux/build-appimage.sh (układ katalogów AppImage: -DKETTLELAN_PACKAGE=appimage)
-set(KETTLELAN_PACKAGE "" CACHE STRING "Układ instalacji: deb, appimage albo puste (bez reguł instalacji)")
+#   AppImage:  packaging/linux/build-appimage.sh (AppImage layout: -DKETTLELAN_PACKAGE=appimage)
+set(KETTLELAN_PACKAGE "" CACHE STRING "Install layout: deb, appimage or empty (no install rules)")
 
 if(KETTLELAN_BUILD_APP AND KETTLELAN_BUILD_GUI AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND KETTLELAN_PACKAGE)
     set(KETTLELAN_ICON_SIZES 16 24 32 48 64 128 256 512)
@@ -176,7 +184,7 @@ if(KETTLELAN_BUILD_APP AND KETTLELAN_BUILD_GUI AND CMAKE_SYSTEM_NAME STREQUAL "L
     install(FILES packaging/linux/kettlelan.desktop DESTINATION share/applications)
 
     if(KETTLELAN_PACKAGE STREQUAL "deb")
-        # Programy, biblioteka Steama i pomocnik w /usr/lib/kettlelan (własność roota).
+        # Programs, the Steam library and the helper in /usr/lib/kettlelan (owned by root).
         install(TARGETS kettlelan kettlelan-cli RUNTIME DESTINATION lib/kettlelan)
         install(FILES "${STEAMWORKS_REDIST}" DESTINATION lib/kettlelan)
         install(PROGRAMS scripts/kettlelan-helper DESTINATION lib/kettlelan)
@@ -186,7 +194,7 @@ if(KETTLELAN_BUILD_APP AND KETTLELAN_BUILD_GUI AND CMAKE_SYSTEM_NAME STREQUAL "L
         install(FILES LICENSE DESTINATION share/doc/kettlelan RENAME copyright)
         install(FILES README.md SECURITY.md DESTINATION share/doc/kettlelan)
 
-        set(KETTLELAN_DEB_DISTRO "" CACHE STRING "Dopisek do nazwy pliku .deb, np. debian12 albo ubuntu24.04")
+        set(KETTLELAN_DEB_DISTRO "" CACHE STRING "Suffix for the .deb file name, e.g. debian12 or ubuntu24.04")
         set(CPACK_GENERATOR DEB)
         set(CPACK_PACKAGE_NAME kettlelan)
         set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
@@ -200,7 +208,7 @@ if(KETTLELAN_BUILD_APP AND KETTLELAN_BUILD_GUI AND CMAKE_SYSTEM_NAME STREQUAL "L
         set(CPACK_DEBIAN_PACKAGE_DESCRIPTION "Play classic LAN games (Quake 3, Unreal Tournament, Counter-Strike 1.6,
 Warcraft III...) with friends as if you were on the same router.
 No player limit, no port forwarding and no own server - traffic goes
-through the encrypted Steam network. Wirtualny LAN przez siec Steam.")
+through the encrypted Steam network.")
         set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
         set(CPACK_DEBIAN_PACKAGE_DEPENDS "pkexec | policykit-1, iproute2, qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtquick-layouts, qml6-module-qtquick-shapes, qml6-module-qtquick-templates, qml6-module-qtquick-window, qml6-module-qtqml-workerscript")
         set(CPACK_DEBIAN_PACKAGE_SUGGESTS "steam-installer | steam-launcher | steam")
@@ -211,11 +219,11 @@ through the encrypted Steam network. Wirtualny LAN przez siec Steam.")
         endif()
         include(CPack)
     elseif(KETTLELAN_PACKAGE STREQUAL "appimage")
-        # AppImage: wszystko w usr/bin, biblioteki Qt dołoży linuxdeploy.
+        # AppImage: everything in usr/bin, linuxdeploy adds the Qt libraries.
         install(TARGETS kettlelan kettlelan-cli RUNTIME DESTINATION bin)
         install(FILES "${STEAMWORKS_REDIST}" DESTINATION bin)
         install(PROGRAMS scripts/kettlelan-helper DESTINATION bin)
     else()
-        message(FATAL_ERROR "KETTLELAN_PACKAGE musi być „deb” albo „appimage”.")
+        message(FATAL_ERROR "KETTLELAN_PACKAGE must be \"deb\" or \"appimage\".")
     endif()
 endif()

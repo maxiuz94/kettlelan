@@ -11,6 +11,8 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QGuiApplication>
+#include <QLocale>
+#include <QQmlEngine>
 #include <QMenu>
 #include <QPalette>
 #include <QSettings>
@@ -50,13 +52,13 @@ QString normalizeCode(const QString& code) {
     return c ? QString::fromStdString(netcode::format(*c)) : QString();
 }
 
-// Tekst od innych osób w menu Qt: „&” oznacza tam skrót klawiszowy, więc podwajamy go.
+// Text from other people in a Qt menu: "&" marks a keyboard shortcut there, so double it.
 QString menuText(const QString& t) {
     QString out = t;
     return out.replace(QLatin1Char('&'), QStringLiteral("&&"));
 }
 
-// Plik z ustawieniami zawiera kody sieci (działają jak hasła) – tylko dla właściciela.
+// The settings file holds network codes (they work like passwords) – owner only.
 void restrictSettingsFile() {
     QSettings s;
     s.sync();
@@ -90,7 +92,7 @@ QString autostartFile() {
            QStringLiteral("/autostart/kettlelan.desktop");
 }
 QString executablePath() {
-    const QByteArray appImage = qgetenv("APPIMAGE"); // uruchomione z AppImage
+    const QByteArray appImage = qgetenv("APPIMAGE"); // started from an AppImage
     return appImage.isEmpty() ? QCoreApplication::applicationFilePath() : QString::fromLocal8Bit(appImage);
 }
 #else
@@ -116,7 +118,6 @@ Backend::Backend(bool demo, QObject* parent) : QObject(parent), demo_(demo) {
     connect(this, &Backend::settingsChanged, this, &Backend::themeChanged);
 
     setupTray();
-    if (demo_) loadDemo();
 }
 
 Backend::~Backend() = default;
@@ -129,20 +130,21 @@ void Backend::startEngine() {
         [this](const Snapshot& snap) {
             QMetaObject::invokeMethod(this, [this, snap] { applySnapshot(snap); }, Qt::QueuedConnection);
         },
-        [this](const std::string& text) {
-            const QString t = QString::fromStdString(text);
-            QMetaObject::invokeMethod(this, [this, t] { handleEvent(t); }, Qt::QueuedConnection);
+        [this](const Message& message) {
+            QMetaObject::invokeMethod(this, [this, message] { handleEvent(message); }, Qt::QueuedConnection);
         });
     engine_->setHideAddress(hideAddress_);
     engine_->setProtectServices(protectServices_);
     engine_->start();
 }
 
-// ---------------------------------------------------------------- stan z silnika
+// ---------------------------------------------------------------- state from the engine
 
 void Backend::applySnapshot(const Snapshot& snap) {
     status_ = statusName(snap.status);
-    errorText_ = QString::fromStdString(snap.error);
+    hasError_ = snap.status == EngineStatus::SteamMissing || snap.status == EngineStatus::TunError;
+    errorMessage_ = snap.error;
+    errorText_ = hasError_ ? translate(errorMessage_) : QString();
     personaName_ = QString::fromStdString(snap.personaName);
     selfAddress_ = QString::fromStdString(snap.selfAddress);
     netState_ = netStateName(snap.netState);
@@ -170,7 +172,7 @@ void Backend::applySnapshot(const Snapshot& snap) {
         lastSavedSignature_.clear();
     }
 
-    // Automatyczny powrót do ostatniej sieci – raz, zaraz po połączeniu ze Steamem.
+    // Rejoin the last network automatically – once, right after connecting to Steam.
     if (status_ == QLatin1String("ready") && !autoConnectDone_) {
         autoConnectDone_ = true;
         const QString last = QSettings().value(QStringLiteral("lastNetwork")).toString();
@@ -179,23 +181,29 @@ void Backend::applySnapshot(const Snapshot& snap) {
     rebuildTrayMenu();
 }
 
-void Backend::handleEvent(const QString& text) {
+QString Backend::translate(const Message& message) const {
+    QString text = QCoreApplication::translate("Messages", messageTemplate(message.id));
+    for (const auto& arg : message.args) text = text.arg(QString::fromStdString(arg));
+    return text;
+}
+
+void Backend::handleEvent(const Message& message) {
+    const QString text = translate(message);
     emit toast(text);
-    // Powiadomienia systemowe tylko o osobach, i tylko gdy okno jest schowane.
-    const bool aboutPeople = text.contains(QStringLiteral("dołączył")) || text.contains(QStringLiteral("opuścił"));
+    // System notifications only about people, and only when the window is hidden.
     const bool hidden = !window_ || !window_->isVisible();
-    if (notifications_ && aboutPeople && hidden && tray_)
+    if (notifications_ && isPeerEvent(message.id) && hidden && tray_)
         tray_->showMessage(QStringLiteral("KettleLAN"), text.toHtmlEscaped(), makeAppIcon(true), 4000);
 }
 
-// ---------------------------------------------------------------- akcje
+// ---------------------------------------------------------------- actions
 
 void Backend::retry() {
     if (engine_) engine_->retry();
 }
 
 QString Backend::defaultNetworkName() const {
-    return personaName_.isEmpty() ? QStringLiteral("Moja sieć") : QStringLiteral("Sieć %1").arg(personaName_);
+    return personaName_.isEmpty() ? tr("My network") : tr("%1's network").arg(personaName_);
 }
 
 void Backend::createNetwork(const QString& name) {
@@ -213,7 +221,7 @@ bool Backend::isCodeValid(const QString& code) const { return netcode::parse(cod
 
 void Backend::joinNetwork(const QString& code) {
     if (!isCodeValid(code)) {
-        emit toast(QStringLiteral("To nie wygląda na kod sieci. Kod ma postać KTL-XXXX-XXXX-XXXX."));
+        emit toast(translate({Msg::InvalidCode, {}}));
         return;
     }
     const QString normalized = normalizeCode(code);
@@ -231,14 +239,14 @@ void Backend::forgetNetwork(const QString& code) {
             storeSaved();
             if (QSettings().value(QStringLiteral("lastNetwork")).toString() == c)
                 QSettings().remove(QStringLiteral("lastNetwork"));
-            emit toast(QStringLiteral("Usunięto „%1” z Twoich sieci").arg(name));
+            emit toast(tr("Removed “%1” from your networks").arg(name));
             return;
         }
     }
 }
 
 void Backend::leaveNetwork() {
-    // Świadome opuszczenie: przy następnym uruchomieniu nie wracamy automatycznie do tej sieci.
+    // Leaving on purpose: do not rejoin this network automatically on the next start.
     QSettings().remove(QStringLiteral("lastNetwork"));
     if (demo_) {
         netState_ = QStringLiteral("idle");
@@ -267,11 +275,11 @@ void Backend::showWindow() {
 void Backend::quitApp() {
     if (tray_) tray_->hide();
     if (window_) window_->hide();
-    if (engine_) engine_->shutdown(); // opuszcza sieć i rozłącza Steam (maks. ~3 s)
+    if (engine_) engine_->shutdown(); // leaves the network and disconnects Steam (~3 s at most)
     QCoreApplication::quit();
 }
 
-// ---------------------------------------------------------------- ustawienia
+// ---------------------------------------------------------------- settings
 
 void Backend::setCloseToTray(bool v) {
     if (v == closeToTray_) return;
@@ -303,7 +311,52 @@ void Backend::setProtectServices(bool v) {
     emit settingsChanged();
 }
 
-// ---------------------------------------------------------------- zapisane sieci
+// ---------------------------------------------------------------- language
+
+void Backend::loadTranslator(const QString& language) {
+    QCoreApplication::removeTranslator(&translator_);
+    // English is the source language; its file only holds plural forms ("1 member", "2 members").
+    const QString lang = language == QLatin1String("pl") ? QStringLiteral("pl") : QStringLiteral("en");
+    if (translator_.load(QStringLiteral(":/i18n/kettlelan_%1.qm").arg(lang))) QCoreApplication::installTranslator(&translator_);
+}
+
+void Backend::applyInitialLanguage() {
+    QSettings s;
+    const QString forced = qEnvironmentVariable("KETTLELAN_LANG"); // e.g. for screenshots
+    if (!forced.isEmpty()) {
+        language_ = forced;
+    } else if (s.contains(QStringLiteral("language"))) {
+        language_ = s.value(QStringLiteral("language")).toString();
+    } else {
+        language_ = QStringLiteral("en");
+        // First start on a Polish system: offer Polish (the user can always change it in the settings).
+        askLanguage_ = QLocale::system().language() == QLocale::Polish;
+        if (!askLanguage_) s.setValue(QStringLiteral("language"), language_);
+    }
+    loadTranslator(language_);
+    if (demo_) loadDemo(); // demo texts in the chosen language
+}
+
+void Backend::setLanguage(const QString& language) {
+    const bool isNew = language != language_;
+    language_ = language;
+    askLanguage_ = false;
+    QSettings().setValue(QStringLiteral("language"), language_);
+    if (isNew) {
+        loadTranslator(language_);
+        if (qmlEngine_) qmlEngine_->retranslate();
+        if (hasError_) errorText_ = translate(errorMessage_);
+        if (demo_) loadDemo();
+        trayMenuSignature_.clear();
+        rebuildTrayMenu();
+        emit changed();
+    }
+    emit languageChanged();
+}
+
+void Backend::keepEnglish() { setLanguage(QStringLiteral("en")); }
+
+// ---------------------------------------------------------------- saved networks
 
 void Backend::loadSaved() {
     saved_ = QSettings().value(QStringLiteral("networks")).toList();
@@ -329,7 +382,7 @@ QString Backend::savedName(const QString& code) const {
 void Backend::rememberNetwork(const QString& code, const QString& name) {
     QVariantMap entry;
     entry[QStringLiteral("code")] = code;
-    entry[QStringLiteral("name")] = name.isEmpty() ? QStringLiteral("Sieć KettleLAN") : name;
+    entry[QStringLiteral("name")] = name.isEmpty() ? QStringLiteral("KettleLAN network") : name;
     entry[QStringLiteral("lastUsed")] = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
     for (int i = 0; i < saved_.size(); ++i)
         if (saved_[i].toMap().value(QStringLiteral("code")).toString() == code) {
@@ -373,7 +426,7 @@ void Backend::setAutostart(bool v) {
             out << "[Desktop Entry]\n"
                    "Type=Application\n"
                    "Name=KettleLAN\n"
-                   "Comment=Wirtualny LAN przez sieć Steam\n"
+                   "Comment=Virtual LAN over the Steam network\n"
                    "Exec=\"" << executablePath() << "\" --minimized\n"
                    "Terminal=false\n"
                    "X-GNOME-Autostart-enabled=true\n";
@@ -415,7 +468,7 @@ QString Backend::interfaceName() const {
 #endif
 }
 
-// ---------------------------------------------------------------- zasobnik
+// ---------------------------------------------------------------- system tray
 
 void Backend::setupTray() {
     if (!QSystemTrayIcon::isSystemTrayAvailable()) return;
@@ -437,7 +490,7 @@ void Backend::rebuildTrayMenu() {
     if (!tray_) return;
     const bool connected = netState_ == QLatin1String("connected");
 
-    // Menu przebudowujemy tylko przy zmianie składu sieci (ping zmienia się co sekundę).
+    // Rebuild the menu only when the members change (ping changes every second).
     QString sig = netState_ + networkName_ + networkCode_ + QString::number(saved_.size());
     for (const auto& v : peers_) {
         const auto m = v.toMap();
@@ -463,32 +516,32 @@ void Backend::rebuildTrayMenu() {
             anyone = true;
             const QString name = m.value(QStringLiteral("name")).toString();
             const QString addr = m.value(QStringLiteral("address")).toString();
-            trayMenu_->addAction(menuText(QStringLiteral("Kopiuj IP: %1  (%2)").arg(name, addr)), this, [this, name, addr] {
-                copyText(addr, QStringLiteral("Skopiowano adres %1 (%2)").arg(addr, name));
+            trayMenu_->addAction(menuText(tr("Copy IP: %1  (%2)").arg(name, addr)), this, [this, name, addr] {
+                copyText(addr, tr("Copied address %1 (%2)").arg(addr, name));
             });
         }
-        if (!anyone) trayMenu_->addAction(QStringLiteral("Nikt jeszcze nie dołączył"))->setEnabled(false);
+        if (!anyone) trayMenu_->addAction(tr("Nobody has joined yet"))->setEnabled(false);
         trayMenu_->addSeparator();
-        trayMenu_->addAction(QStringLiteral("Kopiuj kod sieci"), this, [this] {
-            copyText(networkCode_, QStringLiteral("Skopiowano kod sieci – wyślij go znajomym"));
+        trayMenu_->addAction(tr("Copy network code"), this, [this] {
+            copyText(networkCode_, tr("Network code copied – send it to your friends"));
         });
-        trayMenu_->addAction(QStringLiteral("Opuść sieć"), this, [this] { leaveNetwork(); });
+        trayMenu_->addAction(tr("Leave network"), this, [this] { leaveNetwork(); });
     } else if (netState_ == QLatin1String("idle") && status_ == QLatin1String("ready") && !saved_.isEmpty()) {
-        trayMenu_->addAction(QStringLiteral("Twoje sieci"))->setEnabled(false);
+        trayMenu_->addAction(tr("Your networks"))->setEnabled(false);
         for (const auto& v : saved_) {
             const auto m = v.toMap();
             const QString code = m.value(QStringLiteral("code")).toString();
-            trayMenu_->addAction(menuText(QStringLiteral("Połącz: %1").arg(m.value(QStringLiteral("name")).toString())), this,
+            trayMenu_->addAction(menuText(tr("Connect: %1").arg(m.value(QStringLiteral("name")).toString())), this,
                                  [this, code] { connectSaved(code); });
         }
         trayMenu_->addSeparator();
     }
-    trayMenu_->addAction(QStringLiteral("Pokaż okno"), this, [this] { showWindow(); });
+    trayMenu_->addAction(tr("Show window"), this, [this] { showWindow(); });
     trayMenu_->addSeparator();
-    trayMenu_->addAction(QStringLiteral("Zakończ KettleLAN"), this, [this] { quitApp(); });
+    trayMenu_->addAction(tr("Quit KettleLAN"), this, [this] { quitApp(); });
 }
 
-// ---------------------------------------------------------------- tryb pokazowy (do zrzutów ekranu)
+// ---------------------------------------------------------------- demo mode (for screenshots)
 
 void Backend::loadDemo() {
     demoPage_ = qEnvironmentVariable("KETTLELAN_DEMO_PAGE", QStringLiteral("start"));
@@ -496,7 +549,9 @@ void Backend::loadDemo() {
     selfAddress_ = QStringLiteral("100.80.46.79");
     if (demoPage_ == QLatin1String("steam")) {
         status_ = QStringLiteral("steamMissing");
-        errorText_ = QStringLiteral("Steam nie jest uruchomiony. Włącz Steama, zaloguj się i spróbuj ponownie.");
+        hasError_ = true;
+        errorMessage_ = {Msg::SteamNotRunning, {}};
+        errorText_ = translate(errorMessage_);
     } else {
         status_ = QStringLiteral("ready");
     }
@@ -506,18 +561,18 @@ void Backend::loadDemo() {
         m[QStringLiteral("code")] = code;
         return QVariant(m);
     };
-    saved_ = {demoEntry(QStringLiteral("Wieczór z Quake"), QStringLiteral("KTL-50AA-1SZ3-XRK3")),
-              demoEntry(QStringLiteral("Warcraft III ze znajomymi"), QStringLiteral("KTL-7F3Q-9XM2-A4KD"))};
+    saved_ = {demoEntry(tr("Quake night"), QStringLiteral("KTL-50AA-1SZ3-XRK3")),
+              demoEntry(tr("Warcraft III with friends"), QStringLiteral("KTL-7F3Q-9XM2-A4KD"))};
     if (demoPage_ == QLatin1String("network")) {
         netState_ = QStringLiteral("connected");
-        networkName_ = qEnvironmentVariable("KETTLELAN_DEMO_NAME", QStringLiteral("Wieczór z Quake"));
+        networkName_ = qEnvironmentVariable("KETTLELAN_DEMO_NAME", tr("Quake night"));
         networkCode_ = QStringLiteral("KTL-50AA-1SZ3-XRK3");
         peers_ = {
             peerToMap(QStringLiteral("maxiuZ"), QStringLiteral("100.80.46.79"), true, true, true, false, -1, false),
-            peerToMap(QStringLiteral("Znajomy 1"), QStringLiteral("100.71.4.92"), false, false, true, false, 18, false),
-            peerToMap(QStringLiteral("Znajomy 2"), QStringLiteral("100.98.230.7"), false, false, true, false, 34, false),
-            peerToMap(QStringLiteral("Znajomy 3"), QStringLiteral("100.112.61.140"), false, false, true, false, 52, true),
-            peerToMap(QStringLiteral("Znajomy 4"), QStringLiteral("100.77.9.31"), false, false, false, false, -1, false),
+            peerToMap(tr("Friend %1").arg(1), QStringLiteral("100.71.4.92"), false, false, true, false, 18, false),
+            peerToMap(tr("Friend %1").arg(2), QStringLiteral("100.98.230.7"), false, false, true, false, 34, false),
+            peerToMap(tr("Friend %1").arg(3), QStringLiteral("100.112.61.140"), false, false, true, false, 52, true),
+            peerToMap(tr("Friend %1").arg(4), QStringLiteral("100.77.9.31"), false, false, false, false, -1, false),
         };
         memberCount_ = 4;
     }

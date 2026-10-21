@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls.Basic
 import KettleLAN
 
-// Przycisk z samą ikoną (min. 44×44 px). `label` trafia do podpowiedzi i czytnika ekranu.
+// Icon-only button (at least 44×44 px). `label` is used for the tooltip and screen readers.
 Button {
     id: b
     property string iconName

@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls.Basic
 import KettleLAN
 
-// Przycisk: "primary" (główna akcja ekranu) albo "secondary".
+// Button: "primary" (main action of a screen) or "secondary".
 Button {
     id: b
     property string kind: "primary"
@@ -50,7 +50,7 @@ Button {
         border.width: b.kind === "primary" ? 0 : 1
         border.color: Theme.border
 
-        Rectangle { // obwódka fokusu klawiatury
+        Rectangle { // keyboard focus ring
             anchors.fill: parent
             anchors.margins: -3
             radius: parent.radius + 3

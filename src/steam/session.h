@@ -1,21 +1,23 @@
-// KettleLAN – połączenie z klientem Steam (Steamworks API).
+// KettleLAN – connection to the Steam client (Steamworks API).
 #pragma once
 
 #include <cstdint>
 #include <string>
 
+#include "messages.h"
+
 namespace kettle::steam {
 
-// Testowe App ID Valve (Spacewar) – darmowe, dostępne dla każdego konta Steam.
-// Własne App ID wystarczy wpisać tutaj (oraz w CMakeLists.txt).
+// Valve's test App ID (Spacewar) – free and available to every Steam account.
+// To use your own App ID, change it here.
 inline constexpr uint32_t kAppId = 480;
 
 class Session {
 public:
-    // Łączy się z działającym klientem Steam. Przy błędzie zwraca false i opis w `error`.
-    bool init(std::string& error);
+    // Connects to the running Steam client. On failure returns false and fills `error`.
+    bool init(Message& error);
     void shutdown();
-    // Musi być wywoływane regularnie w wątku Steama (obsługa zdarzeń).
+    // Must be called regularly on the Steam thread (handles callbacks).
     void runCallbacks();
 
     uint64_t steamId() const { return steamId_; }

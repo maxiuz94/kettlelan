@@ -1,10 +1,10 @@
 [Desktop Entry]
 Type=Application
 Name=KettleLAN
-GenericName=Wirtualny LAN
-GenericName[en]=Virtual LAN
-Comment=Graj ze znajomymi w gry LAN przez sieć Steam
-Comment[en]=Play LAN games with friends over the Steam network
+GenericName=Virtual LAN
+GenericName[pl]=Wirtualny LAN
+Comment=Play LAN games with friends over the Steam network
+Comment[pl]=Graj ze znajomymi w gry LAN przez sieć Steam
 Exec=kettlelan
 Icon=kettlelan
 Terminal=false

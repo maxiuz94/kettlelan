@@ -1,4 +1,4 @@
-// KettleLAN – wersja konsolowa (etap 1). Interfejs graficzny dojdzie w etapie 3.
+// KettleLAN – command-line version (useful for diagnostics and SSH sessions).
 #include <atomic>
 #include <chrono>
 #include <csignal>
@@ -13,6 +13,7 @@
 #include <thread>
 
 #include "log.h"
+#include "messages.h"
 #include "netcode.h"
 #include "network.h"
 #include "session.h"
@@ -29,7 +30,7 @@ namespace {
 std::atomic<bool> g_quit{false};
 
 void onSignal(int) {
-    // Drugie Ctrl+C zamyka program natychmiast.
+    // A second Ctrl+C quits immediately.
     if (g_quit) std::_Exit(130);
     g_quit = true;
 }
@@ -54,46 +55,46 @@ private:
 };
 
 void printHelp() {
-    std::cout << "\nPolecenia:\n"
-                 "  utworz [nazwa]   – tworzy nową sieć i pokazuje jej kod\n"
-                 "  dolacz <kod>     – łączy z siecią o tym kodzie, np. dolacz KTL-7F3Q-9XM2-A4KD\n"
-                 "  lista            – członkowie sieci, ich adresy i ping\n"
-                 "  kod              – pokazuje kod obecnej sieci\n"
-                 "  opusc            – opuszcza sieć\n"
-                 "  koniec           – zamyka KettleLAN\n"
-                 "(działają też angielskie: create, join, list, code, leave, quit)\n";
+    std::cout << "\nCommands:\n"
+                 "  create [name]   create a new network and show its code\n"
+                 "  join <code>     connect to a network, e.g. join KTL-7F3Q-9XM2-A4KD\n"
+                 "  list            network members, their addresses and ping\n"
+                 "  code            show the code of the current network\n"
+                 "  leave           leave the network\n"
+                 "  help            show this help\n"
+                 "  quit            exit KettleLAN\n";
 #ifdef KETTLELAN_SECURITY_TESTS
-    std::cout << "\nTryb testów bezpieczeństwa (symulacja intruza):\n"
-                 "  test-zly-klucz <kod>   – wchodzi do lobby sieci, ale podaje fałszywy dowód klucza\n"
-                 "  test-podszyj <adres>   – wysyła członkom ping z podrobionym adresem nadawcy\n";
+    std::cout << "\nSecurity test mode (simulated intruder):\n"
+                 "  test-wrong-key <code>   join the network's lobby with a forged key proof\n"
+                 "  test-spoof <address>    send members a ping with a forged source address\n";
 #endif
     std::cout << "\n";
 }
 
 void printPeers(const steam::Network& net) {
     if (net.state() == steam::State::Connecting) {
-        std::cout << "Łączę się z siecią, chwilę…\n";
+        std::cout << "Connecting to the network, please wait…\n";
         return;
     }
     if (net.state() != steam::State::Connected) {
-        std::cout << "Nie jesteś w żadnej sieci.\n";
+        std::cout << "You are not in a network.\n";
         return;
     }
-    std::cout << "\nSieć „" << net.networkName() << "”  (" << net.codeText() << ")\n";
+    std::cout << "\nNetwork \"" << net.networkName() << "\"  (" << net.codeText() << ")\n";
     for (const auto& p : net.peers()) {
         std::string status;
-        if (p.self) status = "to Ty";
-        else if (p.conflict) status = "konflikt adresu";
-        else if (!p.verified) status = "łączenie…";
-        else if (p.pingMs >= 0) status = std::to_string(p.pingMs) + " ms, " + (p.relayed ? "relay Steam" : "bezpośrednio");
-        else status = "połączono";
+        if (p.self) status = "you";
+        else if (p.conflict) status = "address conflict";
+        else if (!p.verified) status = "connecting…";
+        else if (p.pingMs >= 0) status = std::to_string(p.pingMs) + " ms, " + (p.relayed ? "Steam relay" : "direct");
+        else status = "connected";
         std::cout << "  " << std::left << std::setw(16) << p.address.toString() << std::setw(24)
-                  << (p.name + (p.owner ? " ★" : "")) << status << "\n";
+                  << (p.name + (p.owner ? " *" : "")) << status << "\n";
     }
     std::cout << "\n";
 }
 
-// Usuwa sekwencje klawiszy specjalnych (strzałki itp.), które terminal wkleja jako „^[[A”.
+// Removes escape sequences of special keys (arrows etc.) that the terminal inserts as "^[[A".
 std::string stripEscapes(const std::string& line) {
     std::string out;
     for (size_t i = 0; i < line.size(); ++i) {
@@ -120,35 +121,36 @@ void handleCommand(const std::string& rawLine, steam::Network& net) {
     if (!rest.empty() && rest.front() == ' ') rest.erase(0, 1);
 
     if (cmd.empty()) return;
-    if (cmd == "utworz" || cmd == "utwórz" || cmd == "create") net.create(rest);
-    else if (cmd == "dolacz" || cmd == "dołącz" || cmd == "join") {
+    if (cmd == "create") net.create(rest);
+    else if (cmd == "join") {
         const auto code = netcode::parse(rest);
-        if (!code) std::cout << "To nie wygląda na kod sieci (format: KTL-XXXX-XXXX-XXXX).\n";
+        if (!code) std::cout << english({Msg::InvalidCode, {}}) << "\n";
         else net.connect(*code, "");
-    } else if (cmd == "lista" || cmd == "list") printPeers(net);
-    else if (cmd == "kod" || cmd == "code") {
-        if (net.state() == steam::State::Connected) std::cout << "Kod sieci: " << net.codeText() << "\n";
-        else std::cout << "Nie jesteś w żadnej sieci.\n";
-    } else if (cmd == "opusc" || cmd == "opuść" || cmd == "leave") net.leave();
-    else if (cmd == "koniec" || cmd == "quit" || cmd == "exit") g_quit = true;
-    else if (cmd == "pomoc" || cmd == "help" || cmd == "?") printHelp();
+    } else if (cmd == "list") printPeers(net);
+    else if (cmd == "code") {
+        if (net.state() == steam::State::Connected) std::cout << "Network code: " << net.codeText() << "\n";
+        else std::cout << "You are not in a network.\n";
+    } else if (cmd == "leave") net.leave();
+    else if (cmd == "quit" || cmd == "exit") g_quit = true;
+    else if (cmd == "help" || cmd == "?") printHelp();
 #ifdef KETTLELAN_SECURITY_TESTS
-    else if (cmd == "test-zly-klucz") {
+    else if (cmd == "test-wrong-key") {
         const auto code = netcode::parse(rest);
-        if (!code) std::cout << "Podaj kod sieci.\n";
+        if (!code) std::cout << "Give a network code.\n";
         else {
-            std::cout << "TEST: łączę z siecią, udając, że nie znam klucza. Druga strona powinna mnie zignorować.\n";
+            std::cout << "TEST: joining the network while pretending not to know the key. "
+                         "The other side should ignore us.\n";
             net.setDebugWrongKey(true);
             net.connect(*code, "");
         }
-    } else if (cmd == "test-podszyj") {
+    } else if (cmd == "test-spoof") {
         const auto fake = ip::Address4::parse(rest);
-        if (!fake) std::cout << "Podaj adres do podrobienia, np. test-podszyj 100.65.115.91\n";
-        else std::cout << "TEST: wysłano podrobiony ping (nadawca " << fake->toString() << ") do "
-                       << net.debugSendSpoofed(*fake) << " osób. Powinien zostać odrzucony.\n";
+        if (!fake) std::cout << "Give an address to forge, e.g. test-spoof 100.65.115.91\n";
+        else std::cout << "TEST: sent a forged ping (source " << fake->toString() << ") to "
+                       << net.debugSendSpoofed(*fake) << " member(s). It should be dropped.\n";
     }
 #endif
-    else std::cout << "Nieznane polecenie „" << cmd << "”. Wpisz „pomoc”.\n";
+    else std::cout << "Unknown command \"" << cmd << "\". Type \"help\".\n";
 }
 
 } // namespace
@@ -157,30 +159,30 @@ int main() {
     std::signal(SIGINT, onSignal);
     std::signal(SIGTERM, onSignal);
 
-    std::cout << "KettleLAN " << KETTLELAN_VERSION << " – wirtualny LAN przez sieć Steam (open source, BSD-3)\n";
+    std::cout << "KettleLAN " << KETTLELAN_VERSION << " – virtual LAN over the Steam network (open source, BSD-3)\n";
 
     steam::Session session;
-    std::string error;
+    Message error;
     if (!session.init(error)) {
-        std::cerr << error << "\n";
+        std::cerr << english(error) << "\n";
         return 1;
     }
 
     steam::Network net(session.steamId(), nullptr);
     net.setHideAddress(true);
     net.setProtectServices(true);
-    std::cout << "Ochrona: adres IP ukryty (relay Steam), usługi komputera chronione.\n";
+    std::cout << "Protection: IP address hidden (Steam relay), computer services protected.\n";
 
     auto tun = platform::openTun(net.selfAddress(), error);
     if (!tun) {
-        std::cerr << error << "\n";
+        std::cerr << english(error) << "\n";
         session.shutdown();
         return 1;
     }
     net.setPacketHandler([&tun](std::span<const uint8_t> p) { tun->write(p); });
     tun->start([&net](std::span<const uint8_t> p) { net.sendPacket(p); });
 
-    std::cout << "Twój adres w sieci KettleLAN: " << net.selfAddress().toString() << "\n";
+    std::cout << "Your KettleLAN address: " << net.selfAddress().toString() << "\n";
     printHelp();
 
     CommandQueue commands;
@@ -205,11 +207,11 @@ int main() {
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 
-    std::cout << "Zamykam KettleLAN…" << std::endl;
-    // Zabezpieczenie: gdyby sprzątanie się zacięło, po 3 s kończymy proces na siłę.
+    std::cout << "Closing KettleLAN…" << std::endl;
+    // Safety net: if cleanup hangs, force the process to exit after 3 seconds.
     std::thread([] {
         std::this_thread::sleep_for(std::chrono::seconds(3));
-        std::fputs("KettleLAN nie zamknął się w 3 s – wymuszam zamknięcie.\n", stderr);
+        std::fputs("KettleLAN did not close within 3 s – forcing exit.\n", stderr);
         std::_Exit(0);
     }).detach();
 
@@ -219,8 +221,8 @@ int main() {
     tun.reset();
     session.shutdown();
 
-    // Kończymy od razu: obiekty powiązane ze Steamem nie mogą być niszczone po SteamAPI_Shutdown(),
-    // a wątek czytający klawiaturę i tak czeka na wpisanie kolejnej linii.
+    // Exit right away: objects tied to Steam must not be destroyed after SteamAPI_Shutdown(),
+    // and the keyboard thread is still waiting for the next line anyway.
     std::cout.flush();
     std::clog.flush();
     std::_Exit(0);

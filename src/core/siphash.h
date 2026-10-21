@@ -1,4 +1,4 @@
-// KettleLAN – SipHash-2-4 (Aumasson, Bernstein), 64-bitowy skrót z kluczem.
+// KettleLAN – SipHash-2-4 (Aumasson, Bernstein), a keyed 64-bit hash.
 #pragma once
 
 #include <array>

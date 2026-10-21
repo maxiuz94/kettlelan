@@ -18,7 +18,7 @@ static QPixmap renderIcon(int size, bool connected) {
     const QColor accent("#F08A4B");
     const QColor dark("#14161A");
 
-    // korpus: szerszy u dołu, zaokrąglony
+    // body: wider at the bottom, rounded
     QPainterPath body;
     body.moveTo(8.2, 9.0);
     body.lineTo(15.8, 9.0);
@@ -29,7 +29,7 @@ static QPixmap renderIcon(int size, bool connected) {
     body.cubicTo(3.6, 14.2, 5.4, 10.6, 8.2, 9.0);
     body.closeSubpath();
 
-    // dzióbek z lewej, skierowany w górę
+    // spout on the left, pointing up
     QPainterPath spout;
     spout.moveTo(5.6, 12.2);
     spout.lineTo(1.6, 8.6);
@@ -41,17 +41,17 @@ static QPixmap renderIcon(int size, bool connected) {
     p.setPen(Qt::NoPen);
     p.fillPath(body.united(spout), accent);
 
-    // pasek na korpusie (detal)
+    // stripe on the body (detail)
     p.setBrush(dark);
     p.setOpacity(0.18);
     p.drawRoundedRect(QRectF(4.6, 15.6, 14.8, 1.4), 0.7, 0.7);
     p.setOpacity(1.0);
 
-    // gałka pokrywki
+    // lid knob
     p.setBrush(accent);
     p.drawEllipse(QPointF(12.0, 7.6), 1.4, 1.1);
 
-    // pałąk nad czajnikiem
+    // handle above the kettle
     QPen pen(accent, 1.9, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
     p.setPen(pen);
     p.setBrush(Qt::NoBrush);
@@ -60,7 +60,7 @@ static QPixmap renderIcon(int size, bool connected) {
     handle.cubicTo(7.4, 3.0, 16.6, 3.0, 16.4, 9.4);
     p.drawPath(handle);
 
-    // para z dzióbka
+    // steam from the spout
     QPen steamPen(accent, 1.4, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
     p.setPen(steamPen);
     QPainterPath s;

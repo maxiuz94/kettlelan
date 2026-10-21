@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Shapes
 import KettleLAN
 
-// Ikona liniowa rysowana ścieżką SVG (siatka 24×24), bez plików graficznych.
+// Line icon drawn from an SVG path (24×24 grid), no image files.
 Item {
     id: root
     property string name

@@ -1,6 +1,6 @@
-// KettleLAN – test odporności (fuzzing) funkcji czytających dane od innych osób.
-// Budowany z AddressSanitizer + UndefinedBehaviorSanitizer: każdy błąd pamięci przerywa test.
-//   ./kettlelan_fuzz [liczba_iteracji]
+// KettleLAN – fuzzing of every function that reads data coming from other people.
+// Built with AddressSanitizer + UndefinedBehaviorSanitizer in CI: any memory error stops the test.
+//   ./kettlelan_fuzz [iterations]
 #include <cstdio>
 #include <cstdlib>
 #include <random>
@@ -15,7 +15,7 @@
 
 using namespace kettle;
 
-// Poprawny pakiet IPv4/UDP jako punkt wyjścia do mutacji (fuzzing „z ziarnem”).
+// A valid IPv4/UDP packet as the starting point for mutations (seeded fuzzing).
 static std::vector<uint8_t> seedPacket(std::mt19937& rng) {
     std::vector<uint8_t> p(28 + rng() % 64, 0);
     p[0] = 0x45;
@@ -32,10 +32,10 @@ static void mutate(std::vector<uint8_t>& d, std::mt19937& rng) {
     const int n = 1 + int(rng() % 8);
     for (int i = 0; i < n; ++i) {
         switch (rng() % 5) {
-        case 0: if (!d.empty()) d[rng() % d.size()] = uint8_t(rng()); break;           // losowy bajt
-        case 1: if (!d.empty()) d[rng() % d.size()] ^= uint8_t(1u << (rng() % 8)); break; // jeden bit
-        case 2: if (!d.empty()) d.resize(rng() % d.size()); break;                      // ucięcie
-        case 3: d.push_back(uint8_t(rng())); break;                                     // dopisanie
+        case 0: if (!d.empty()) d[rng() % d.size()] = uint8_t(rng()); break;           // random byte
+        case 1: if (!d.empty()) d[rng() % d.size()] ^= uint8_t(1u << (rng() % 8)); break; // single bit
+        case 2: if (!d.empty()) d.resize(rng() % d.size()); break;                      // truncate
+        case 3: d.push_back(uint8_t(rng())); break;                                     // append
         case 4: if (d.size() > 3) { const uint8_t v[] = {0x00, 0xFF, 0x7F, 0x80}; d[rng() % 4] = v[rng() % 4]; } break;
         }
     }
@@ -63,21 +63,21 @@ int main(int argc, char** argv) {
         (void)filter::isDiscoveryBroadcast(s);
         (void)protocol::decode(s);
 
-        // tekst: nicki i nazwy sieci od obcych
+        // text: names and network names from strangers
         const std::string str(d.begin(), d.end());
         const std::string clean = text::sanitize(str, 1 + rng() % 80);
         for (unsigned char c : clean)
-            if (c < 0x20 || c == 0x7F) { std::printf("BŁĄD: znak sterujący po oczyszczeniu\n"); return 1; }
+            if (c < 0x20 || c == 0x7F) { std::printf("ERROR: control character left after sanitizing\n"); return 1; }
 
-        // kody sieci wpisywane / wklejane przez użytkownika
+        // network codes typed / pasted by the user
         if (netcode::parse(str)) ++codes;
         std::string code = "KTL-";
         for (int i = 0; i < 14; ++i) code += char(32 + rng() % 95);
         if (const auto c = netcode::parse(code)) {
-            if (!(netcode::parse(netcode::format(*c)) == *c)) { std::printf("BŁĄD: kod nie przechodzi w obie strony\n"); return 1; }
+            if (!(netcode::parse(netcode::format(*c)) == *c)) { std::printf("ERROR: code does not round-trip\n"); return 1; }
         }
     }
-    std::printf("Fuzzing OK: %ld prób, parsowalne IPv4: %ld, przepuszczone: %ld, zablokowane: %ld, kody: %ld\n",
+    std::printf("Fuzzing OK: %ld inputs, valid IPv4: %ld, allowed: %ld, blocked: %ld, codes: %ld\n",
                 iterations, parsed, allowed, blocked, codes);
     return 0;
 }

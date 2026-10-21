@@ -13,42 +13,42 @@ struct Range {
     const char* name;
 };
 
-// Usługi, do których członkowie sieci nie powinni mieć dostępu.
+// Services that network members should not be able to reach.
 constexpr Range kProtected[] = {
     {22, 22, "SSH"},
     {23, 23, "Telnet"},
-    {25, 25, "poczta (SMTP)"},
+    {25, 25, "mail (SMTP)"},
     {53, 53, "DNS"},
-    {80, 80, "serwer WWW"},
+    {80, 80, "web server"},
     {111, 111, "RPC (NFS)"},
-    {135, 135, "RPC Windows"},
-    {137, 139, "udostępnianie plików (NetBIOS)"},
-    {443, 443, "serwer WWW (HTTPS)"},
-    {445, 445, "udostępnianie plików (SMB)"},
-    {548, 548, "udostępnianie plików (AFP)"},
-    {631, 631, "drukarki (CUPS)"},
-    {1433, 1434, "baza danych (MS SQL)"},
+    {135, 135, "Windows RPC"},
+    {137, 139, "file sharing (NetBIOS)"},
+    {443, 443, "web server (HTTPS)"},
+    {445, 445, "file sharing (SMB)"},
+    {548, 548, "file sharing (AFP)"},
+    {631, 631, "printing (CUPS)"},
+    {1433, 1434, "database (MS SQL)"},
     {1714, 1764, "KDE Connect"},
     {1900, 1900, "UPnP / SSDP"},
-    {2049, 2049, "udostępnianie plików (NFS)"},
-    {3306, 3306, "baza danych (MySQL/MariaDB)"},
-    {3389, 3389, "zdalny pulpit (RDP)"},
-    {5000, 5001, "panel NAS / UPnP"},
-    {5353, 5353, "mDNS (nazwa komputera)"},
-    {5355, 5355, "LLMNR (nazwa komputera)"},
-    {5432, 5432, "baza danych (PostgreSQL)"},
-    {5900, 5910, "zdalny pulpit (VNC)"},
-    {6000, 6007, "serwer X11"},
-    {6379, 6379, "baza danych (Redis)"},
-    {8080, 8080, "serwer WWW"},
+    {2049, 2049, "file sharing (NFS)"},
+    {3306, 3306, "database (MySQL/MariaDB)"},
+    {3389, 3389, "remote desktop (RDP)"},
+    {5000, 5001, "NAS panel / UPnP"},
+    {5353, 5353, "mDNS (computer name)"},
+    {5355, 5355, "LLMNR (computer name)"},
+    {5432, 5432, "database (PostgreSQL)"},
+    {5900, 5910, "remote desktop (VNC)"},
+    {6000, 6007, "X11 server"},
+    {6379, 6379, "database (Redis)"},
+    {8080, 8080, "web server"},
     {8096, 8096, "Jellyfin"},
-    {8443, 8443, "serwer WWW (HTTPS)"},
-    {9000, 9000, "panel administracyjny"},
-    {9090, 9091, "panel administracyjny (Cockpit/Transmission)"},
-    {9443, 9443, "panel administracyjny"},
+    {8443, 8443, "web server (HTTPS)"},
+    {9000, 9000, "admin panel"},
+    {9090, 9091, "admin panel (Cockpit/Transmission)"},
+    {9443, 9443, "admin panel"},
     {10000, 10000, "Webmin"},
     {11211, 11211, "Memcached"},
-    {27017, 27017, "baza danych (MongoDB)"},
+    {27017, 27017, "database (MongoDB)"},
     {27036, 27037, "Steam Remote Play"},
     {32400, 32400, "Plex"},
 };
@@ -65,7 +65,7 @@ bool isDiscoveryBroadcast(std::span<const uint8_t> p) {
     if (p.size() < 28 || (p[0] >> 4) != 4 || p[9] != kUdp) return false;
     const size_t ihl = size_t(p[0] & 0x0F) * 4;
     if (ihl < 20 || p.size() < ihl + 4) return false;
-    if ((((p[6] << 8) | p[7]) & 0x1FFF) != 0) return false; // dalszy fragment – bez portów
+    if ((((p[6] << 8) | p[7]) & 0x1FFF) != 0) return false; // later fragment – no ports
     const uint16_t dst = uint16_t((p[ihl + 2] << 8) | p[ihl + 3]);
     switch (dst) {
     case 137: case 138:  // NetBIOS
@@ -99,9 +99,9 @@ Result inspectInbound(std::span<const uint8_t> p) {
 
     res.protocol = p[9];
     const uint16_t fragField = uint16_t((p[6] << 8) | p[7]);
-    const uint16_t fragOffset = fragField & 0x1FFF; // w jednostkach 8 bajtów
+    const uint16_t fragOffset = fragField & 0x1FFF; // in 8-byte units
 
-    if (res.protocol == kIcmp) return res; // ping i komunikaty ICMP – dozwolone
+    if (res.protocol == kIcmp) return res; // ping and ICMP messages – allowed
 
     if (res.protocol != kTcp && res.protocol != kUdp) {
         res.verdict = Verdict::BlockedProtocol;
@@ -109,14 +109,14 @@ Result inspectInbound(std::span<const uint8_t> p) {
     }
 
     if (fragOffset != 0) {
-        // Dalsze fragmenty nie mają nagłówka z portem. Fragment z przesunięciem 1 (8 bajtów)
-        // to znana sztuczka nadpisania numeru portu (RFC 1858) – odrzucamy. Pozostałe przepuszczamy:
-        // bez pierwszego fragmentu (sprawdzanego niżej) system i tak nie złoży pakietu.
+        // Later fragments carry no port header. A fragment at offset 1 (8 bytes) is a known trick
+        // to overwrite the port number (RFC 1858) – drop it. Others pass: without the first fragment
+        // (checked below) the system cannot reassemble the packet anyway.
         if (fragOffset == 1) res.verdict = Verdict::BlockedFragment;
         return res;
     }
 
-    // Pierwszy (lub jedyny) fragment musi zawierać pełne numery portów.
+    // The first (or only) fragment must contain complete port numbers.
     const auto l4 = p.subspan(ihl, total - ihl);
     const size_t minHeader = res.protocol == kTcp ? 20 : 8;
     const bool moreFragments = (fragField & 0x2000) != 0;

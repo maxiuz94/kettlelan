@@ -1,8 +1,8 @@
-// KettleLAN – ochrona usług komputera przed członkami sieci.
+// KettleLAN – protects this computer's services from other network members.
 //
-// Filtr działa na pakietach ODEBRANYCH od innych członków, zanim trafią do systemu.
-// Blokuje połączenia do typowych usług (SSH, udostępnianie plików, zdalny pulpit, bazy danych…),
-// które nie powinny być widoczne dla graczy. Ruch gier przechodzi bez zmian.
+// The filter works on packets RECEIVED from other members, before they reach the system.
+// It blocks connections to common services (SSH, file sharing, remote desktop, databases…)
+// that should not be visible to other players. Game traffic passes unchanged.
 #pragma once
 
 #include <cstdint>
@@ -13,9 +13,9 @@ namespace kettle::filter {
 
 enum class Verdict {
     Allow,
-    BlockedService,   // port chronionej usługi
-    BlockedProtocol,  // protokół inny niż TCP/UDP/ICMP
-    BlockedFragment,  // podejrzany fragment IP (np. próba ukrycia numeru portu)
+    BlockedService,   // port of a protected service
+    BlockedProtocol,  // protocol other than TCP/UDP/ICMP
+    BlockedFragment,  // suspicious IP fragment (e.g. an attempt to hide the port number)
     Malformed,
 };
 
@@ -25,18 +25,18 @@ struct Result {
     uint16_t dstPort = 0;
 };
 
-// Ocena pakietu IPv4 przychodzącego z sieci KettleLAN.
+// Inspects an IPv4 packet coming from the KettleLAN network.
 Result inspectInbound(std::span<const uint8_t> packet);
 
-// Czy pakiet WYSYŁANY przez nasz system do wszystkich członków sieci (broadcast/multicast)
-// jest ogłoszeniem usług systemowych, które zdradza nazwę komputera i udostępniane zasoby
+// Whether a packet SENT by our system to all members (broadcast/multicast) is a service
+// announcement that reveals the computer's name and shared resources
 // (mDNS/Avahi, NetBIOS, SSDP, KDE Connect, Spotify, Steam Remote Play…).
 bool isDiscoveryBroadcast(std::span<const uint8_t> packet);
 
-// Czy port jest na liście chronionych usług (TCP lub UDP).
+// Whether the port belongs to a protected service (TCP or UDP).
 bool isProtectedPort(uint16_t port);
 
-// Nazwa usługi do dziennika, np. „SSH”, „udostępnianie plików (SMB)”.
+// Service name for the log, e.g. "SSH", "file sharing (SMB)".
 std::string serviceName(uint16_t port);
 
 } // namespace kettle::filter

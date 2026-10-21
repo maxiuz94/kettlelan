@@ -1,16 +1,16 @@
-# budowanie
+# build output
 /build*/
 *.AppImage
 squashfs-root/
 /out/
 CMakeUserPresets.json
 
-# Steamworks SDK – licencja Valve zabrania umieszczania go w repozytorium
+# Steamworks SDK – Valve's license does not allow it in the repository
 steamworks_sdk_*.zip
 /third_party/steamworks/
 /sdk/
 
-# edytory / systemy
+# editors / systems
 .vscode/
 .idea/
 *.swp

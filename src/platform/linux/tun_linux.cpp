@@ -1,8 +1,8 @@
-// KettleLAN – karta TUN na Linuksie.
+// KettleLAN – TUN adapter on Linux.
 //
-// Program działa jako zwykły użytkownik (inaczej nie połączy się ze Steamem). Kartę `kettle0`
-// tworzy raz pomocnik `kettlelan-helper` uruchamiany przez pkexec (okno hasła systemu).
-// Karta jest „trwała” i należy do użytkownika, więc później otwieramy ją bez uprawnień.
+// The program runs as a normal user (otherwise it cannot talk to Steam). The `kettle0` adapter is
+// created once by the `kettlelan-helper` program started through pkexec (system password prompt).
+// The adapter is persistent and owned by the user, so later it is opened without any privileges.
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <linux/if_tun.h>
@@ -52,7 +52,7 @@ public:
                 const ssize_t n = ::read(fd_, buf.data(), buf.size());
                 if (n > 0) onPacket(std::span<const uint8_t>(buf.data(), size_t(n)));
                 else if (n < 0 && errno != EAGAIN && errno != EINTR) {
-                    KLOG_ERROR("Odczyt z " << kIfName << " nie powiódł się: " << std::strerror(errno));
+                    KLOG_ERROR("Reading from " << kIfName << " failed: " << std::strerror(errno));
                     break;
                 }
             }
@@ -66,7 +66,7 @@ public:
 
     void write(std::span<const uint8_t> packet) override {
         const ssize_t n = ::write(fd_, packet.data(), packet.size());
-        if (n < 0) KLOG_DEBUG("Zapis do " << kIfName << ": " << std::strerror(errno));
+        if (n < 0) KLOG_DEBUG("Writing to " << kIfName << " failed: " << std::strerror(errno));
     }
 
     std::string name() const override { return kIfName; }
@@ -77,7 +77,7 @@ private:
     std::thread reader_;
 };
 
-// Czy karta istnieje, należy do nas i ma właściwy adres – wtedy nie trzeba prosić o hasło.
+// Whether the adapter exists, belongs to us and has the right address – then no password is needed.
 bool interfaceReady(ip::Address4 address) {
     const fs::path sys = fs::path("/sys/class/net") / kIfName;
     if (!fs::exists(sys)) return false;
@@ -113,8 +113,8 @@ fs::path findHelper() {
     return {};
 }
 
-// AppImage działa z katalogu zamontowanego przez FUSE, do którego root domyślnie nie ma dostępu.
-// Kopiujemy wtedy pomocnika do świeżego, prywatnego katalogu (0700) tylko na czas uruchomienia.
+// An AppImage runs from a FUSE mount that root cannot access by default.
+// In that case the helper is copied to a fresh private folder (0700) just for the time it runs.
 struct HelperCopy {
     fs::path dir;
     ~HelperCopy() {
@@ -123,14 +123,14 @@ struct HelperCopy {
     }
 };
 
-fs::path prepareHelper(const fs::path& helper, HelperCopy& copy, std::string& error) {
+fs::path prepareHelper(const fs::path& helper, HelperCopy& copy, Message& error) {
     if (std::getenv("APPIMAGE") == nullptr) return helper;
     const char* runtime = std::getenv("XDG_RUNTIME_DIR");
     std::string tmpl = std::string(runtime && *runtime ? runtime : "/tmp") + "/kettlelan-helper-XXXXXX";
     std::vector<char> buf(tmpl.begin(), tmpl.end());
     buf.push_back('\0');
     if (!::mkdtemp(buf.data())) {
-        error = std::string("Nie można utworzyć katalogu tymczasowego: ") + std::strerror(errno);
+        error = {Msg::TunTempDirFailed, {std::strerror(errno)}};
         return {};
     }
     copy.dir = buf.data();
@@ -139,16 +139,16 @@ fs::path prepareHelper(const fs::path& helper, HelperCopy& copy, std::string& er
     fs::copy_file(helper, target, ec);
     if (!ec) fs::permissions(target, fs::perms::owner_all, fs::perm_options::replace, ec);
     if (ec) {
-        error = "Nie można przygotować pomocnika: " + ec.message();
+        error = {Msg::TunHelperCopyFailed, {ec.message()}};
         return {};
     }
     return target;
 }
 
-bool runHelper(ip::Address4 address, std::string& error) {
+bool runHelper(ip::Address4 address, Message& error) {
     const fs::path found = findHelper();
     if (found.empty()) {
-        error = "Nie znaleziono pomocnika kettlelan-helper (powinien leżeć obok programu).";
+        error = {Msg::TunHelperMissing, {}};
         return false;
     }
     HelperCopy copy;
@@ -156,9 +156,9 @@ bool runHelper(ip::Address4 address, std::string& error) {
     if (helper.empty()) return false;
     const std::string uid = std::to_string(::getuid());
     const std::string addr = address.toString();
-    KLOG_INFO("Tworzę kartę " << kIfName << " (" << addr << "/10) – system poprosi o hasło administratora.");
+    KLOG_INFO("Creating adapter " << kIfName << " (" << addr << "/10) – the system will ask for the administrator password.");
 
-    // Uruchamia „<narzędzie> <pomocnik> up <uid> <adres>” i zwraca kod wyjścia (kExecFailed = brak narzędzia).
+    // Runs "<tool> <helper> up <uid> <address>" and returns its exit code (kExecFailed = tool missing).
     constexpr int kExecFailed = 120;
     auto run = [&](const char* tool) {
         const pid_t pid = ::fork();
@@ -174,45 +174,43 @@ bool runHelper(ip::Address4 address, std::string& error) {
     };
 
     int code = run("pkexec");
-    // pkexec: 126 = anulowano okno hasła, 127 = brak zgody / nie udało się uwierzytelnić
-    // (np. przez SSH, gdzie polkit nie widzi sesji pulpitu). W terminalu próbujemy wtedy sudo.
+    // pkexec: 126 = password prompt cancelled, 127 = not authorized / authentication failed
+    // (e.g. over SSH, where polkit sees no desktop session). In a terminal we then try sudo.
     if ((code == 127 || code == kExecFailed) && ::isatty(STDIN_FILENO)) {
-        KLOG_INFO("Okno hasła systemu nie jest dostępne – próbuję sudo.");
+        KLOG_INFO("The system password prompt is not available – trying sudo.");
         const int sudoCode = run("sudo");
         if (sudoCode != kExecFailed) code = sudoCode;
     }
     if (code == 0) return true;
 
-    // W AppImage kopia pomocnika znika po wyjściu z funkcji – tam ręczne polecenie nie ma sensu.
+    // In an AppImage the helper copy disappears after this function, so a manual command makes no sense there.
     const bool appImage = std::getenv("APPIMAGE") != nullptr;
-    const std::string manual = appImage ? std::string("(uruchom KettleLAN z menu pulpitu)")
-                                        : "sudo " + helper.string() + " up " + uid + " " + addr;
+    const std::string manual = "sudo " + helper.string() + " up " + uid + " " + addr;
     if (code == kExecFailed)
-        error = "Brak programu pkexec (pakiet polkit). Zainstaluj go albo utwórz kartę ręcznie:\n  " + manual;
+        error = {Msg::TunPkexecMissing, {manual}};
     else if (code == 126)
-        error = "Anulowano okno hasła – bez tego nie da się utworzyć karty sieciowej.";
+        error = {Msg::TunCancelled, {}};
     else if (code == 127)
-        error = "Nie udało się potwierdzić uprawnień administratora (np. w sesji SSH bez pulpitu). "
-                "Uruchom KettleLAN z pulpitu albo utwórz kartę ręcznie:\n  " + manual;
+        error = appImage ? Message{Msg::TunAuthFailedAppImage, {}} : Message{Msg::TunAuthFailed, {manual}};
     else
-        error = "Pomocnik kettlelan-helper zakończył się błędem (kod " + std::to_string(code) + ").";
+        error = {Msg::TunHelperFailed, {std::to_string(code)}};
     return false;
 }
 
 } // namespace
 
-std::unique_ptr<Tun> openTun(ip::Address4 address, std::string& error) {
+std::unique_ptr<Tun> openTun(ip::Address4 address, Message& error) {
     if (!interfaceReady(address)) {
         if (!runHelper(address, error)) return nullptr;
         if (!interfaceReady(address)) {
-            error = "Karta kettle0 nadal nie jest gotowa po uruchomieniu pomocnika.";
+            error = {Msg::TunNotReady, {}};
             return nullptr;
         }
     }
 
     const int fd = ::open("/dev/net/tun", O_RDWR | O_CLOEXEC);
     if (fd < 0) {
-        error = std::string("Nie można otworzyć /dev/net/tun: ") + std::strerror(errno);
+        error = {Msg::TunOpenFailed, {std::strerror(errno)}};
         return nullptr;
     }
     ifreq ifr{};
@@ -220,13 +218,13 @@ std::unique_ptr<Tun> openTun(ip::Address4 address, std::string& error) {
     std::strncpy(ifr.ifr_name, kIfName, IFNAMSIZ - 1);
     if (::ioctl(fd, TUNSETIFF, &ifr) < 0) {
         if (errno == EBUSY)
-            error = "KettleLAN jest już uruchomiony w innym oknie lub terminalu – zamknij go i spróbuj ponownie.";
+            error = {Msg::TunBusy, {}};
         else
-            error = std::string("Nie można podłączyć się do karty kettle0: ") + std::strerror(errno);
+            error = {Msg::TunAttachFailed, {std::strerror(errno)}};
         ::close(fd);
         return nullptr;
     }
-    KLOG_INFO("Karta " << kIfName << " gotowa, adres " << address.toString());
+    KLOG_INFO("Adapter " << kIfName << " ready, address " << address.toString());
     return std::make_unique<LinuxTun>(fd);
 }
 

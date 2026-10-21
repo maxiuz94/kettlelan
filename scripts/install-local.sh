@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# KettleLAN – instalacja dla bieżącego użytkownika (bez roota), z ikoną w menu aplikacji.
-#   ./scripts/install-local.sh            instaluje zbudowany program z folderu build/
-#   ./scripts/install-local.sh --remove   usuwa instalację
+# KettleLAN – install for the current user (no root), with an entry in the application menu.
+#   ./scripts/install-local.sh            installs the program built in build/
+#   ./scripts/install-local.sh --remove   removes the installation
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -11,11 +11,11 @@ ICONS="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor/256x256/apps"
 
 if [ "${1:-}" = "--remove" ]; then
     rm -rf "$DEST" "$APPS/kettlelan.desktop" "$ICONS/kettlelan.png"
-    echo "Usunięto KettleLAN z $DEST i z menu aplikacji."
+    echo "Removed KettleLAN from $DEST and from the application menu."
     exit 0
 fi
 
-[ -x build/kettlelan ] || { echo "Najpierw zbuduj program: ./scripts/build.sh"; exit 1; }
+[ -x build/kettlelan ] || { echo "Build the program first: ./scripts/build.sh"; exit 1; }
 
 mkdir -p "$DEST" "$APPS" "$ICONS"
 cp --remove-destination build/kettlelan build/kettlelan-cli build/libsteam_api.so build/kettlelan-helper "$DEST/"
@@ -25,8 +25,10 @@ cat > "$APPS/kettlelan.desktop" << DESKTOP
 [Desktop Entry]
 Type=Application
 Name=KettleLAN
-GenericName=Wirtualny LAN
-Comment=Graj ze znajomymi w gry LAN przez sieć Steam
+GenericName=Virtual LAN
+GenericName[pl]=Wirtualny LAN
+Comment=Play LAN games with friends over the Steam network
+Comment[pl]=Graj ze znajomymi w gry LAN przez sieć Steam
 Exec="$DEST/kettlelan"
 Icon=kettlelan
 Terminal=false
@@ -36,4 +38,4 @@ StartupWMClass=kettlelan
 DESKTOP
 
 update-desktop-database "$APPS" >/dev/null 2>&1 || true
-echo "Zainstalowano w $DEST. KettleLAN jest w menu aplikacji (kategoria Internet / Gry)."
+echo "Installed to $DEST. KettleLAN is in your application menu (Internet / Games)."

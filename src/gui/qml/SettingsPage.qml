@@ -4,7 +4,7 @@ import QtQuick.Layouts
 import KettleLAN
 import KettleLAN.Core
 
-// Ustawienia programu.
+// Program settings.
 Item {
     id: page
     signal back()
@@ -53,8 +53,8 @@ Item {
             Layout.topMargin: 10
             Layout.bottomMargin: 10
             spacing: 6
-            IconButton { iconName: "back"; label: "Wróć"; onClicked: page.back() }
-            Text { textFormat: Text.PlainText; text: "Ustawienia"; color: Theme.text; font.pixelSize: 17; font.weight: Font.Bold; Layout.fillWidth: true }
+            IconButton { iconName: "back"; label: qsTr("Back"); onClicked: page.back() }
+            Text { textFormat: Text.PlainText; text: qsTr("Settings"); color: Theme.text; font.pixelSize: 17; font.weight: Font.Bold; Layout.fillWidth: true }
         }
         Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
 
@@ -73,26 +73,26 @@ Item {
                 width: parent.width - 2 * Theme.pad
                 spacing: 10
 
-                SectionTitle { text: "Ogólne" }
+                SectionTitle { text: qsTr("General") }
                 Group {
                     Toggle {
                         Layout.fillWidth: true
-                        title: "Uruchamiaj z systemem"
-                        hint: "Startuje schowany w zasobniku"
+                        title: qsTr("Start with the system")
+                        hint: qsTr("Starts hidden in the system tray")
                         checked: Backend.autostart
                         onUserToggled: (value) => Backend.autostart = value
                     }
                     Toggle {
                         Layout.fillWidth: true
-                        title: "Łącz automatycznie z ostatnią siecią"
-                        hint: "Po uruchomieniu wraca do sieci, której nie opuściłeś przyciskiem „Opuść”"
+                        title: qsTr("Rejoin the last network automatically")
+                        hint: qsTr("On start, rejoins the network you did not leave with “Leave”")
                         checked: Backend.autoConnect
                         onUserToggled: (value) => Backend.autoConnect = value
                     }
                     Toggle {
                         Layout.fillWidth: true
-                        title: "Zamknięcie okna chowa do zasobnika"
-                        hint: Backend.trayAvailable ? "Sieć działa dalej w tle" : "Twój pulpit nie ma zasobnika systemowego"
+                        title: qsTr("Closing the window keeps KettleLAN in the tray")
+                        hint: Backend.trayAvailable ? qsTr("The network keeps running in the background") : qsTr("Your desktop has no system tray")
                         enabled: Backend.trayAvailable
                         checked: Backend.closeToTray && Backend.trayAvailable
                         onUserToggled: (value) => Backend.closeToTray = value
@@ -100,39 +100,63 @@ Item {
                     Toggle {
                         Layout.fillWidth: true
                         last: true
-                        title: "Powiadomienia"
-                        hint: "Gdy ktoś dołączy lub wyjdzie, a okno jest schowane"
+                        title: qsTr("Notifications")
+                        hint: qsTr("When someone joins or leaves while the window is hidden")
                         checked: Backend.notifications
                         onUserToggled: (value) => Backend.notifications = value
                     }
                 }
 
-                SectionTitle { text: "Prywatność i bezpieczeństwo" }
+                SectionTitle { text: qsTr("Privacy and security") }
                 Group {
                     Toggle {
                         Layout.fillWidth: true
-                        title: "Ukryj mój adres IP"
-                        hint: "Połączenia zawsze przez serwery Steama – nikt z sieci nie pozna Twojego adresu. Ping może wzrosnąć o kilka–kilkanaście ms."
+                        title: qsTr("Hide my IP address")
+                        hint: qsTr("Always connect through Steam's servers – nobody in the network learns your address. Ping may increase by a few milliseconds.")
                         checked: Backend.hideAddress
                         onUserToggled: (value) => Backend.hideAddress = value
                     }
                     Toggle {
                         Layout.fillWidth: true
                         last: true
-                        title: "Chroń usługi tego komputera"
-                        hint: "Blokuje dostęp z sieci do SSH, udostępniania plików, zdalnego pulpitu, baz danych i paneli administracyjnych. Gry działają normalnie. Zablokowane próby: " + Backend.blockedCount
+                        title: qsTr("Protect this computer's services")
+                        hint: qsTr("Blocks network access to SSH, file sharing, remote desktop, databases and admin panels. Games work normally. Blocked attempts: %1").arg(Backend.blockedCount)
                         checked: Backend.protectServices
                         onUserToggled: (value) => Backend.protectServices = value
                     }
                 }
 
-                SectionTitle { text: "Wygląd" }
+                SectionTitle { text: qsTr("Appearance") }
                 Group {
                     RowLayout {
                         Layout.fillWidth: true
                         Layout.margins: 10
                         Layout.leftMargin: 14
-                        Text { textFormat: Text.PlainText; text: "Motyw"; color: Theme.text; font.pixelSize: 14; Layout.fillWidth: true }
+                        Text { textFormat: Text.PlainText; text: qsTr("Language"); color: Theme.text; font.pixelSize: 14; Layout.fillWidth: true }
+                        ComboBox {
+                            id: languageBox
+                            implicitWidth: 170
+                            implicitHeight: 40
+                            textRole: "label"
+                            valueRole: "value"
+                            // language names are always shown in their own language
+                            model: [
+                                { label: "English", value: "en" },
+                                { label: "Polski", value: "pl" }
+                            ]
+                            Component.onCompleted: currentIndex = indexOfValue(Backend.language)
+                            onActivated: Backend.language = currentValue
+                            Accessible.name: qsTr("Language")
+                            background: Rectangle { radius: Theme.smallRadius + 2; color: Theme.bg; border.color: languageBox.visualFocus ? Theme.accent : Theme.border }
+                            contentItem: Text { textFormat: Text.PlainText; leftPadding: 12; text: languageBox.displayText; color: Theme.text; font.pixelSize: 14; verticalAlignment: Text.AlignVCenter }
+                        }
+                    }
+                    Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Layout.margins: 10
+                        Layout.leftMargin: 14
+                        Text { textFormat: Text.PlainText; text: qsTr("Theme"); color: Theme.text; font.pixelSize: 14; Layout.fillWidth: true }
                         ComboBox {
                             id: themeBox
                             implicitWidth: 170
@@ -140,23 +164,25 @@ Item {
                             textRole: "label"
                             valueRole: "value"
                             model: [
-                                { label: "Jak w systemie", value: "system" },
-                                { label: "Ciemny", value: "dark" },
-                                { label: "Jasny", value: "light" }
+                                { label: qsTr("Same as system"), value: "system" },
+                                { label: qsTr("Dark"), value: "dark" },
+                                { label: qsTr("Light"), value: "light" }
                             ]
+                            // the model is rebuilt after a language change – keep the selection
+                            onModelChanged: currentIndex = indexOfValue(Backend.theme)
                             Component.onCompleted: currentIndex = indexOfValue(Backend.theme)
                             onActivated: Backend.theme = currentValue
-                            Accessible.name: "Motyw"
+                            Accessible.name: qsTr("Theme")
                             background: Rectangle { radius: Theme.smallRadius + 2; color: Theme.bg; border.color: themeBox.visualFocus ? Theme.accent : Theme.border }
                             contentItem: Text { textFormat: Text.PlainText; leftPadding: 12; text: themeBox.displayText; color: Theme.text; font.pixelSize: 14; verticalAlignment: Text.AlignVCenter }
                         }
                     }
                 }
 
-                SectionTitle { text: "Zaawansowane" }
+                SectionTitle { text: qsTr("Advanced") }
                 Group {
-                    InfoRow { title: "Karta sieciowa"; value: Backend.interfaceName }
-                    InfoRow { title: "Twój adres"; value: Backend.selfAddress !== "" ? Backend.selfAddress : "—" }
+                    InfoRow { title: qsTr("Network adapter"); value: Backend.interfaceName }
+                    InfoRow { title: qsTr("Your address"); value: Backend.selfAddress !== "" ? Backend.selfAddress : "—" }
                     InfoRow { title: "MTU"; value: "1200"; last: true }
                 }
 
@@ -164,8 +190,8 @@ Item {
                     Layout.fillWidth: true
                     Layout.topMargin: 10
                     spacing: 10
-                    AppButton { Layout.fillWidth: true; kind: "secondary"; text: "Kod źródłowy"; onClicked: Backend.openUrl("https://github.com/maxiuz94/kettlelan") }
-                    AppButton { Layout.fillWidth: true; kind: "secondary"; text: "Otwórz dziennik"; onClicked: Backend.openLogs() }
+                    AppButton { Layout.fillWidth: true; kind: "secondary"; text: qsTr("Source code"); onClicked: Backend.openUrl("https://github.com/maxiuz94/kettlelan") }
+                    AppButton { Layout.fillWidth: true; kind: "secondary"; text: qsTr("Open log"); onClicked: Backend.openLogs() }
                 }
                 Text { textFormat: Text.PlainText;
                     Layout.fillWidth: true
@@ -174,13 +200,13 @@ Item {
                     wrapMode: Text.WordWrap
                     color: Theme.muted
                     font.pixelSize: 12
-                    text: "KettleLAN " + Backend.version + ", licencja BSD-3, na bazie PartyLAN.\nSteam jest znakiem towarowym Valve Corporation."
+                    text: qsTr("KettleLAN %1 · BSD-3 license · based on PartyLAN.\nSteam is a trademark of Valve Corporation.").arg(Backend.version)
                 }
                 AppButton {
                     Layout.fillWidth: true
                     Layout.topMargin: 6
                     kind: "secondary"
-                    text: "Zakończ KettleLAN"
+                    text: qsTr("Quit KettleLAN")
                     onClicked: Backend.quitApp()
                 }
             }

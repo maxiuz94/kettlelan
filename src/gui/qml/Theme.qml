@@ -2,7 +2,7 @@ pragma Singleton
 import QtQuick
 import KettleLAN.Core
 
-// Kolory i wymiary interfejsu – jedno miejsce do zmiany wyglądu całego programu.
+// Interface colours and sizes – one place to change the look of the whole program.
 QtObject {
     readonly property bool dark: Backend.darkMode
 

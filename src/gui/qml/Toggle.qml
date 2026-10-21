@@ -3,7 +3,7 @@ import QtQuick.Controls.Basic
 import QtQuick.Layouts
 import KettleLAN
 
-// Wiersz ustawień z przełącznikiem.
+// Settings row with a switch.
 Rectangle {
     id: row
     property string title

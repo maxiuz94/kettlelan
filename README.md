@@ -1,109 +1,151 @@
+<div align="center">
+
+<img src="packaging/linux/icons/kettlelan-128.png" width="96" alt="KettleLAN logo">
+
 # KettleLAN
 
-**Otwartoźródłowy wirtualny LAN przez sieć Steam** – zagraj ze znajomymi w gry LAN (Quake 3,
-Unreal Tournament, Counter-Strike 1.6, Warcraft III…) tak, jakbyście siedzieli przy jednym routerze.
-Bez limitu osób, bez przekierowywania portów i bez własnego serwera.
+**An open-source virtual LAN over the Steam network.**<br>
+Play classic LAN games with your friends as if you were on the same router –<br>
+no player limit, no port forwarding, no server of your own.
 
-> Status: **Linux – gotowe paczki AppImage i .deb.** Wersja dla Windowsa jest w drodze.
+[![Build](https://github.com/maxiuz94/kettlelan/actions/workflows/build.yml/badge.svg)](https://github.com/maxiuz94/kettlelan/actions/workflows/build.yml)
+[![Release](https://img.shields.io/github/v/release/maxiuz94/kettlelan)](https://github.com/maxiuz94/kettlelan/releases/latest)
+[![License: BSD-3-Clause](https://img.shields.io/github/license/maxiuz94/kettlelan)](LICENSE)
+![Platform: Linux](https://img.shields.io/badge/platform-Linux-informational)
 
-## Pobieranie
+**English** · [Polski](README.pl.md)
 
-Gotowe pliki są na stronie [**Releases**](https://github.com/maxiuz94/kettlelan/releases):
+<img src="docs/screenshots/start-en.png" width="250" alt="Start screen">&nbsp;
+<img src="docs/screenshots/network-en.png" width="250" alt="Network screen">&nbsp;
+<img src="docs/screenshots/settings-en.png" width="250" alt="Settings">
 
-| System | Plik | Instalacja |
-|--------|------|------------|
-| Każda dystrybucja Linuksa | `KettleLAN-…-x86_64.AppImage` | `chmod +x KettleLAN-*.AppImage`, potem uruchom (bez instalacji) |
+</div>
+
+## Why KettleLAN?
+
+Old multiplayer games – Quake 3, Unreal Tournament, Counter-Strike 1.6, Warcraft III, Age of Empires II and
+many more – were made for LAN parties. Tools like Hamachi recreate a LAN over the internet, but limit the
+number of players on free plans or need you to run a server.
+
+KettleLAN uses the network your friends already have: **Steam**. Traffic goes through Steam's encrypted
+networking (directly or via Valve's relays), so it works behind any router and even behind carrier-grade NAT.
+
+## Features
+
+- **Networks with a permanent code** (`KTL-XXXX-XXXX-XXXX`) – create a network once and share the code.
+  It works no matter who created it: the first person to connect opens it, everyone else joins.
+- **No player limit**, no port forwarding, no account other than Steam.
+- **A stable address** (`100.x.x.x`) for every player – click a person to copy their address for the game.
+- **Saved networks**, automatic reconnect and start with the system – like Hamachi.
+- **Private by default** – your IP address is hidden from other players and your computer's services
+  (SSH, file sharing, remote desktop, databases…) are blocked for them.
+- System tray icon, notifications, dark and light theme, English and Polish interface.
+- Command-line version (`kettlelan-cli`) for diagnostics and SSH sessions.
+
+## Download
+
+Get the latest version from the [**Releases**](https://github.com/maxiuz94/kettlelan/releases/latest) page
+([what's new](CHANGELOG.md)):
+
+| System | File | How to install |
+|--------|------|----------------|
+| Any Linux distribution | `KettleLAN-…-x86_64.AppImage` | `chmod +x KettleLAN-*.AppImage`, then run it |
 | Ubuntu 24.04+, Mint 22+, Pop!_OS, Debian 13 | `kettlelan_…_ubuntu24.04_amd64.deb` | `sudo apt install ./kettlelan_…_ubuntu24.04_amd64.deb` |
 | Debian 12, MX Linux 23 | `kettlelan_…_debian12_amd64.deb` | `sudo apt install ./kettlelan_…_debian12_amd64.deb` |
 
-Potrzebny jest zainstalowany i zalogowany **Steam** (zwykła wersja z repozytorium dystrybucji albo ze
-strony Valve; wersje Flatpak/Snap mogą nie współpracować).
+You need **Steam** installed and signed in (the regular version from your distribution or from Valve;
+the Flatpak and Snap versions may not work). Windows support is in progress.
 
-Pliki buduje GitHub Actions z publicznego kodu. Przy każdym wydaniu są sumy SHA256 i atestacja
-pochodzenia – sprawdzisz je poleceniem `gh attestation verify NAZWA_PLIKU -R maxiuz94/kettlelan`.
+All files are built by GitHub Actions from this repository. Each release comes with SHA256 checksums and
+a build attestation – verify a file with `gh attestation verify FILE -R maxiuz94/kettlelan`.
 
-## Jak to działa
+## Quick start
 
-- Tworzysz sieć i dostajesz kod, np. `KTL-7F3Q-9XM2-A4KD`. Wysyłasz go znajomym.
-- Każdy uczestnik dostaje stały adres `100.x.x.x` na wirtualnej karcie sieciowej `kettle0`.
-- Gry widzą zwykłą sieć lokalną: hostujesz serwer jak w LAN-ie, a znajomi łączą się na Twój adres.
-- Ruch płynie przez sieć Steam (szyfrowany; połączenie bezpośrednie albo przez relay Valve),
-  więc działa nawet za NAT-em operatora.
-- Do sieci wpuszczani są tylko ci, którzy znają kod – sam numer lobby nie wystarczy.
+1. Start Steam and sign in.
+2. Start KettleLAN. The first time (and after every reboot) your system asks for the administrator
+   password – this creates the virtual network adapter `kettle0`. KettleLAN itself runs as a normal user.
+3. Click **Create network**, then **Invite friends** – the code is copied to the clipboard. Send it to your friends.
+4. Your friends paste the code into **Network code** and click **Join**.
+5. Start a game server as you would on a LAN. Your friends connect to your address shown in KettleLAN
+   (click a person on the list to copy their address).
 
-KettleLAN używa testowego App ID `480` (Spacewar), dlatego w Steamie będziesz widoczny jako
-„grający w Spacewar”.
+The network is saved under **Your networks** – next time just click **Connect**.
 
-## Budowanie (Linux)
+## How it works
 
-Potrzebne pakiety:
+- Every player gets a virtual network adapter with a stable address in `100.64.0.0/10`, derived from
+  their Steam account. Games see an ordinary local network.
+- A network is a Steam lobby found by a tag derived from the network code. Members prove that they know
+  the network's key before any traffic is exchanged.
+- Packets travel through Steam's networking: encrypted, authenticated with Steam certificates, directly or
+  through Valve's relays.
+- KettleLAN uses Valve's test App ID `480`, so your friends will see you as "playing Spacewar".
 
-| Dystrybucja    | Polecenie |
-|----------------|-----------|
-| Arch / Manjaro | `sudo pacman -S --needed base-devel cmake git polkit iproute2 qt6-base qt6-declarative` |
-| Ubuntu 24.04+ / Debian 13+ | `sudo apt install build-essential cmake git pkexec iproute2 qt6-base-dev qt6-declarative-dev qml6-module-qtquick qml6-module-qtqml qml6-module-qtquick-controls qml6-module-qtquick-layouts qml6-module-qtquick-shapes qml6-module-qtquick-window qml6-module-qtqml-workerscript` |
-| Fedora         | `sudo dnf install gcc-c++ cmake git polkit iproute qt6-qtbase-devel qt6-qtdeclarative-devel` |
+## Security and privacy
 
-Potem:
+- **Your IP address is hidden by default** – traffic goes through Steam's relays, so other players never
+  learn your public address (*Settings → Hide my IP address*).
+- **Your computer's services are protected** – other players cannot reach SSH, file sharing, remote desktop,
+  databases or admin panels; your computer does not announce its name and services to them
+  (*Settings → Protect this computer's services*).
+- Packets are accepted only from verified members and only with their own address – no spoofing.
+- The program does not run as root; a tiny, strictly validated helper creates the network adapter.
+- Attack scenarios, fuzzing and helper tests run on every change in CI.
+
+Details and how to report a vulnerability: [SECURITY.md](SECURITY.md).
+
+## FAQ
+
+**Does the game have to support LAN?** Yes – KettleLAN creates a LAN, so the game needs a LAN or
+"direct IP" multiplayer mode. Games that only use online matchmaking do not benefit.
+
+**The server does not show up in the game's LAN list.** Connect by typing the host's KettleLAN address
+(`100.x.x.x`). LAN discovery over KettleLAN does not work in every game yet.
+
+**Can I play with someone who is not my Steam friend?** Yes – anyone with the network code can join.
+
+**Is there a player limit?** Steam lobbies allow up to 250 members.
+
+**Why "Spacewar"?** It is Valve's free test App ID that every Steam account can use. A dedicated App ID
+would require publishing KettleLAN on Steam.
+
+## Building from source
+
+Required packages:
+
+| Distribution | Command |
+|--------------|---------|
+| Arch / Manjaro | `sudo pacman -S --needed base-devel cmake git polkit iproute2 qt6-base qt6-declarative qt6-tools` |
+| Ubuntu 24.04+ / Debian 12+ | `sudo apt install build-essential cmake git pkexec iproute2 qt6-base-dev qt6-declarative-dev qt6-tools-dev qt6-l10n-tools qml6-module-qtquick qml6-module-qtqml qml6-module-qtquick-controls qml6-module-qtquick-layouts qml6-module-qtquick-shapes qml6-module-qtquick-templates qml6-module-qtquick-window qml6-module-qtqml-workerscript` |
+| Fedora | `sudo dnf install gcc-c++ cmake git polkit iproute qt6-qtbase-devel qt6-qtdeclarative-devel qt6-qttools-devel` |
+
+Then:
 
 ```sh
 git clone https://github.com/maxiuz94/kettlelan.git
 cd kettlelan
-./scripts/build.sh
+./scripts/build.sh               # build and run the tests
+./scripts/install-local.sh       # optional: add KettleLAN to your application menu
 ```
 
-Do kompilacji potrzebne jest **Steamworks SDK** (darmowe, wymaga konta Steam). Licencja Valve nie
-pozwala dołączyć go do repozytorium.
+Building needs the **Steamworks SDK** (free, requires a Steam account). Valve's license does not allow
+it in the repository – `build.sh` offers to open the download page and finds `steamworks_sdk_XXX.zip` in
+your Downloads folder. Releases are built from the official SDK file listed in
+[`cmake/steamworks-sdk.sha256`](cmake/steamworks-sdk.sha256)
+(source: https://partner.steamgames.com/downloads/list).
 
-**Skąd pochodzi SDK:** oficjalna strona Valve https://partner.steamgames.com/downloads/list
-(dokumentacja: https://partner.steamgames.com/doc/sdk). Wydania KettleLAN budowane są z pliku
-`steamworks_sdk_165.zip` o sumie SHA256 zapisanej w [`cmake/steamworks-sdk.sha256`](cmake/steamworks-sdk.sha256) –
-po pobraniu możesz ją sprawdzić: `sha256sum steamworks_sdk_165.zip`. Skrypt `build.sh` sam zaproponuje otwarcie strony pobierania
-i znajdzie plik `steamworks_sdk_XXX.zip` w folderze Pobrane. Gotowe paczki KettleLAN SDK nie
-wymagają.
+Packages: `packaging/linux/build-appimage.sh` (AppImage) and `cpack` with `-DKETTLELAN_PACKAGE=deb` (.deb).
+Releasing a new version: [docs/RELEASING.md](docs/RELEASING.md).
 
-## Uruchamianie
+## Translations
 
-1. Włącz Steama i zaloguj się.
-2. Uruchom `./build/kettlelan` albo dodaj program do menu aplikacji: `./scripts/install-local.sh`.
-   Przy pierwszym uruchomieniu (i po każdym restarcie komputera) system poprosi o hasło
-   administratora – to tworzenie karty sieciowej `kettle0`. Sam program działa jako zwykły użytkownik.
-3. Kliknij **Utwórz sieć** i wyślij znajomym kod (przycisk **Zaproś znajomych** kopiuje go do schowka)
-   albo wklej cudzy kod w pole **Kod sieci** i kliknij **Dołącz**.
-4. Na liście członków kliknij osobę, żeby skopiować jej adres – wpisz go w grze przy łączeniu z serwerem.
+The interface is translated with Qt Linguist files in [`translations/`](translations). To add a language,
+copy `kettlelan_pl.ts`, translate it (with Qt Linguist or a text editor) and add it to `CMakeLists.txt`.
+After changing texts in the code run `cmake --build build --target update_translations`.
 
-**Kod sieci jest stały.** Sieć zapisuje się na liście „Twoje sieci” i wystarczy kliknąć **Połącz**, nawet gdy
-nikogo w niej nie ma – pierwsza osoba „otwiera” sieć, kolejne do niej dołączają. Domyślnie KettleLAN po
-uruchomieniu wraca do ostatniej sieci (chyba że ją opuściłeś przyciskiem **Opuść**).
+## License
 
-Zamknięcie okna chowa KettleLAN do zasobnika (sieć działa dalej). Całkowite zamknięcie:
-menu ikony w zasobniku → **Zakończ KettleLAN**.
+BSD-3-Clause, see [LICENSE](LICENSE). Based on [PartyLAN](https://github.com/gyf304/partylan) by Yifan Gu.
 
-Wersja w terminalu, przydatna do diagnostyki: `./build/kettlelan-cli` (polecenia: `utworz`, `dolacz`,
-`lista`, `kod`, `opusc`, `koniec`).
-
-Karta `kettle0` zostaje do restartu komputera. Usunięcie ręczne:
-`pkexec ./build/kettlelan-helper down`.
-
-## Bezpieczeństwo i prywatność
-
-- **Twój adres IP jest domyślnie ukryty** – ruch idzie przez relay Steama, członkowie sieci nie poznają
-  Twojego publicznego adresu (Ustawienia → „Ukryj mój adres IP”).
-- **Usługi komputera są chronione** – członkowie sieci nie dostaną się do SSH, udostępniania plików,
-  zdalnego pulpitu ani baz danych (Ustawienia → „Chroń usługi tego komputera”).
-- Program nie działa jako root, a pakiety przyjmuje tylko od zweryfikowanych członków sieci.
-
-Szczegóły i zgłaszanie luk: [SECURITY.md](SECURITY.md).
-
-## Licencja
-
-BSD-3-Clause, zobacz [LICENSE](LICENSE). Projekt bazuje na
-[PartyLAN](https://github.com/gyf304/partylan) autorstwa Yifan Gu.
-
-Steam jest znakiem towarowym Valve Corporation. KettleLAN nie jest powiązany z Valve.
-
----
-
-**English:** KettleLAN is an open-source virtual LAN over the Steam network for playing classic LAN
-games with friends – no player limit, no port forwarding, no server. Build with
-`./scripts/build.sh` (requires the free Steamworks SDK). Licensed under BSD-3-Clause.
+Steam and the Steam logo are trademarks of Valve Corporation. KettleLAN is not affiliated with or
+endorsed by Valve.

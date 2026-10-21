@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import KettleLAN
 
-// Karta z wartością do skopiowania (adres, kod sieci).
+// Card with a value to copy (address, network code).
 Rectangle {
     id: card
     property string label
@@ -43,7 +43,7 @@ Rectangle {
                 implicitHeight: 34
                 iconName: "copy"
                 iconSize: 16
-                label: "Kopiuj"
+                label: qsTr("Copy")
                 onClicked: card.copyRequested()
             }
         }

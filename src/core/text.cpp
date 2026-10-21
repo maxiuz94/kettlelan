@@ -11,11 +11,11 @@ std::string sanitize(const std::string& in, size_t maxChars) {
     while (i < in.size() && chars < maxChars) {
         const unsigned char c = static_cast<unsigned char>(in[i]);
         size_t len = 1;
-        if (c >= 0xF8) { ++i; continue; }       // niepoprawny bajt UTF-8
+        if (c >= 0xF8) { ++i; continue; }       // invalid UTF-8 byte
         if (c >= 0xF0) len = 4;
         else if (c >= 0xE0) len = 3;
         else if (c >= 0xC0) len = 2;
-        else if (c >= 0x80) { ++i; continue; } // osierocony bajt kontynuacji – pomijamy
+        else if (c >= 0x80) { ++i; continue; } // stray continuation byte – skip
         if (i + len > in.size()) { ++i; continue; }
         bool valid = true;
         for (size_t k = 1; k < len; ++k)
@@ -40,7 +40,7 @@ std::string sanitize(const std::string& in, size_t maxChars) {
         }
         i += len;
     }
-    // bez spacji na brzegach
+    // trim spaces
     const auto b = out.find_first_not_of(' ');
     if (b == std::string::npos) return {};
     const auto e = out.find_last_not_of(' ');

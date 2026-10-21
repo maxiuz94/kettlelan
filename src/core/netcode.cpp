@@ -6,7 +6,7 @@
 namespace kettle::netcode {
 
 static constexpr char kAlphabet[] = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-static constexpr int kChars = 12; // 12 × 5 bitów = 60 bitów
+static constexpr int kChars = 12; // 12 × 5 bits = 60 bits
 
 static int decodeChar(char c) {
     c = char(std::toupper(static_cast<unsigned char>(c)));

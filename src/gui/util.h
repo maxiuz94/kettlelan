@@ -1,4 +1,4 @@
-// KettleLAN – drobne funkcje pomocnicze GUI.
+// KettleLAN – small GUI helpers.
 #pragma once
 
 #include <QIcon>
@@ -7,11 +7,11 @@
 
 namespace kettle::gui {
 
-// Ikona czajnika rysowana w kodzie (bez plików graficznych). Zielona kropka = połączono z siecią.
+// Kettle icon drawn in code (no image files). Green dot = connected to a network.
 QIcon makeAppIcon(bool connected);
 QPixmap renderAppIcon(int size, bool connected);
 
-// Plik dziennika programu (do wysyłania przy zgłaszaniu błędów).
+// The program's log file (to attach when reporting bugs).
 QString logFilePath();
 
 } // namespace kettle::gui

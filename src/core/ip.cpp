@@ -1,5 +1,5 @@
-// KettleLAN – adresy i pakiety IPv4.
-// Na podstawie ip.cpp z PartyLAN (c) 2023 Yifan Gu, licencja BSD-3.
+// KettleLAN – IPv4 addresses and packets.
+// Based on ip.cpp from PartyLAN (c) 2023 Yifan Gu, BSD-3 license.
 #include "ip.h"
 
 #include <charconv>
@@ -49,7 +49,7 @@ static uint64_t splitmix64(uint64_t x) {
 Address4 addressForSteamId(uint64_t steamId) {
     const uint32_t size = kVirtualNet.size();
     uint32_t host = uint32_t(splitmix64(steamId) % size);
-    // pomijamy adres sieci i broadcast podsieci
+    // skip the network address and the subnet broadcast
     if (host == 0) host = 1;
     if (host == size - 1) host = size - 2;
     return Address4(kVirtualNet.network().value() + host);

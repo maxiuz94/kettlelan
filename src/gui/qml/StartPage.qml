@@ -5,7 +5,7 @@ import QtQuick.Layouts
 import KettleLAN
 import KettleLAN.Core
 
-// Ekran startowy: utwórz sieć albo dołącz kodem.
+// Start screen: create a network or join with a code.
 Item {
     id: page
     signal openSettings()
@@ -15,7 +15,7 @@ Item {
         anchors.fill: parent
         spacing: 0
 
-        // --- nagłówek
+        // --- header
         RowLayout {
             Layout.fillWidth: true
             Layout.leftMargin: Theme.pad
@@ -25,11 +25,11 @@ Item {
             spacing: 10
             SvgIcon { name: "kettle"; size: 28; color: Theme.accent }
             Text { textFormat: Text.PlainText; text: "KettleLAN"; color: Theme.text; font.pixelSize: 18; font.weight: Font.Bold; Layout.fillWidth: true }
-            IconButton { iconName: "settings"; label: "Ustawienia"; onClicked: page.openSettings() }
+            IconButton { iconName: "settings"; label: qsTr("Settings"); onClicked: page.openSettings() }
         }
         Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
 
-        // --- treść
+        // --- content
         ColumnLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -51,8 +51,8 @@ Item {
                     Rectangle { width: 10; height: 10; radius: 5; color: Theme.ok }
                     ColumnLayout {
                         spacing: 2
-                        Text { textFormat: Text.PlainText; text: "Połączono ze Steam"; color: Theme.text; font.pixelSize: 14; font.weight: Font.DemiBold }
-                        Text { textFormat: Text.PlainText; text: "Zalogowano jako " + Backend.personaName; color: Theme.muted; font.pixelSize: 13 }
+                        Text { textFormat: Text.PlainText; text: qsTr("Connected to Steam"); color: Theme.text; font.pixelSize: 14; font.weight: Font.DemiBold }
+                        Text { textFormat: Text.PlainText; text: qsTr("Signed in as %1").arg(Backend.personaName); color: Theme.muted; font.pixelSize: 13 }
                     }
                 }
             }
@@ -62,7 +62,7 @@ Item {
                 spacing: 6
                 Text { textFormat: Text.PlainText;
                     Layout.fillWidth: true
-                    text: "Zagraj ze znajomymi jak w LAN-ie"
+                    text: qsTr("Play with friends like on a LAN")
                     color: Theme.text
                     font.pixelSize: 23
                     font.weight: Font.Bold
@@ -70,7 +70,7 @@ Item {
                 }
                 Text { textFormat: Text.PlainText;
                     Layout.fillWidth: true
-                    text: "Utwórz sieć i wyślij znajomym jej kod albo dołącz do istniejącej sieci."
+                    text: qsTr("Create a network and send its code to your friends, or join an existing one.")
                     color: Theme.muted
                     font.pixelSize: 14
                     lineHeight: 1.3
@@ -83,7 +83,7 @@ Item {
                 implicitHeight: 52
                 kind: "primary"
                 iconName: "plus"
-                text: "Utwórz sieć"
+                text: qsTr("Create network")
                 enabled: !page.busy
                 onClicked: createDialog.open()
             }
@@ -91,7 +91,7 @@ Item {
             ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 8
-                Text { textFormat: Text.PlainText; text: "Kod sieci"; color: Theme.muted; font.pixelSize: 13; font.weight: Font.DemiBold }
+                Text { textFormat: Text.PlainText; text: qsTr("Network code"); color: Theme.muted; font.pixelSize: 13; font.weight: Font.DemiBold }
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: 8
@@ -99,7 +99,7 @@ Item {
                         id: codeField
                         Layout.fillWidth: true
                         implicitHeight: 48
-                        placeholderText: "np. KTL-50AA-1SZ3-XRK3"
+                        placeholderText: qsTr("e.g. KTL-50AA-1SZ3-XRK3")
                         placeholderTextColor: Theme.muted
                         color: Theme.text
                         font.family: Theme.mono
@@ -107,7 +107,7 @@ Item {
                         selectByMouse: true
                         enabled: !page.busy
                         leftPadding: 14
-                        Accessible.name: "Kod sieci"
+                        Accessible.name: qsTr("Network code")
                         background: Rectangle {
                             radius: Theme.radius
                             color: Theme.surface
@@ -119,36 +119,36 @@ Item {
                     AppButton {
                         id: joinButton
                         kind: "secondary"
-                        text: "Dołącz"
+                        text: qsTr("Join")
                         enabled: !page.busy && Backend.isCodeValid(codeField.text)
                         onClicked: Backend.joinNetwork(codeField.text)
                     }
                 }
                 Text { textFormat: Text.PlainText;
                     Layout.fillWidth: true
-                    text: "Kod dostaniesz od osoby, która utworzyła sieć. Kod się nie zmienia – zapisz go raz."
+                    text: qsTr("You get the code from whoever created the network. It never changes – save it once.")
                     color: Theme.muted
                     font.pixelSize: 12
                     wrapMode: Text.WordWrap
                 }
             }
 
-            // --- łączenie w toku
+            // --- connecting
             RowLayout {
                 Layout.fillWidth: true
                 visible: page.busy
                 spacing: 10
                 BusyIndicator { implicitWidth: 28; implicitHeight: 28; running: page.busy }
-                Text { textFormat: Text.PlainText; text: "Łączę z siecią…"; color: Theme.text; font.pixelSize: 14; Layout.fillWidth: true }
+                Text { textFormat: Text.PlainText; text: qsTr("Connecting to the network…"); color: Theme.text; font.pixelSize: 14; Layout.fillWidth: true }
             }
 
-            // --- zapisane sieci
+            // --- saved networks
             ColumnLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 spacing: 8
                 visible: Backend.savedNetworks.length > 0 && !page.busy
-                Text { textFormat: Text.PlainText; text: "Twoje sieci"; color: Theme.muted; font.pixelSize: 13; font.weight: Font.DemiBold }
+                Text { textFormat: Text.PlainText; text: qsTr("Your networks"); color: Theme.muted; font.pixelSize: 13; font.weight: Font.DemiBold }
                 Rectangle {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
@@ -188,13 +188,13 @@ Item {
                                     leftPadding: 14
                                     rightPadding: 14
                                     font.pixelSize: 14
-                                    text: "Połącz"
+                                    text: qsTr("Connect")
                                     onClicked: Backend.connectSaved(savedRow.modelData.code)
                                 }
                                 IconButton {
                                     iconName: "trash"
                                     iconSize: 18
-                                    label: "Zapomnij sieć"
+                                    label: qsTr("Forget network")
                                     onClicked: Backend.forgetNetwork(savedRow.modelData.code)
                                 }
                             }
@@ -213,7 +213,7 @@ Item {
             Item { Layout.fillHeight: true; visible: Backend.savedNetworks.length === 0 || page.busy }
         }
 
-        // --- stopka
+        // --- footer
         Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
         RowLayout {
             Layout.fillWidth: true
@@ -221,9 +221,9 @@ Item {
             Layout.rightMargin: Theme.pad
             Layout.topMargin: 12
             Layout.bottomMargin: 12
-            Text { textFormat: Text.PlainText; text: "Wersja " + Backend.version + ", open source (BSD-3)"; color: Theme.muted; font.pixelSize: 12; Layout.fillWidth: true }
+            Text { textFormat: Text.PlainText; text: qsTr("Version %1 · open source (BSD-3)").arg(Backend.version); color: Theme.muted; font.pixelSize: 12; Layout.fillWidth: true }
             Text {
-                text: "<a href=\"https://github.com/maxiuz94/kettlelan\">Kod źródłowy</a>"
+                text: "<a href=\"https://github.com/maxiuz94/kettlelan\">" + qsTr("Source code") + "</a>"
                 textFormat: Text.StyledText
                 linkColor: Theme.muted
                 font.pixelSize: 12
@@ -233,7 +233,7 @@ Item {
         }
     }
 
-    // --- okno nazwy nowej sieci
+    // --- new network name dialog
     Popup {
         id: createDialog
         parent: Overlay.overlay
@@ -248,8 +248,8 @@ Item {
 
         contentItem: ColumnLayout {
             spacing: 14
-            Text { textFormat: Text.PlainText; text: "Nowa sieć"; color: Theme.text; font.pixelSize: 18; font.weight: Font.Bold }
-            Text { textFormat: Text.PlainText; text: "Nazwa pomoże znajomym rozpoznać sieć."; color: Theme.muted; font.pixelSize: 13; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+            Text { textFormat: Text.PlainText; text: qsTr("New network"); color: Theme.text; font.pixelSize: 18; font.weight: Font.Bold }
+            Text { textFormat: Text.PlainText; text: qsTr("A name helps your friends recognise the network."); color: Theme.muted; font.pixelSize: 13; Layout.fillWidth: true; wrapMode: Text.WordWrap }
             TextField {
                 id: nameField
                 Layout.fillWidth: true
@@ -259,7 +259,7 @@ Item {
                 maximumLength: 60
                 selectByMouse: true
                 leftPadding: 14
-                Accessible.name: "Nazwa sieci"
+                Accessible.name: qsTr("Network name")
                 background: Rectangle {
                     radius: Theme.radius
                     color: Theme.bg
@@ -272,11 +272,11 @@ Item {
                 Layout.fillWidth: true
                 spacing: 10
                 Item { Layout.fillWidth: true }
-                AppButton { kind: "secondary"; text: "Anuluj"; onClicked: createDialog.close() }
+                AppButton { kind: "secondary"; text: qsTr("Cancel"); onClicked: createDialog.close() }
                 AppButton {
                     id: createButton
                     kind: "primary"
-                    text: "Utwórz"
+                    text: qsTr("Create")
                     onClicked: { Backend.createNetwork(nameField.text); createDialog.close() }
                 }
             }

@@ -1,4 +1,4 @@
-// KettleLAN – wirtualna karta sieciowa (TUN), wspólny interfejs dla Linuksa i Windowsa.
+// KettleLAN – virtual network adapter (TUN), common interface for Linux and Windows.
 #pragma once
 
 #include <cstdint>
@@ -8,6 +8,7 @@
 #include <string>
 
 #include "ip.h"
+#include "messages.h"
 
 namespace kettle::platform {
 
@@ -18,16 +19,16 @@ public:
     using PacketHandler = std::function<void(std::span<const uint8_t>)>;
 
     virtual ~Tun() = default;
-    // Uruchamia wątek czytający pakiety wysyłane przez system/gry do sieci KettleLAN.
+    // Starts a thread that reads packets sent by the system/games to the KettleLAN network.
     virtual void start(PacketHandler onPacket) = 0;
     virtual void stop() = 0;
-    // Oddaje systemowi pakiet odebrany od innego członka sieci.
+    // Hands a packet received from another member over to the system.
     virtual void write(std::span<const uint8_t> packet) = 0;
     virtual std::string name() const = 0;
 };
 
-// Przygotowuje kartę (w razie potrzeby prosi o uprawnienia administratora) i ją otwiera.
-// Przy błędzie zwraca nullptr i opis w `error`.
-std::unique_ptr<Tun> openTun(ip::Address4 address, std::string& error);
+// Prepares the adapter (asking for administrator rights if needed) and opens it.
+// On failure returns nullptr and fills `error`.
+std::unique_ptr<Tun> openTun(ip::Address4 address, Message& error);
 
 } // namespace kettle::platform

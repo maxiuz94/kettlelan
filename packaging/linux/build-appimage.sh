@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# KettleLAN – budowanie AppImage (jeden plik, Qt w środku).
+# KettleLAN – building the AppImage (a single file with Qt inside).
 #
-#   QMAKE=/ścieżka/do/qmake6 packaging/linux/build-appimage.sh [katalog-budowania]
+#   QMAKE=/path/to/qmake6 packaging/linux/build-appimage.sh [build-dir]
 #
-# Narzędzia linuxdeploy są pobierane w przypiętych wersjach i sprawdzane sumą SHA256.
+# The linuxdeploy tools are downloaded in pinned versions and verified with SHA256.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 BUILD="${1:-$ROOT/build-appimage}"
 mkdir -p "$BUILD"
-BUILD="$(cd "$BUILD" && pwd)"   # pełna ścieżka – skrypt później zmienia katalog
+BUILD="$(cd "$BUILD" && pwd)"   # absolute path – the script changes directory later
 TOOLS="$BUILD/tools"
 VERSION="$(sed -n 's/^project(KettleLAN VERSION \([0-9.]*\).*/\1/p' "$ROOT/CMakeLists.txt")"
 
@@ -18,10 +18,10 @@ LINUXDEPLOY_SHA256="4648f278ab3ef31f819e67c30d50f462640e5365a77637d7e6f2ad9fd0b4
 QTPLUGIN_URL="https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/1-alpha-20250213-1/linuxdeploy-plugin-qt-x86_64.AppImage"
 QTPLUGIN_SHA256="15106be885c1c48a021198e7e1e9a48ce9d02a86dd0a1848f00bdbf3c1c92724"
 
-fetch() { # fetch <url> <sha256> <plik>
+fetch() { # fetch <url> <sha256> <file>
     if [ ! -f "$3" ] || ! echo "$2  $3" | sha256sum -c --status; then
         curl -fsSL -o "$3" "$1"
-        echo "$2  $3" | sha256sum -c || { echo "Zła suma kontrolna: $3"; rm -f "$3"; exit 1; }
+        echo "$2  $3" | sha256sum -c || { echo "Wrong checksum: $3"; rm -f "$3"; exit 1; }
     fi
     chmod +x "$3"
 }
@@ -31,16 +31,16 @@ fetch "$LINUXDEPLOY_URL" "$LINUXDEPLOY_SHA256" "$TOOLS/linuxdeploy-x86_64.AppIma
 fetch "$QTPLUGIN_URL" "$QTPLUGIN_SHA256" "$TOOLS/linuxdeploy-plugin-qt-x86_64.AppImage"
 
 cmake -S "$ROOT" -B "$BUILD" -DCMAKE_BUILD_TYPE=Release -DKETTLELAN_PACKAGE=appimage ${CMAKE_EXTRA_ARGS:-}
-cmake --build "$BUILD" --parallel "${JOBS:-$(nproc)}"   # JOBS=2 na słabszych komputerach
+cmake --build "$BUILD" --parallel "${JOBS:-$(nproc)}"   # JOBS=2 on low-memory computers
 ctest --test-dir "$BUILD" --output-on-failure
 
 APPDIR="$BUILD/AppDir"
 rm -rf "$APPDIR"
 DESTDIR="$APPDIR" cmake --install "$BUILD" --prefix /usr
 
-# QML używany przez program (moduły QtQuick, Controls, Layouts, Shapes…)
+# QML used by the program (QtQuick, Controls, Layouts, Shapes… modules)
 export QML_SOURCES_PATHS="$ROOT/src/gui/qml"
-# Wayland obok X11 – tylko razem z dodatkami „shell integration”, bez których Qt i tak spadłby na X11.
+# Wayland next to X11 – only together with the shell integration plugins, without which Qt falls back to X11 anyway.
 QT_PLUGINS="$("${QMAKE:-qmake6}" -query QT_INSTALL_PLUGINS)"
 WAYLAND_ARGS=()
 if [ -f "$QT_PLUGINS/platforms/libqwayland-generic.so" ] && [ -d "$QT_PLUGINS/wayland-shell-integration" ]; then
@@ -52,12 +52,12 @@ if [ -f "$QT_PLUGINS/platforms/libqwayland-generic.so" ] && [ -d "$QT_PLUGINS/wa
             WAYLAND_ARGS+=(--deploy-deps-only "$APPDIR/usr/plugins/$d")
         fi
     done
-    echo "Wayland: dołączono wtyczkę i dodatki (${#WAYLAND_ARGS[@]} parametrów)"
+    echo "Wayland: plugin and shell integrations included (${#WAYLAND_ARGS[@]} arguments)"
 else
-    echo "Wayland: brak dodatków w instalacji Qt – AppImage użyje X11 (XWayland)"
+    echo "Wayland: no shell integrations in this Qt install – the AppImage will use X11 (XWayland)"
 fi
 export QMAKE="${QMAKE:-qmake6}"
-export APPIMAGE_EXTRACT_AND_RUN=1   # bez FUSE (np. w GitHub Actions)
+export APPIMAGE_EXTRACT_AND_RUN=1   # without FUSE (e.g. on GitHub Actions)
 export LDAI_OUTPUT="KettleLAN-${VERSION}-x86_64.AppImage"
 
 cd "$BUILD"
@@ -72,4 +72,4 @@ PATH="$TOOLS:$PATH" "$TOOLS/linuxdeploy-x86_64.AppImage" \
     --output appimage
 
 echo
-echo "Gotowe: $BUILD/$LDAI_OUTPUT"
+echo "Done: $BUILD/$LDAI_OUTPUT"

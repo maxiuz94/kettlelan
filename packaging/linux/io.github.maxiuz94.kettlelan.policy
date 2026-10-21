@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
   "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
-<!-- KettleLAN: zgoda na utworzenie wirtualnej karty sieciowej kettle0.
-     Dotyczy wyłącznie pomocnika /usr/lib/kettlelan/kettlelan-helper (instalowanego z paczką .deb). -->
+<!-- KettleLAN: permission to create the kettle0 virtual network adapter.
+     Applies only to the helper /usr/lib/kettlelan/kettlelan-helper (installed by the .deb package). -->
 <policyconfig>
   <vendor>KettleLAN</vendor>
   <vendor_url>https://github.com/maxiuz94/kettlelan</vendor_url>

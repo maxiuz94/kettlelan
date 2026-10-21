@@ -1,4 +1,4 @@
-// KettleLAN – testy rdzenia (bez Steama). Uruchom: ctest --test-dir build
+// KettleLAN – core tests (no Steam needed). Run: ctest --test-dir build
 #include <cstdio>
 #include <cstdlib>
 #include <set>
@@ -17,7 +17,7 @@ static int failures = 0;
 #define CHECK(cond)                                                                                \
     do {                                                                                           \
         if (!(cond)) {                                                                             \
-            std::printf("NIEUDANE: %s (linia %d)\n", #cond, __LINE__);                             \
+            std::printf("FAILED: %s (line %d)\n", #cond, __LINE__);                                 \
             ++failures;                                                                            \
         }                                                                                          \
     } while (0)
@@ -110,7 +110,7 @@ static void testGenerate() {
     CHECK(netcode::parse(netcode::format(a)) == a);
 }
 
-// Buduje pakiet IPv4 z nagłówkiem TCP/UDP (porty) do testów filtra.
+// Builds an IPv4 packet with a TCP/UDP header (ports) for the filter tests.
 static std::vector<uint8_t> makePacket(uint8_t proto, uint16_t dstPort, uint16_t frag = 0, size_t l4len = 20) {
     std::vector<uint8_t> p(20 + l4len, 0);
     p[0] = 0x45;
@@ -120,7 +120,7 @@ static std::vector<uint8_t> makePacket(uint8_t proto, uint16_t dstPort, uint16_t
     p[7] = uint8_t(frag);
     p[9] = proto;
     if (l4len >= 4) {
-        p[20] = 0x9C; p[21] = 0x40; // port źródłowy 40000
+        p[20] = 0x9C; p[21] = 0x40; // source port 40000
         p[22] = uint8_t(dstPort >> 8);
         p[23] = uint8_t(dstPort);
     }
@@ -138,30 +138,30 @@ static void testFilter() {
     CHECK(filter::inspectInbound(makePacket(17, 5353)).verdict == Verdict::BlockedService);  // mDNS
     CHECK(filter::inspectInbound(makePacket(1, 0)).verdict == Verdict::Allow);        // ICMP (ping)
     CHECK(filter::inspectInbound(makePacket(47, 0)).verdict == Verdict::BlockedProtocol); // GRE
-    // fragmentacja: przesunięcie 1 (nadpisanie portu) i za krótki pierwszy fragment
+    // fragmentation: offset 1 (port overwrite) and a too short first fragment
     CHECK(filter::inspectInbound(makePacket(6, 0, 0x0001, 20)).verdict == Verdict::BlockedFragment);
     CHECK(filter::inspectInbound(makePacket(6, 22, 0x2000, 8)).verdict == Verdict::BlockedFragment);
     CHECK(filter::inspectInbound(makePacket(17, 27960, 0x2000, 8)).verdict == Verdict::Allow);
     CHECK(filter::inspectInbound(makePacket(17, 22, 0x2000, 8)).verdict == Verdict::BlockedService);
-    CHECK(filter::inspectInbound(makePacket(6, 0, 0x00B9, 20)).verdict == Verdict::Allow); // dalszy fragment
+    CHECK(filter::inspectInbound(makePacket(6, 0, 0x00B9, 20)).verdict == Verdict::Allow); // later fragment
     CHECK(filter::inspectInbound(std::span<const uint8_t>()).verdict == Verdict::Malformed);
     CHECK(filter::serviceName(22) == "SSH");
 
     CHECK(filter::isDiscoveryBroadcast(makePacket(17, 5353, 0, 8)));   // mDNS
     CHECK(filter::isDiscoveryBroadcast(makePacket(17, 1716, 0, 8)));   // KDE Connect
-    CHECK(!filter::isDiscoveryBroadcast(makePacket(17, 27960, 0, 8))); // Quake 3 – wykrywanie serwerów
-    CHECK(!filter::isDiscoveryBroadcast(makePacket(6, 5353)));         // TCP – nie dotyczy
+    CHECK(!filter::isDiscoveryBroadcast(makePacket(17, 27960, 0, 8))); // Quake 3 – server discovery
+    CHECK(!filter::isDiscoveryBroadcast(makePacket(6, 5353)));         // TCP – not relevant
 }
 
 static void testSanitize() {
     CHECK(text::sanitize("maxiuZ") == "maxiuZ");
     CHECK(text::sanitize("Zażółć gęślą jaźń") == "Zażółć gęślą jaźń");
-    CHECK(text::sanitize("zły\x1b[2Jnick") == "zły[2Jnick");       // ESC usunięty
-    CHECK(text::sanitize("a\xe2\x80\xae" "b") == "ab");               // U+202E (odwrócenie kierunku)
-    CHECK(text::sanitize("\xc2\x9b" "31m") == "31m");                  // znak sterujący C1
+    CHECK(text::sanitize("bad\x1b[2Jname") == "bad[2Jname");       // ESC removed
+    CHECK(text::sanitize("a\xe2\x80\xae" "b") == "ab");               // U+202E (right-to-left override)
+    CHECK(text::sanitize("\xc2\x9b" "31m") == "31m");                  // C1 control character
     CHECK(text::sanitize("  spacje  ") == "spacje");
     CHECK(text::sanitize(std::string(200, 'x')).size() == 64);
-    CHECK(text::sanitize("\xff\xfeok") == "ok");                    // błędne UTF-8
+    CHECK(text::sanitize("\xff\xfeok") == "ok");                    // invalid UTF-8
 }
 
 int main() {
@@ -173,6 +173,6 @@ int main() {
     testGenerate();
     testFilter();
     testSanitize();
-    if (failures == 0) std::printf("Wszystkie testy rdzenia OK\n");
+    if (failures == 0) std::printf("All core tests passed\n");
     return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }

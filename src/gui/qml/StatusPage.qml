@@ -4,7 +4,7 @@ import QtQuick.Layouts
 import KettleLAN
 import KettleLAN.Core
 
-// Ekran przed gotowością: łączenie ze Steamem albo błąd do naprawienia.
+// Screen shown before ready: connecting to Steam or an error to fix.
 Item {
     id: page
     readonly property bool busy: Backend.status === "starting"
@@ -27,9 +27,9 @@ Item {
             color: Theme.text
             font.pixelSize: 20
             font.weight: Font.Bold
-            text: page.busy ? "Łączę ze Steamem…"
-                 : Backend.status === "steamMissing" ? "Brak połączenia ze Steamem"
-                 : "Nie udało się przygotować karty sieciowej"
+            text: page.busy ? qsTr("Connecting to Steam…")
+                 : Backend.status === "steamMissing" ? qsTr("Not connected to Steam")
+                 : qsTr("Could not set up the network adapter")
         }
         Text { textFormat: Text.PlainText;
             Layout.fillWidth: true
@@ -38,7 +38,7 @@ Item {
             color: Theme.muted
             font.pixelSize: 14
             lineHeight: 1.3
-            text: page.busy ? "Przy pierwszym uruchomieniu system poprosi o hasło – to tworzenie wirtualnej karty sieciowej."
+            text: page.busy ? qsTr("On the first start the system asks for your password – this creates the virtual network adapter.")
                             : Backend.errorText
         }
         BusyIndicator {
@@ -50,7 +50,7 @@ Item {
             Layout.alignment: Qt.AlignHCenter
             Layout.topMargin: 6
             visible: !page.busy
-            text: "Spróbuj ponownie"
+            text: qsTr("Try again")
             onClicked: Backend.retry()
         }
     }

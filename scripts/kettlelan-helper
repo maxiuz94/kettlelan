@@ -1,11 +1,11 @@
 #!/bin/sh
-# KettleLAN – pomocnik systemowy (Linux). Uruchamiany jako root przez pkexec.
+# KettleLAN – system helper (Linux). Started as root through pkexec (or sudo).
 #
-#   kettlelan-helper up <uid> <adres>      tworzy kartę kettle0 należącą do użytkownika <uid>
-#   kettlelan-helper down                  usuwa kartę kettle0
-#   kettlelan-helper check <uid> <adres>   tylko sprawdza argumenty (bez roota, do testów)
+#   kettlelan-helper up <uid> <address>      creates the kettle0 adapter owned by user <uid>
+#   kettlelan-helper down                    removes the kettle0 adapter
+#   kettlelan-helper check <uid> <address>   only validates the arguments (no root, for tests)
 #
-# Robi tylko te rzeczy i ściśle sprawdza argumenty, bo działa z uprawnieniami roota.
+# It does only these things and validates its arguments strictly, because it runs as root.
 set -eu
 
 IFACE=kettle0
@@ -16,50 +16,50 @@ export PATH
 die() { echo "kettlelan-helper: $*" >&2; exit 2; }
 
 need_root() {
-    [ "$(id -u)" -eq 0 ] || die "musi działać jako root (przez pkexec)"
-    command -v ip >/dev/null 2>&1 || die "brak polecenia ip (pakiet iproute2)"
+    [ "$(id -u)" -eq 0 ] || die "must run as root (through pkexec)"
+    command -v ip >/dev/null 2>&1 || die "the ip command is missing (iproute2 package)"
 }
 
-# Sprawdza uid i adres. Wszystko, co nie pasuje dokładnie do wzorca, jest odrzucane.
+# Validates uid and address. Anything that does not match the pattern exactly is rejected.
 validate() {
     uid=$1
     addr=$2
-    case "$uid" in ''|*[!0-9]*) die "nieprawidłowy uid" ;; esac
-    [ "${#uid}" -le 10 ] || die "nieprawidłowy uid"
-    # uid musi należeć do istniejącego, zwykłego konta (nie root ani konto systemowe)
-    [ "$uid" -ge 1000 ] || die "nieprawidłowy uid"
-    getent passwd "$uid" >/dev/null 2>&1 || die "nieznany użytkownik"
-    # adres musi leżeć w 100.64.0.0/10 (100.64.x.x – 100.127.x.x), bez zer wiodących
+    case "$uid" in ''|*[!0-9]*) die "invalid uid" ;; esac
+    [ "${#uid}" -le 10 ] || die "invalid uid"
+    # uid must belong to an existing regular account (not root or a system account)
+    [ "$uid" -ge 1000 ] || die "invalid uid"
+    getent passwd "$uid" >/dev/null 2>&1 || die "unknown user"
+    # the address must be inside 100.64.0.0/10 (100.64.x.x – 100.127.x.x), without leading zeros
     oct='(0|[1-9][0-9]?|1[0-9][0-9]|2[0-4][0-9]|25[0-5])'
     case "$addr" in *"
-"*) die "nieprawidłowy adres" ;; esac
+"*) die "invalid address" ;; esac
     printf '%s' "$addr" | grep -Eqx "100\\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\\.$oct\\.$oct" \
-        || die "nieprawidłowy adres"
+        || die "invalid address"
 }
 
 case "${1:-}" in
 up)
-    [ $# -eq 3 ] || die "użycie: up <uid> <adres>"
+    [ $# -eq 3 ] || die "usage: up <uid> <address>"
     need_root
     validate "$2" "$3"
     ip link del "$IFACE" 2>/dev/null || true
     ip tuntap add dev "$IFACE" mode tun user "$uid"
     ip addr add "$addr/10" broadcast + dev "$IFACE"
     ip link set dev "$IFACE" mtu "$MTU" up
-    echo "kettlelan-helper: karta $IFACE gotowa ($addr/10)"
+    echo "kettlelan-helper: adapter $IFACE ready ($addr/10)"
     ;;
 down)
-    [ $# -eq 1 ] || die "użycie: down"
+    [ $# -eq 1 ] || die "usage: down"
     need_root
     ip link del "$IFACE" 2>/dev/null || true
-    echo "kettlelan-helper: karta $IFACE usunięta"
+    echo "kettlelan-helper: adapter $IFACE removed"
     ;;
 check)
-    [ $# -eq 3 ] || die "użycie: check <uid> <adres>"
+    [ $# -eq 3 ] || die "usage: check <uid> <address>"
     validate "$2" "$3"
     echo "OK"
     ;;
 *)
-    die "użycie: up <uid> <adres> | down | check <uid> <adres>"
+    die "usage: up <uid> <address> | down | check <uid> <address>"
     ;;
 esac

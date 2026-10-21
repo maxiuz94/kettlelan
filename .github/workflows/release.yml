@@ -1,7 +1,7 @@
 name: Release
 
-# Wydanie powstaje po wypchnięciu tagu wersji, np.:  git tag v0.1.0 && git push origin v0.1.0
-# Ręczne uruchomienie (workflow_dispatch) buduje paczki do sprawdzenia, bez publikowania wydania.
+# A release is created when a version tag is pushed, e.g.:  git tag v0.1.0 && git push origin v0.1.0
+# Running it manually (workflow_dispatch) builds the packages for testing without publishing a release.
 on:
   push:
     tags: [ 'v*' ]
@@ -14,8 +14,21 @@ env:
   SDK_FILE: steamworks_sdk_165.zip
 
 jobs:
+  changelog:
+    name: CHANGELOG.md entry
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check the version entry
+        run: |
+          VERSION="$(sed -n 's/^project(KettleLAN VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "${GITHUB_REF_NAME#v}" != "$VERSION" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match the version in CMakeLists.txt (${VERSION})"; exit 1
+          fi
+          scripts/release-notes.sh "$VERSION" "$GITHUB_SHA"
+
   deb:
-    name: Paczka .deb (${{ matrix.distro }})
+    name: .deb package (${{ matrix.distro }})
     runs-on: ubuntu-24.04
     container: ${{ matrix.image }}
     strategy:
@@ -27,30 +40,31 @@ jobs:
           - distro: ubuntu24.04
             image: ubuntu:24.04
     steps:
-      - name: Narzędzia i biblioteki
+      - name: Tools and libraries
         run: |
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             build-essential cmake git ca-certificates curl file dpkg-dev gh libgl-dev \
+            qt6-tools-dev qt6-l10n-tools \
             qt6-base-dev qt6-declarative-dev qml6-module-qtquick qml6-module-qtqml \
             qml6-module-qtquick-controls qml6-module-qtquick-layouts qml6-module-qtquick-shapes \
             qml6-module-qtquick-templates qml6-module-qtquick-window qml6-module-qtqml-workerscript
       - uses: actions/checkout@v6
-      - name: Steamworks SDK (oficjalny plik Valve, sprawdzany sumą SHA256)
+      - name: Steamworks SDK (official Valve file, verified with SHA256)
         env:
           GH_TOKEN: ${{ secrets.SDK_REPO_TOKEN }}
         run: |
-          test -n "$GH_TOKEN" || { echo "Brak sekretu SDK_REPO_TOKEN"; exit 1; }
+          test -n "$GH_TOKEN" || { echo "The SDK_REPO_TOKEN secret is missing"; exit 1; }
           gh release download sdk-165 -R maxiuz94/steamworks-sdk -p "$SDK_FILE" -D "$RUNNER_TEMP"
           cd "$RUNNER_TEMP" && sha256sum -c "$GITHUB_WORKSPACE/cmake/steamworks-sdk.sha256"
-      - name: Budowanie
+      - name: Build
         run: |
           cmake -B build -DCMAKE_BUILD_TYPE=Release -DKETTLELAN_PACKAGE=deb \
                 -DKETTLELAN_DEB_DISTRO=${{ matrix.distro }} -DSTEAMWORKS_SDK_ZIP="$RUNNER_TEMP/$SDK_FILE"
           cmake --build build --parallel "$(nproc)"
-      - name: Testy
+      - name: Test
         run: ctest --test-dir build --output-on-failure
-      - name: Paczka
+      - name: Package
         run: cd build && cpack --config CPackConfig.cmake && dpkg-deb -I kettlelan_*.deb
       - uses: actions/upload-artifact@v7
         with:
@@ -60,7 +74,7 @@ jobs:
 
   appimage:
     name: AppImage
-    runs-on: ubuntu-22.04   # starszy system = działa także na starszych dystrybucjach
+    runs-on: ubuntu-22.04   # an older system, so the AppImage also runs on older distributions
     steps:
       - uses: actions/checkout@v6
       - name: Qt 6.8 (LTS)
@@ -68,16 +82,16 @@ jobs:
         with:
           version: '6.8.3'
           cache: true
-      - name: Biblioteki systemowe
+      - name: System libraries
         run: sudo apt-get update && sudo apt-get install -y libxcb-cursor0 libgl-dev file
-      - name: Steamworks SDK (oficjalny plik Valve, sprawdzany sumą SHA256)
+      - name: Steamworks SDK (official Valve file, verified with SHA256)
         env:
           GH_TOKEN: ${{ secrets.SDK_REPO_TOKEN }}
         run: |
-          test -n "$GH_TOKEN" || { echo "Brak sekretu SDK_REPO_TOKEN"; exit 1; }
+          test -n "$GH_TOKEN" || { echo "The SDK_REPO_TOKEN secret is missing"; exit 1; }
           gh release download sdk-165 -R maxiuz94/steamworks-sdk -p "$SDK_FILE" -D "$RUNNER_TEMP"
           cd "$RUNNER_TEMP" && sha256sum -c "$GITHUB_WORKSPACE/cmake/steamworks-sdk.sha256"
-      - name: Budowanie AppImage
+      - name: Build the AppImage
         env:
           QMAKE: ${{ env.QT_ROOT_DIR }}/bin/qmake
           CMAKE_EXTRA_ARGS: -DSTEAMWORKS_SDK_ZIP=${{ runner.temp }}/steamworks_sdk_165.zip
@@ -89,13 +103,13 @@ jobs:
           if-no-files-found: error
 
   release:
-    name: Wydanie na GitHubie
-    needs: [ deb, appimage ]
+    name: GitHub release
+    needs: [ changelog, deb, appimage ]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     permissions:
-      contents: write       # utworzenie wydania
-      id-token: write       # atestacja pochodzenia
+      contents: write       # create the release
+      id-token: write       # build attestation
       attestations: write
     steps:
       - uses: actions/checkout@v6
@@ -103,41 +117,16 @@ jobs:
         with:
           path: dist
           merge-multiple: true
-      - name: Sumy kontrolne
+      - name: Checksums
         run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
-      - name: Atestacja pochodzenia (kto, z jakiego kodu i jak zbudował pliki)
+      - name: Build attestation (who built the files, from which code and how)
         uses: actions/attest-build-provenance@v4
         with:
           subject-path: 'dist/*'
-      - name: Publikacja wydania
+      - name: Publish the release (description from CHANGELOG.md)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          SDK_SHA="$(cut -d' ' -f1 cmake/steamworks-sdk.sha256)"
-          cat > notes.md << NOTES
-          ## KettleLAN ${VERSION}
-
-          ### Pobieranie
-          | System | Plik |
-          |--------|------|
-          | Każda dystrybucja Linuksa | \`KettleLAN-${VERSION}-x86_64.AppImage\` – nadaj prawo uruchamiania i uruchom |
-          | Ubuntu 24.04+, Mint 22+, Pop!_OS, Debian 13 | \`kettlelan_${VERSION}_ubuntu24.04_amd64.deb\` |
-          | Debian 12, MX Linux 23 | \`kettlelan_${VERSION}_debian12_amd64.deb\` |
-
-          Instalacja paczki \`.deb\`: \`sudo apt install ./nazwa-pliku.deb\`
-
-          ### Sprawdzanie plików
-          - Sumy: \`sha256sum -c SHA256SUMS.txt --ignore-missing\`
-          - Pochodzenie (GitHub CLI): \`gh attestation verify NAZWA_PLIKU -R ${GITHUB_REPOSITORY}\`
-          - Pliki zbudował GitHub Actions z commita \`${GITHUB_SHA}\` – log budowania jest publiczny w zakładce Actions.
-
-          ### Steamworks SDK
-          Paczki zawierają bibliotekę Steama (\`libsteam_api.so\`), którą Valve pozwala dołączać do programów.
-          Do budowania użyto oficjalnego **Steamworks SDK 1.65** (\`steamworks_sdk_165.zip\`,
-          SHA256 \`${SDK_SHA}\`) ze strony https://partner.steamgames.com/downloads/list.
-          SDK nie jest częścią repozytorium, bo zabrania tego licencja Valve – można je pobrać samemu
-          (za darmo, z kontem Steam) i sprawdzić sumę.
-          NOTES
-          sed -i 's/^          //' notes.md
+          scripts/release-notes.sh "$VERSION" "$GITHUB_SHA" > notes.md
           gh release create "$GITHUB_REF_NAME" dist/* --title "KettleLAN ${VERSION}" --notes-file notes.md

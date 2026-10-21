@@ -11,7 +11,7 @@
 namespace kettle::steam {
 
 static void setAppIdEnv() {
-    // Zamiast pliku steam_appid.txt – działa niezależnie od katalogu, z którego uruchomiono program.
+    // Instead of a steam_appid.txt file – works no matter which folder the program was started from.
     const std::string id = std::to_string(kAppId);
 #ifdef _WIN32
     _putenv_s("SteamAppId", id.c_str());
@@ -22,29 +22,29 @@ static void setAppIdEnv() {
 #endif
 }
 
-bool Session::init(std::string& error) {
+bool Session::init(Message& error) {
     setAppIdEnv();
     SteamErrMsg msg{};
     const ESteamAPIInitResult r = SteamAPI_InitEx(&msg);
     if (r != k_ESteamAPIInitResult_OK) {
         switch (r) {
         case k_ESteamAPIInitResult_NoSteamClient:
-            error = "Steam nie jest uruchomiony. Włącz Steama, zaloguj się i spróbuj ponownie.";
+            error = {Msg::SteamNotRunning, {}};
             break;
         case k_ESteamAPIInitResult_VersionMismatch:
-            error = "Klient Steam jest za stary – zaktualizuj Steama.";
+            error = {Msg::SteamOutdated, {}};
             break;
         default:
-            error = std::string("Nie udało się połączyć ze Steamem: ") + msg;
+            error = {Msg::SteamInitFailed, {std::string(msg)}};
             break;
         }
         return false;
     }
     initialized_ = true;
     steamId_ = SteamUser()->GetSteamID().ConvertToUint64();
-    // Przygotowanie relayów Valve z wyprzedzeniem – szybsze pierwsze połączenie.
+    // Prepare Valve's relays in advance – faster first connection.
     SteamNetworkingUtils()->InitRelayNetworkAccess();
-    KLOG_INFO("Połączono ze Steam jako " << personaName());
+    KLOG_INFO("Connected to Steam as " << personaName());
     return true;
 }
 

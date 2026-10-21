@@ -8,27 +8,27 @@ on:
 
 jobs:
   tests:
-    name: Testy (rdzeń, bezpieczeństwo, fuzzing, pomocnik)
+    name: Tests (core, security, fuzzing, helper)
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v6
-      - name: Konfiguracja
+      - name: Configure
         run: cmake -B build -DKETTLELAN_BUILD_APP=OFF -DCMAKE_BUILD_TYPE=Release
-      - name: Budowanie
+      - name: Build
         run: cmake --build build -j"$(nproc)"
-      - name: Testy
+      - name: Test
         run: ctest --test-dir build --output-on-failure
 
   sanitizers:
-    name: Testy z wykrywaniem błędów pamięci (ASan + UBSan)
+    name: Tests with memory error detection (ASan + UBSan)
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v6
-      - name: Konfiguracja
+      - name: Configure
         run: cmake -B build -DKETTLELAN_BUILD_APP=OFF -DKETTLELAN_SANITIZE=ON -DCMAKE_BUILD_TYPE=Debug
-      - name: Budowanie
+      - name: Build
         run: cmake --build build -j"$(nproc)"
-      - name: Testy
+      - name: Test
         run: ctest --test-dir build --output-on-failure
-      - name: Długi fuzzing (5 mln prób)
+      - name: Long fuzzing (5 million inputs)
         run: ./build/kettlelan_fuzz 5000000

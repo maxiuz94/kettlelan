@@ -1,7 +1,7 @@
-// KettleLAN – testy bezpieczeństwa: scenariusze ataków na sieć i sprawdzenie, że zostają odparte.
+// KettleLAN – security tests: attack scenarios against the network logic and checks that they fail.
 //
-// Uczestnicy:  JA (nasz komputer), ADAM (uczciwy członek znający kod),
-//              EWA (jest w lobby, ale nie zna klucza), OBCY (spoza lobby).
+// Participants:  ME (our computer), ALICE (honest member who knows the code),
+//                EVE (in the lobby but without the key), STRANGER (outside the lobby).
 #include <cstdio>
 #include <cstdlib>
 #include <map>
@@ -16,28 +16,28 @@ using router::InboundResult;
 
 static int failures = 0;
 static int checks = 0;
-#define EXPECT(cond, opis)                                                                         \
+#define EXPECT(cond, what)                                                                         \
     do {                                                                                           \
         ++checks;                                                                                  \
         if (!(cond)) {                                                                             \
-            std::printf("  NIEUDANE: %s  [%s, linia %d]\n", opis, #cond, __LINE__);                \
+            std::printf("  FAILED: %s  [%s, line %d]\n", what, #cond, __LINE__);                   \
             ++failures;                                                                            \
         }                                                                                          \
     } while (0)
-#define SCENARIUSZ(nazwa) std::printf("- %s\n", nazwa)
+#define SCENARIO(name) std::printf("- %s\n", name)
 
-constexpr uint64_t JA = 76561198002501818ull;
-constexpr uint64_t ADAM = 76561198019664098ull;
-constexpr uint64_t EWA = 76561198000000001ull;
-constexpr uint64_t OBCY = 76561198000000002ull;
+constexpr uint64_t ME = 76561198002501818ull;
+constexpr uint64_t ALICE = 76561198019664098ull;
+constexpr uint64_t EVE = 76561198000000001ull;
+constexpr uint64_t STRANGER = 76561198000000002ull;
 
-static const netcode::NetworkCode KOD{0x12345678, 0x0ABCDEF};
-static const netcode::NetworkCode INNY_KOD{0x12345678, 0x0ABCDEE}; // ten sam identyfikator, inny klucz
+static const netcode::NetworkCode CODE{0x12345678, 0x0ABCDEF};
+static const netcode::NetworkCode OTHER_CODE{0x12345678, 0x0ABCDEE}; // same network id, different key
 
-static ip::Address4 adres(uint64_t id) { return ip::addressForSteamId(id); }
+static ip::Address4 addr(uint64_t id) { return ip::addressForSteamId(id); }
 
-// Pakiet IPv4 z danym protokołem i portem docelowym.
-static std::vector<uint8_t> pakiet(ip::Address4 src, ip::Address4 dst, uint8_t proto = 17, uint16_t port = 27960) {
+// IPv4 packet with the given protocol and destination port.
+static std::vector<uint8_t> packet(ip::Address4 src, ip::Address4 dst, uint8_t proto = 17, uint16_t port = 27960) {
     std::vector<uint8_t> p(40, 0);
     p[0] = 0x45;
     p[3] = uint8_t(p.size());
@@ -51,225 +51,224 @@ static std::vector<uint8_t> pakiet(ip::Address4 src, ip::Address4 dst, uint8_t p
     return p;
 }
 
-static protocol::HelloMessage hello(const netcode::NetworkCode& kod, uint64_t od, uint64_t doKogo,
-                                    ip::Address4 adr, uint8_t wersja = protocol::kVersion) {
+static protocol::HelloMessage hello(const netcode::NetworkCode& code, uint64_t from, uint64_t to,
+                                    ip::Address4 address, uint8_t version = protocol::kVersion) {
     protocol::HelloMessage m;
-    m.address = adr;
-    m.version = wersja;
-    m.proof = protocol::computeProof(kod, od, doKogo);
+    m.address = address;
+    m.version = version;
+    m.proof = protocol::computeProof(code, from, to);
     return m;
 }
 
-// Sieć: JA, ADAM i EWA w lobby; ADAM zweryfikowany.
-static void siec(router::Router& r) {
-    r.setCode(KOD);
-    r.syncMembers({JA, ADAM, EWA});
-    r.onHello(ADAM, hello(KOD, ADAM, JA, adres(ADAM)));
+// Network: ME, ALICE and EVE in the lobby; ALICE verified.
+static void setUp(router::Router& r) {
+    r.setCode(CODE);
+    r.syncMembers({ME, ALICE, EVE});
+    r.onHello(ALICE, hello(CODE, ALICE, ME, addr(ALICE)));
 }
 
 int main() {
-    std::printf("Testy bezpieczeństwa KettleLAN\n");
+    std::printf("KettleLAN security tests\n");
 
-    SCENARIUSZ("Uczciwy członek z poprawnym kodem zostaje zweryfikowany");
+    SCENARIO("An honest member with the right code gets verified");
     {
-        router::Router r(JA);
-        r.setCode(KOD);
-        r.syncMembers({JA, ADAM});
-        EXPECT(r.onHello(ADAM, hello(KOD, ADAM, JA, adres(ADAM))) == HelloResult::Verified, "pierwsze HELLO weryfikuje");
-        EXPECT(r.onHello(ADAM, hello(KOD, ADAM, JA, adres(ADAM))) == HelloResult::Repeated, "kolejne HELLO nic nie psuje");
-        EXPECT(r.onData(ADAM, pakiet(adres(ADAM), adres(JA))) == InboundResult::Deliver, "jego pakiet gry dociera");
+        router::Router r(ME);
+        r.setCode(CODE);
+        r.syncMembers({ME, ALICE});
+        EXPECT(r.onHello(ALICE, hello(CODE, ALICE, ME, addr(ALICE))) == HelloResult::Verified, "first HELLO verifies");
+        EXPECT(r.onHello(ALICE, hello(CODE, ALICE, ME, addr(ALICE))) == HelloResult::Repeated, "a repeated HELLO breaks nothing");
+        EXPECT(r.onData(ALICE, packet(addr(ALICE), addr(ME))) == InboundResult::Deliver, "their game packet is delivered");
     }
 
-    SCENARIUSZ("EWA jest w lobby, ale nie zna klucza – nie przejdzie weryfikacji");
+    SCENARIO("EVE is in the lobby but does not know the key – verification fails");
     {
-        router::Router r(JA);
-        siec(r);
-        EXPECT(r.onHello(EWA, hello(INNY_KOD, EWA, JA, adres(EWA))) == HelloResult::BadProof, "zły klucz odrzucony");
-        EXPECT(r.onHello(EWA, hello(KOD, EWA, ADAM, adres(EWA))) == HelloResult::BadProof,
-               "dowód wyliczony dla innego odbiorcy nie działa");
-        protocol::HelloMessage zgadywany = hello(KOD, EWA, JA, adres(EWA));
-        zgadywany.proof ^= 1;
-        EXPECT(r.onHello(EWA, zgadywany) == HelloResult::BadProof, "dowód różniący się 1 bitem odrzucony");
-        EXPECT(r.onData(EWA, pakiet(adres(EWA), adres(JA))) == InboundResult::UnknownSender, "jej pakiety nie docierają");
+        router::Router r(ME);
+        setUp(r);
+        EXPECT(r.onHello(EVE, hello(OTHER_CODE, EVE, ME, addr(EVE))) == HelloResult::BadProof, "wrong key rejected");
+        EXPECT(r.onHello(EVE, hello(CODE, EVE, ALICE, addr(EVE))) == HelloResult::BadProof,
+               "a proof made for another receiver does not work");
+        protocol::HelloMessage guessed = hello(CODE, EVE, ME, addr(EVE));
+        guessed.proof ^= 1;
+        EXPECT(r.onHello(EVE, guessed) == HelloResult::BadProof, "a proof off by one bit is rejected");
+        EXPECT(r.onData(EVE, packet(addr(EVE), addr(ME))) == InboundResult::UnknownSender, "her packets are not delivered");
     }
 
-    SCENARIUSZ("EWA odtwarza (replay) cudzy dowód");
+    SCENARIO("EVE replays someone else's proof");
     {
-        router::Router r(JA);
-        siec(r);
-        // EWA podsłuchała dowód ADAMA wysłany do nas (w praktyce szyfrowany przez Steam) i wysyła go jako swój
-        EXPECT(r.onHello(EWA, hello(KOD, ADAM, JA, adres(EWA))) == HelloResult::BadProof, "dowód ADAMA nie działa dla EWY");
-        EXPECT(r.onHello(EWA, hello(KOD, ADAM, JA, adres(ADAM))) == HelloResult::BadProof, "nawet z adresem ADAMA");
+        router::Router r(ME);
+        setUp(r);
+        // EVE captured ALICE's proof sent to us (in practice encrypted by Steam) and sends it as her own
+        EXPECT(r.onHello(EVE, hello(CODE, ALICE, ME, addr(EVE))) == HelloResult::BadProof, "ALICE's proof does not work for EVE");
+        EXPECT(r.onHello(EVE, hello(CODE, ALICE, ME, addr(ALICE))) == HelloResult::BadProof, "not even with ALICE's address");
     }
 
-    SCENARIUSZ("OBCY spoza lobby wysyła poprawnie wyglądające dane");
+    SCENARIO("A STRANGER outside the lobby sends valid-looking data");
     {
-        router::Router r(JA);
-        siec(r);
-        EXPECT(r.onHello(OBCY, hello(KOD, OBCY, JA, adres(OBCY))) == HelloResult::UnknownPeer, "HELLO od obcego odrzucone");
-        EXPECT(r.onData(OBCY, pakiet(adres(OBCY), adres(JA))) == InboundResult::UnknownSender, "jego pakiety odrzucone");
-        EXPECT(r.onData(OBCY, pakiet(adres(ADAM), adres(JA))) == InboundResult::UnknownSender,
-               "także podszywając się pod adres ADAMA");
+        router::Router r(ME);
+        setUp(r);
+        EXPECT(r.onHello(STRANGER, hello(CODE, STRANGER, ME, addr(STRANGER))) == HelloResult::UnknownPeer, "HELLO from a stranger rejected");
+        EXPECT(r.onData(STRANGER, packet(addr(STRANGER), addr(ME))) == InboundResult::UnknownSender, "their packets rejected");
+        EXPECT(r.onData(STRANGER, packet(addr(ALICE), addr(ME))) == InboundResult::UnknownSender,
+               "also when pretending to be ALICE");
     }
 
-    SCENARIUSZ("Członek próbuje przejąć cudzy adres przy weryfikacji");
+    SCENARIO("A member tries to take over someone else's address during verification");
     {
-        router::Router r(JA);
-        r.setCode(KOD);
-        r.syncMembers({JA, ADAM, EWA});
-        // EWA zna kod (np. była kiedyś zaproszona), ale ogłasza adres ADAMA
-        EXPECT(r.onHello(EWA, hello(KOD, EWA, JA, adres(ADAM))) == HelloResult::BadAddress, "cudzy adres odrzucony");
-        EXPECT(r.onHello(EWA, hello(KOD, EWA, JA, adres(JA))) == HelloResult::BadAddress, "nasz adres odrzucony");
-        EXPECT(r.onData(EWA, pakiet(adres(ADAM), adres(JA))) == InboundResult::UnknownSender, "nadal bez ruchu");
+        router::Router r(ME);
+        r.setCode(CODE);
+        r.syncMembers({ME, ALICE, EVE});
+        // EVE knows the code (e.g. she was invited once) but announces ALICE's address
+        EXPECT(r.onHello(EVE, hello(CODE, EVE, ME, addr(ALICE))) == HelloResult::BadAddress, "someone else's address rejected");
+        EXPECT(r.onHello(EVE, hello(CODE, EVE, ME, addr(ME))) == HelloResult::BadAddress, "our address rejected");
+        EXPECT(r.onData(EVE, packet(addr(ALICE), addr(ME))) == InboundResult::UnknownSender, "still no traffic");
     }
 
-    SCENARIUSZ("Zweryfikowany członek podszywa się pod innych (spoofing adresu źródłowego)");
+    SCENARIO("A verified member impersonates others (source address spoofing)");
     {
-        router::Router r(JA);
-        siec(r);
-        r.syncMembers({JA, ADAM, EWA});
-        r.onHello(EWA, hello(KOD, EWA, JA, adres(EWA))); // EWA też zweryfikowana
-        EXPECT(r.onData(ADAM, pakiet(adres(EWA), adres(JA))) == InboundResult::Spoofed, "ADAM jako EWA – odrzucone");
-        EXPECT(r.onData(ADAM, pakiet(adres(JA), adres(JA))) == InboundResult::Spoofed, "ADAM jako my – odrzucone");
-        EXPECT(r.onData(ADAM, pakiet(ip::Address4(192, 168, 8, 1), adres(JA))) == InboundResult::Spoofed,
-               "ADAM jako router domowy – odrzucone");
-        EXPECT(r.onData(ADAM, pakiet(ip::Address4(127, 0, 0, 1), adres(JA))) == InboundResult::Spoofed,
-               "ADAM jako localhost – odrzucone");
+        router::Router r(ME);
+        setUp(r);
+        r.onHello(EVE, hello(CODE, EVE, ME, addr(EVE))); // EVE verified too
+        EXPECT(r.onData(ALICE, packet(addr(EVE), addr(ME))) == InboundResult::Spoofed, "ALICE as EVE – rejected");
+        EXPECT(r.onData(ALICE, packet(addr(ME), addr(ME))) == InboundResult::Spoofed, "ALICE as us – rejected");
+        EXPECT(r.onData(ALICE, packet(ip::Address4(192, 168, 8, 1), addr(ME))) == InboundResult::Spoofed,
+               "ALICE as the home router – rejected");
+        EXPECT(r.onData(ALICE, packet(ip::Address4(127, 0, 0, 1), addr(ME))) == InboundResult::Spoofed,
+               "ALICE as localhost – rejected");
     }
 
-    SCENARIUSZ("Członek próbuje dostać się przez nas dalej (sieć domowa, internet, inni)");
+    SCENARIO("A member tries to reach further through us (home network, internet, others)");
     {
-        router::Router r(JA);
-        siec(r);
-        EXPECT(r.onData(ADAM, pakiet(adres(ADAM), ip::Address4(192, 168, 8, 153))) == InboundResult::NotForUs,
-               "do NAS-a w sieci domowej – odrzucone");
-        EXPECT(r.onData(ADAM, pakiet(adres(ADAM), ip::Address4(127, 0, 0, 1))) == InboundResult::NotForUs,
-               "do localhost – odrzucone");
-        EXPECT(r.onData(ADAM, pakiet(adres(ADAM), ip::Address4(8, 8, 8, 8))) == InboundResult::NotForUs,
-               "do internetu – odrzucone");
-        EXPECT(r.onData(ADAM, pakiet(adres(ADAM), adres(EWA))) == InboundResult::NotForUs,
-               "do innego członka przez nas – odrzucone");
-        EXPECT(r.onData(ADAM, pakiet(adres(ADAM), ip::Address4(255, 255, 255, 255))) == InboundResult::Deliver,
-               "broadcast (wykrywanie serwerów LAN) – dozwolony");
+        router::Router r(ME);
+        setUp(r);
+        EXPECT(r.onData(ALICE, packet(addr(ALICE), ip::Address4(192, 168, 8, 153))) == InboundResult::NotForUs,
+               "to a NAS on the home network – rejected");
+        EXPECT(r.onData(ALICE, packet(addr(ALICE), ip::Address4(127, 0, 0, 1))) == InboundResult::NotForUs,
+               "to localhost – rejected");
+        EXPECT(r.onData(ALICE, packet(addr(ALICE), ip::Address4(8, 8, 8, 8))) == InboundResult::NotForUs,
+               "to the internet – rejected");
+        EXPECT(r.onData(ALICE, packet(addr(ALICE), addr(EVE))) == InboundResult::NotForUs,
+               "to another member through us – rejected");
+        EXPECT(r.onData(ALICE, packet(addr(ALICE), ip::Address4(255, 255, 255, 255))) == InboundResult::Deliver,
+               "broadcast (LAN server discovery) – allowed");
     }
 
-    SCENARIUSZ("Członek próbuje połączyć się z usługami naszego komputera");
+    SCENARIO("A member tries to connect to services on our computer");
     {
-        router::Router r(JA);
-        siec(r);
-        const auto a = adres(ADAM), j = adres(JA);
-        EXPECT(r.onData(ADAM, pakiet(a, j, 6, 22)) == InboundResult::Filtered, "SSH zablokowane");
-        EXPECT(r.onData(ADAM, pakiet(a, j, 6, 445)) == InboundResult::Filtered, "Samba zablokowana");
-        EXPECT(r.onData(ADAM, pakiet(a, j, 6, 3389)) == InboundResult::Filtered, "RDP zablokowany");
-        EXPECT(r.onData(ADAM, pakiet(a, j, 6, 5432)) == InboundResult::Filtered, "PostgreSQL zablokowany");
-        EXPECT(r.onData(ADAM, pakiet(a, ip::Address4(224, 0, 0, 251), 17, 5353)) == InboundResult::Filtered,
-               "zapytania mDNS zablokowane");
-        EXPECT(r.onData(ADAM, pakiet(a, j, 47, 0)) == InboundResult::Filtered, "inny protokół (GRE) zablokowany");
-        EXPECT(r.onData(ADAM, pakiet(a, j, 17, 27960)) == InboundResult::Deliver, "Quake 3 dozwolony");
-        EXPECT(r.onData(ADAM, pakiet(a, j, 6, 25565)) == InboundResult::Deliver, "Minecraft dozwolony");
-        EXPECT(r.onData(ADAM, pakiet(a, j, 1, 0)) == InboundResult::Deliver, "ping dozwolony");
+        router::Router r(ME);
+        setUp(r);
+        const auto a = addr(ALICE), m = addr(ME);
+        EXPECT(r.onData(ALICE, packet(a, m, 6, 22)) == InboundResult::Filtered, "SSH blocked");
+        EXPECT(r.onData(ALICE, packet(a, m, 6, 445)) == InboundResult::Filtered, "Samba blocked");
+        EXPECT(r.onData(ALICE, packet(a, m, 6, 3389)) == InboundResult::Filtered, "RDP blocked");
+        EXPECT(r.onData(ALICE, packet(a, m, 6, 5432)) == InboundResult::Filtered, "PostgreSQL blocked");
+        EXPECT(r.onData(ALICE, packet(a, ip::Address4(224, 0, 0, 251), 17, 5353)) == InboundResult::Filtered,
+               "mDNS queries blocked");
+        EXPECT(r.onData(ALICE, packet(a, m, 47, 0)) == InboundResult::Filtered, "other protocol (GRE) blocked");
+        EXPECT(r.onData(ALICE, packet(a, m, 17, 27960)) == InboundResult::Deliver, "Quake 3 allowed");
+        EXPECT(r.onData(ALICE, packet(a, m, 6, 25565)) == InboundResult::Deliver, "Minecraft allowed");
+        EXPECT(r.onData(ALICE, packet(a, m, 1, 0)) == InboundResult::Deliver, "ping allowed");
         r.setProtectServices(false);
-        EXPECT(r.onData(ADAM, pakiet(a, j, 6, 22)) == InboundResult::Deliver, "po wyłączeniu ochrony SSH przechodzi");
+        EXPECT(r.onData(ALICE, packet(a, m, 6, 22)) == InboundResult::Deliver, "SSH passes once protection is off");
     }
 
-    SCENARIUSZ("Nasz system nie wysyła nic poza siecią ani do niezweryfikowanych");
+    SCENARIO("Our system sends nothing outside the network or to unverified people");
     {
-        router::Router r(JA);
-        siec(r);
-        const auto j = adres(JA);
-        EXPECT(r.recipients(pakiet(j, adres(ADAM))) == std::vector<uint64_t>{ADAM}, "do ADAMA – tylko do niego");
-        EXPECT(r.recipients(pakiet(j, adres(EWA))).empty(), "do niezweryfikowanej EWY – nic");
-        EXPECT(r.recipients(pakiet(ip::Address4(192, 168, 8, 2), adres(ADAM))).empty(),
-               "pakiet z naszym domowym adresem – nie wychodzi (bez wycieku)");
-        EXPECT(r.recipients(pakiet(j, ip::Address4(255, 255, 255, 255))) == std::vector<uint64_t>{ADAM},
-               "broadcast – tylko do zweryfikowanych");
-        EXPECT(r.recipients(pakiet(j, ip::Address4(224, 0, 0, 251), 17, 5353)).empty(),
-               "ogłoszenia mDNS (nazwa komputera) – nie wychodzą");
-        EXPECT(r.recipients(pakiet(j, ip::Address4(100, 127, 255, 255), 17, 137)).empty(),
-               "ogłoszenia NetBIOS – nie wychodzą");
-        EXPECT(r.recipients(pakiet(j, ip::Address4(100, 127, 255, 255), 17, 27960)) == std::vector<uint64_t>{ADAM},
-               "wykrywanie serwerów gry – wychodzi");
+        router::Router r(ME);
+        setUp(r);
+        const auto m = addr(ME);
+        EXPECT(r.recipients(packet(m, addr(ALICE))) == std::vector<uint64_t>{ALICE}, "to ALICE – only to her");
+        EXPECT(r.recipients(packet(m, addr(EVE))).empty(), "to unverified EVE – nothing");
+        EXPECT(r.recipients(packet(ip::Address4(192, 168, 8, 2), addr(ALICE))).empty(),
+               "packet with our home address – not sent (no leak)");
+        EXPECT(r.recipients(packet(m, ip::Address4(255, 255, 255, 255))) == std::vector<uint64_t>{ALICE},
+               "broadcast – verified members only");
+        EXPECT(r.recipients(packet(m, ip::Address4(224, 0, 0, 251), 17, 5353)).empty(),
+               "mDNS announcements (computer name) – not sent");
+        EXPECT(r.recipients(packet(m, ip::Address4(100, 127, 255, 255), 17, 137)).empty(),
+               "NetBIOS announcements – not sent");
+        EXPECT(r.recipients(packet(m, ip::Address4(100, 127, 255, 255), 17, 27960)) == std::vector<uint64_t>{ALICE},
+               "game server discovery – sent");
     }
 
-    SCENARIUSZ("Osoba, która opuściła lobby, traci dostęp natychmiast");
+    SCENARIO("Someone who left the lobby loses access immediately");
     {
-        router::Router r(JA);
-        siec(r);
-        const auto zniknely = r.syncMembers({JA, EWA});
-        EXPECT(zniknely == std::vector<uint64_t>{ADAM}, "wykryto odejście ADAMA");
-        EXPECT(r.onData(ADAM, pakiet(adres(ADAM), adres(JA))) == InboundResult::UnknownSender, "jego pakiety odrzucone");
-        EXPECT(r.recipients(pakiet(adres(JA), adres(ADAM))).empty(), "nic do niego nie wysyłamy");
-        r.syncMembers({JA, EWA, ADAM});
-        EXPECT(r.onData(ADAM, pakiet(adres(ADAM), adres(JA))) == InboundResult::UnknownSender,
-               "po powrocie musi zweryfikować się od nowa");
+        router::Router r(ME);
+        setUp(r);
+        const auto gone = r.syncMembers({ME, EVE});
+        EXPECT(gone == std::vector<uint64_t>{ALICE}, "ALICE leaving is detected");
+        EXPECT(r.onData(ALICE, packet(addr(ALICE), addr(ME))) == InboundResult::UnknownSender, "her packets rejected");
+        EXPECT(r.recipients(packet(addr(ME), addr(ALICE))).empty(), "nothing is sent to her");
+        r.syncMembers({ME, EVE, ALICE});
+        EXPECT(r.onData(ALICE, packet(addr(ALICE), addr(ME))) == InboundResult::UnknownSender,
+               "after coming back she must verify again");
     }
 
-    SCENARIUSZ("Po opuszczeniu sieci nic nie przechodzi");
+    SCENARIO("Nothing passes after leaving the network");
     {
-        router::Router r(JA);
-        siec(r);
+        router::Router r(ME);
+        setUp(r);
         r.clear();
-        EXPECT(r.onData(ADAM, pakiet(adres(ADAM), adres(JA))) == InboundResult::UnknownSender, "brak przyjmowania");
-        EXPECT(r.recipients(pakiet(adres(JA), ip::Address4(255, 255, 255, 255))).empty(), "brak wysyłania");
-        EXPECT(r.onHello(ADAM, hello(KOD, ADAM, JA, adres(ADAM))) == HelloResult::NoNetwork, "brak weryfikacji");
+        EXPECT(r.onData(ALICE, packet(addr(ALICE), addr(ME))) == InboundResult::UnknownSender, "nothing accepted");
+        EXPECT(r.recipients(packet(addr(ME), ip::Address4(255, 255, 255, 255))).empty(), "nothing sent");
+        EXPECT(r.onHello(ALICE, hello(CODE, ALICE, ME, addr(ALICE))) == HelloResult::NoNetwork, "no verification");
     }
 
-    SCENARIUSZ("Inna wersja programu nie zostaje wpuszczona");
+    SCENARIO("A different program version is not let in");
     {
-        router::Router r(JA);
-        r.setCode(KOD);
-        r.syncMembers({JA, ADAM});
-        EXPECT(r.onHello(ADAM, hello(KOD, ADAM, JA, adres(ADAM), protocol::kVersion + 1)) == HelloResult::BadVersion,
-               "inna wersja protokołu odrzucona");
+        router::Router r(ME);
+        r.setCode(CODE);
+        r.syncMembers({ME, ALICE});
+        EXPECT(r.onHello(ALICE, hello(CODE, ALICE, ME, addr(ALICE), protocol::kVersion + 1)) == HelloResult::BadVersion,
+               "different protocol version rejected");
     }
 
-    SCENARIUSZ("Dwie osoby z tym samym adresem (kolizja) – żadna nie przejmuje ruchu drugiej");
+    SCENARIO("Two people with the same address (collision) – neither takes over the other's traffic");
     {
-        // szukamy dwóch SteamID dających ten sam adres (paradoks dnia urodzin, ok. kilku tysięcy prób)
+        // find two SteamIDs giving the same address (birthday paradox, a few thousand tries)
         std::map<uint32_t, uint64_t> seen;
         uint64_t a = 0, b = 0;
         for (uint64_t id = 76561198100000000ull; a == 0; ++id) {
-            const auto [it, ok] = seen.emplace(adres(id).value(), id);
+            const auto [it, ok] = seen.emplace(addr(id).value(), id);
             if (!ok) { a = it->second; b = id; }
         }
-        router::Router r(JA);
-        r.setCode(KOD);
-        r.syncMembers({JA, a, b});
-        EXPECT(r.onHello(a, hello(KOD, a, JA, adres(a))) == HelloResult::Verified, "pierwsza osoba zweryfikowana");
-        EXPECT(r.onHello(b, hello(KOD, b, JA, adres(b))) == HelloResult::Conflict, "druga – konflikt");
-        EXPECT(r.onData(b, pakiet(adres(b), adres(JA))) == InboundResult::UnknownSender, "druga nie wysyła jako pierwsza");
-        EXPECT(r.recipients(pakiet(adres(JA), adres(a))) == std::vector<uint64_t>{a}, "ruch trafia do pierwszej");
+        router::Router r(ME);
+        r.setCode(CODE);
+        r.syncMembers({ME, a, b});
+        EXPECT(r.onHello(a, hello(CODE, a, ME, addr(a))) == HelloResult::Verified, "first person verified");
+        EXPECT(r.onHello(b, hello(CODE, b, ME, addr(b))) == HelloResult::Conflict, "second one – conflict");
+        EXPECT(r.onData(b, packet(addr(b), addr(ME))) == InboundResult::UnknownSender, "the second cannot send as the first");
+        EXPECT(r.recipients(packet(addr(ME), addr(a))) == std::vector<uint64_t>{a}, "traffic goes to the first");
     }
 
-    SCENARIUSZ("Uszkodzone i za duże pakiety");
+    SCENARIO("Broken and oversized packets");
     {
-        router::Router r(JA);
-        siec(r);
-        std::vector<uint8_t> duzy(70000, 0);
-        duzy[0] = 0x45;
-        EXPECT(r.onData(ADAM, duzy) == InboundResult::Malformed, "ponad 64 KB odrzucony");
-        EXPECT(r.onData(ADAM, std::vector<uint8_t>(10, 0x45)) == InboundResult::Malformed, "za krótki odrzucony");
-        auto ipv6 = pakiet(adres(ADAM), adres(JA));
+        router::Router r(ME);
+        setUp(r);
+        std::vector<uint8_t> huge(70000, 0);
+        huge[0] = 0x45;
+        EXPECT(r.onData(ALICE, huge) == InboundResult::Malformed, "over 64 KB rejected");
+        EXPECT(r.onData(ALICE, std::vector<uint8_t>(10, 0x45)) == InboundResult::Malformed, "too short rejected");
+        auto ipv6 = packet(addr(ALICE), addr(ME));
         ipv6[0] = 0x60;
-        EXPECT(r.onData(ADAM, ipv6) == InboundResult::Malformed, "IPv6 odrzucony");
-        auto klamstwo = pakiet(adres(ADAM), adres(JA));
-        klamstwo[2] = 0xFF; // deklarowana długość większa niż pakiet
-        EXPECT(r.onData(ADAM, klamstwo) == InboundResult::Malformed, "fałszywa długość odrzucona");
+        EXPECT(r.onData(ALICE, ipv6) == InboundResult::Malformed, "IPv6 rejected");
+        auto lying = packet(addr(ALICE), addr(ME));
+        lying[2] = 0xFF; // declared length larger than the packet
+        EXPECT(r.onData(ALICE, lying) == InboundResult::Malformed, "false length rejected");
     }
 
-    SCENARIUSZ("Ponawianie HELLO ma limit (brak zalewania sieci)");
+    SCENARIO("HELLO retries are limited (no flooding)");
     {
-        router::Router r(JA);
-        r.setCode(KOD);
-        r.syncMembers({JA, EWA});
+        router::Router r(ME);
+        r.setCode(CODE);
+        r.syncMembers({ME, EVE});
         auto t = router::Router::Clock::now();
-        int wyslane = 0;
+        int sent = 0;
         for (int i = 0; i < 100; ++i, t += std::chrono::seconds(3))
-            wyslane += int(r.dueHellos(t, std::chrono::seconds(2), 15).size());
-        EXPECT(wyslane == 15, "maksymalnie 15 prób do osoby, która nie odpowiada");
+            sent += int(r.dueHellos(t, std::chrono::seconds(2), 15).size());
+        EXPECT(sent == 15, "at most 15 attempts to someone who does not answer");
     }
 
-    std::printf("\n%d sprawdzeń, %d nieudanych\n", checks, failures);
-    if (failures == 0) std::printf("Wszystkie testy bezpieczeństwa OK\n");
+    std::printf("\n%d checks, %d failed\n", checks, failures);
+    if (failures == 0) std::printf("All security tests passed\n");
     return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }

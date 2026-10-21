@@ -16,7 +16,7 @@ struct Engine::State {
     std::unique_ptr<steam::Network> net;
     std::unique_ptr<platform::Tun> tun;
     EngineStatus status = EngineStatus::Starting;
-    std::string error;
+    Message error;
     bool dirty = true;
     bool hideAddress = true;
     bool protectServices = true;
@@ -56,7 +56,7 @@ void Engine::join(const std::string& text, const std::string& nameHint) {
     post([this, text, nameHint] {
         if (!st_->net) return;
         if (const auto code = netcode::parse(text)) st_->net->connect(*code, nameHint);
-        else if (onEvent_) onEvent_("To nie wygląda na kod sieci. Kod ma postać KTL-XXXX-XXXX-XXXX.");
+        else if (onEvent_) onEvent_({Msg::InvalidCode, {}});
         st_->dirty = true;
     });
 }
@@ -85,7 +85,7 @@ void Engine::setProtectServices(bool protect) {
 
 void Engine::initialize() {
     auto& s = *st_;
-    s.error.clear();
+    s.error = {};
     if (!s.session.initialized()) {
         s.status = EngineStatus::Starting;
         publish();
@@ -94,9 +94,9 @@ void Engine::initialize() {
             publish();
             return;
         }
-        s.net = std::make_unique<steam::Network>(s.session.steamId(), [this](const std::string& text) {
+        s.net = std::make_unique<steam::Network>(s.session.steamId(), [this](const Message& message) {
             st_->dirty = true;
-            if (onEvent_) onEvent_(text);
+            if (onEvent_) onEvent_(message);
         });
         s.net->setHideAddress(s.hideAddress);
         s.net->setProtectServices(s.protectServices);
@@ -159,7 +159,7 @@ void Engine::loop() {
                 if (s.net) s.net->tick();
                 nextTick = now + std::chrono::milliseconds(500);
             }
-            // migawka co sekundę (ping) albo od razu po zmianie
+            // snapshot every second (ping) or right after a change
             if (s.dirty || now >= nextPublish) {
                 publish();
                 nextPublish = now + std::chrono::seconds(1);
@@ -182,7 +182,7 @@ void Engine::shutdown() {
             s.tun->stop();
             s.tun.reset();
         }
-        // Obiekt sieci rejestruje callbacki Steama – nie wolno go niszczyć po SteamAPI_Shutdown().
+        // The network object registers Steam callbacks – it must not be destroyed after SteamAPI_Shutdown().
         s.net.reset();
         s.session.shutdown();
         done = true;
@@ -191,7 +191,7 @@ void Engine::shutdown() {
     while (!done && Clock::now() < deadline) std::this_thread::sleep_for(std::chrono::milliseconds(10));
     running_ = false;
     if (done && thread_.joinable()) thread_.join();
-    else if (thread_.joinable()) thread_.detach(); // zawieszony Steam – nie czekamy w nieskończoność
+    else if (thread_.joinable()) thread_.detach(); // Steam is hanging – do not wait forever
 }
 
 } // namespace kettle::gui

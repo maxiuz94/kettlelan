@@ -1,97 +1,98 @@
-# Bezpieczeństwo KettleLAN
+# KettleLAN security
 
-Ten dokument opisuje, co KettleLAN chroni, czego nie chroni i jak zgłosić problem.
+**English** · [Polski](SECURITY.pl.md)
 
-## Zgłaszanie luk
+This document describes what KettleLAN protects, what it does not, and how to report a problem.
 
-Jeśli znajdziesz lukę, **nie zakładaj publicznego zgłoszenia**. Użyj prywatnego zgłoszenia na GitHubie:
-zakładka **Security → Report a vulnerability** w repozytorium.
+## Reporting a vulnerability
 
-## Kto co widzi
+Please **do not open a public issue**. Use GitHub's private reporting instead:
+**Security → Report a vulnerability** in this repository.
 
-| Kto | Co widzi |
-|-----|----------|
-| Osoba postronna (dostawca internetu, to samo Wi-Fi) | Tylko zaszyfrowany ruch UDP Steama (AES-GCM, tożsamość potwierdzona certyfikatami Steam). Bez treści gier i bez adresów `100.x.x.x`. |
-| Członek Twojej sieci, **„Ukryj mój adres IP” włączone** (domyślnie) | Twój nick Steam i adres `100.x.x.x`. Ruch idzie przez relay Valve, więc **nie poznaje Twojego publicznego IP**. |
-| Członek Twojej sieci, ukrywanie wyłączone | Jak wyżej, ale przy połączeniu bezpośrednim także Twój publiczny adres IP. |
-| Valve | Że korzystasz z sieci Steam w aplikacji Spacewar (App ID 480) i z kim się łączysz. |
+## Who sees what
 
-## Ochrona komputera
+| Who | What they see |
+|-----|---------------|
+| A third party (your ISP, someone on the same Wi-Fi) | Only encrypted Steam UDP traffic (AES-GCM, identities verified with Steam certificates). No game data and no `100.x.x.x` addresses. |
+| A member of your network, **"Hide my IP address" on** (default) | Your Steam name and your `100.x.x.x` address. Traffic goes through Valve's relays, so they **never learn your public IP**. |
+| A member of your network, hiding off | As above, plus your public IP address when the connection is direct. |
+| Valve | That you use Steam networking in the Spacewar app (App ID 480) and whom you connect to. |
 
-- **Program nie działa jako root.** Uprawnienia administratora ma tylko skrypt `kettlelan-helper`,
-  który umie wyłącznie utworzyć lub usunąć kartę `kettle0` i ściśle sprawdza argumenty. Hasło zbiera
-  systemowe okno polkit; w terminalu bez pulpitu (np. przez SSH) KettleLAN prosi o nie przez `sudo`.
-- **„Chroń usługi tego komputera”** (domyślnie włączone): pakiety od członków sieci do SSH, udostępniania
-  plików (SMB, NFS, AFP), zdalnego pulpitu (RDP, VNC), baz danych, paneli administracyjnych, KDE Connect,
-  Steam Remote Play itp. są odrzucane, zanim dotrą do systemu. Odrzucane są też protokoły inne niż
-  TCP/UDP/ICMP oraz podejrzane fragmenty IP (RFC 1858). Pełna lista: [`src/core/filter.cpp`](src/core/filter.cpp).
-- Przy włączonej ochronie Twój system **nie rozgłasza** w sieci KettleLAN swoich usług (mDNS/Avahi,
-  NetBIOS, SSDP, KDE Connect, Spotify…), które zdradzają nazwę komputera i udostępniane zasoby.
-- **Brak dostępu do sieci domowej.** Przyjmowane są tylko pakiety adresowane do Twojego adresu
-  `100.x.x.x` (lub rozgłoszeniowe). KettleLAN nie przekazuje ruchu dalej i nie zmienia trasy internetu –
-  przez `kettle0` idzie wyłącznie zakres `100.64.0.0/10`.
-- **Tylko zweryfikowani członkowie.** Połączenia Steam przyjmowane są wyłącznie od osób z lobby sieci,
-  a pakiety tylko od tych, które udowodniły znajomość klucza z kodu – i tylko z ich własnego adresu.
-- **Tekst od innych osób** (nicki, nazwy sieci) jest oczyszczany ze znaków sterujących i wyświetlany
-  jako zwykły tekst – bez HTML, więc nie da się nim np. wczytać obrazka z obcego serwera.
-- Plik z zapisanymi sieciami i dziennik są dostępne tylko dla Twojego konta (uprawnienia `600`).
+## Protecting your computer
 
-## Kod sieci
+- **The program does not run as root.** Only the `kettlelan-helper` script gets administrator rights; it can
+  only create or remove the `kettle0` adapter and validates its arguments strictly. The password is collected
+  by the system's polkit prompt; in a terminal without a desktop (e.g. over SSH) KettleLAN uses `sudo`.
+- **"Protect this computer's services"** (on by default): packets from members to SSH, file sharing
+  (SMB, NFS, AFP), remote desktop (RDP, VNC), databases, admin panels, KDE Connect, Steam Remote Play and
+  similar services are dropped before they reach the system. Protocols other than TCP/UDP/ICMP and suspicious
+  IP fragments (RFC 1858) are dropped too. Full list: [`src/core/filter.cpp`](src/core/filter.cpp).
+- With protection on, your system **does not announce** its services in the KettleLAN network (mDNS/Avahi,
+  NetBIOS, SSDP, KDE Connect, Spotify…), which would reveal the computer's name and shared resources.
+- **No access to your home network.** Only packets addressed to your `100.x.x.x` address (or broadcasts) are
+  accepted. KettleLAN does not forward traffic and does not change your internet route – only the
+  `100.64.0.0/10` range goes through `kettle0`.
+- **Verified members only.** Steam connections are accepted only from people in the network's lobby, and
+  packets only from those who proved that they know the key from the code – and only with their own address.
+- **Text from other people** (Steam names, network names) is cleaned of control characters and shown as plain
+  text – no HTML, so it cannot be used, for example, to load an image from someone's server.
+- The file with saved networks and the log are readable by your account only (permissions `600`).
 
-- Kod (`KTL-XXXX-XXXX-XXXX`, 60 bitów) działa jak hasło. Bez niego nie da się znaleźć lobby sieci
-  (wyszukiwanie odbywa się po skrócie całego kodu) ani dołączyć do niej.
-- Nie ma „właściciela”, który może kogoś wyrzucić. Jeśli kod trafi do niewłaściwej osoby, utwórz nową
-  sieć i wyślij nowy kod tylko zaufanym osobom.
+## The network code
 
-## Czego KettleLAN nie chroni
+- The code (`KTL-XXXX-XXXX-XXXX`, 60 bits) works like a password. Without it nobody can find the network's
+  lobby (the lobby is looked up by a hash of the whole code) or join it.
+- There is no "owner" who could kick someone. If the code reaches the wrong person, create a new network
+  and share the new code only with people you trust.
 
-- Członkowie sieci są dla siebie jak komputery w jednym LAN-ie: widzą ruch gier, który do nich trafia,
-  i mogą łączyć się z portami gier na Twoim komputerze. Wpuszczaj do sieci tylko zaufane osoby.
-- Ochrona usług opiera się na liście portów. Usługa na nietypowym porcie (np. własny serwer na 8123)
-  jest dostępna dla członków sieci – zamknij ją albo zablokuj w firewallu dla karty `kettle0`.
-- Instalacja przez `scripts/install-local.sh` umieszcza pomocnika w katalogu domowym. Złośliwy program
-  działający na Twoim koncie mógłby go podmienić. **Paczka `.deb` tego problemu nie ma**: pomocnik leży
-  w `/usr/lib/kettlelan/` (własność roota), a okno hasła ma własny opis (reguła polkit
+## What KettleLAN does not protect against
+
+- Members of a network are like computers on one LAN: they see the game traffic sent to them and can
+  connect to game ports on your computer. Only let people you trust into your network.
+- Service protection is based on a list of ports. A service on an unusual port (e.g. your own server on 8123)
+  is reachable by members – stop it or block it in your firewall for the `kettle0` adapter.
+- `scripts/install-local.sh` puts the helper into your home folder. Malware running under your account could
+  replace it. **The .deb package does not have this problem**: the helper lives in `/usr/lib/kettlelan/`
+  (owned by root) and the password prompt has its own description (polkit action
   `io.github.maxiuz94.kettlelan.helper`).
-- **AppImage** to jeden plik należący do Ciebie – ma ten sam poziom zaufania co każdy inny program, który
-  uruchamiasz ze swojego konta. Przed utworzeniem karty pomocnik jest kopiowany do świeżego, prywatnego
-  katalogu (`0700`), bo root nie ma dostępu do wnętrza zamontowanego pliku AppImage.
+- An **AppImage** is a single file owned by you – it has the same level of trust as any other program you run
+  from your account. Before creating the adapter the helper is copied into a fresh private folder (`0700`),
+  because root cannot access the inside of a mounted AppImage.
 
-## Skąd pochodzą gotowe pliki
+## Where the release files come from
 
-- Paczki buduje GitHub Actions z publicznego kodu ([`.github/workflows/release.yml`](.github/workflows/release.yml)),
-  a log budowania jest publiczny.
-- Przy każdym wydaniu: sumy `SHA256SUMS.txt` i atestacja pochodzenia –
-  `gh attestation verify NAZWA_PLIKU -R maxiuz94/kettlelan` potwierdza, że plik powstał w tym
-  repozytorium z konkretnego commita.
-- Narzędzia do budowania AppImage (linuxdeploy) są pobierane w przypiętych wersjach i sprawdzane sumą SHA256.
-- Jedyny niepubliczny składnik to oficjalne Steamworks SDK od Valve (licencja zabrania jego
-  publikowania). Workflow sprawdza jego sumę SHA256 z [`cmake/steamworks-sdk.sha256`](cmake/steamworks-sdk.sha256)
-  i przerywa budowanie, jeśli plik jest inny.
+- Packages are built by GitHub Actions from the public code
+  ([`.github/workflows/release.yml`](.github/workflows/release.yml)), and the build log is public.
+- Every release has `SHA256SUMS.txt` and a build attestation – `gh attestation verify FILE -R maxiuz94/kettlelan`
+  confirms that a file was built in this repository from a specific commit.
+- The AppImage tools (linuxdeploy) are downloaded in pinned versions and verified with SHA256.
+- The only non-public input is Valve's official Steamworks SDK (its license does not allow publishing it).
+  The workflow checks its SHA256 against [`cmake/steamworks-sdk.sha256`](cmake/steamworks-sdk.sha256) and stops
+  if the file is different.
 
-## Jak to jest testowane
+## How it is tested
 
-Wszystkie poniższe testy uruchamia `ctest --test-dir build`, a GitHub Actions powtarza je przy każdej
-zmianie w repozytorium – także w wersji z AddressSanitizer i UndefinedBehaviorSanitizer, które
-przerywają test przy każdym błędzie pamięci lub niezdefiniowanym zachowaniu.
+`ctest --test-dir build` runs all of the tests below, and GitHub Actions repeats them on every change –
+also in a build with AddressSanitizer and UndefinedBehaviorSanitizer, which stop on any memory error or
+undefined behaviour.
 
-- **`tests/test_security.cpp`** – scenariusze ataków na logikę sieci (moduł `src/core/router.cpp`,
-  tej samej, której używa program): osoba bez klucza, odtworzenie cudzego dowodu, obcy spoza lobby,
-  przejęcie cudzego adresu, podszywanie się pod innych członków, router domowy i localhost, próby
-  dostania się przez Ciebie do sieci domowej i internetu, dostęp do usług komputera, wycieki przez
-  rozgłaszanie, kolizje adresów, uszkodzone i za duże pakiety, zalewanie wiadomościami HELLO.
-- **`tests/fuzz_core.cpp`** – miliony losowych i celowo zepsutych pakietów, wiadomości, kodów sieci
-  i nicków podawanych do wszystkich funkcji, które czytają dane od innych osób.
-- **`tests/test_helper.sh`** – złośliwe argumenty dla pomocnika działającego jako root: wstrzykiwanie
-  poleceń (`;`, `$(...)`, nowa linia), adresy spoza sieci, zapis ósemkowy, uid roota i kont systemowych.
-- **`tests/test_core.cpp`** – filtr usług (w tym sztuczki z fragmentacją IP), czyszczenie tekstu,
-  kody sieci, dowody i znaczniki.
-- **Utwardzenie programu** – kompilacja z ochroną stosu, PIE, pełnym RELRO i niewykonywalnym stosem.
+- **`tests/test_security.cpp`** – attack scenarios against the network logic (`src/core/router.cpp`, the same
+  code the program uses): someone without the key, replaying someone else's proof, a stranger outside the
+  lobby, taking over someone's address, impersonating other members, the home router and localhost, attempts
+  to reach your home network and the internet through you, access to your computer's services, leaks through
+  broadcasts, address collisions, broken and oversized packets, HELLO flooding.
+- **`tests/fuzz_core.cpp`** – millions of random and deliberately broken packets, messages, network codes and
+  names fed to every function that reads data from other people.
+- **`tests/test_helper.sh`** – malicious arguments for the helper that runs as root: command injection
+  (`;`, `$(...)`, newline), addresses outside the network, octal notation, root and system account uids.
+- **`tests/test_core.cpp`** – the service filter (including IP fragmentation tricks), text cleaning, network
+  codes, proofs and tags.
+- **Hardening** – built with stack protection, PIE, full RELRO and a non-executable stack.
 
-### Testy na dwóch komputerach
+### Tests on two computers
 
-Ataków przez prawdziwą sieć Steam nie da się sprawdzić na jednym komputerze. Do tego służy wersja
-konsolowa zbudowana w trybie testów:
+Attacks over the real Steam network cannot be tested on one computer. Use the command-line version built
+in test mode:
 
 ```sh
 cmake -B build-test -DKETTLELAN_SECURITY_TESTS=ON -DKETTLELAN_BUILD_GUI=OFF
@@ -99,18 +100,9 @@ cmake --build build-test --parallel
 ./build-test/kettlelan-cli
 ```
 
-- `test-zly-klucz <kod>` – wchodzi do lobby sieci z fałszywym dowodem klucza. Druga strona powinna
-  zapisać w dzienniku „nie zna klucza sieci – ignoruję”, a ping do niej nie może działać.
-- `test-podszyj <adres>` – wysyła członkom ping z podrobionym adresem nadawcy. Druga strona powinna
-  zapisać „z cudzym adresem nadawcy (podszywanie się)” i zwiększyć licznik zablokowanych prób.
+- `test-wrong-key <code>` – joins the network's lobby with a forged key proof. The other side should log
+  "does not know the network key – ignoring", and pinging it must not work.
+- `test-spoof <address>` – sends members a ping with a forged source address. The other side should log
+  "with a forged source address (spoofing)" and increase its blocked-attempts counter.
 
-Te polecenia nigdy nie trafiają do zwykłych paczek.
-
----
-
-**English summary:** KettleLAN runs unprivileged (only a tiny, strictly validated helper creates the
-`kettle0` interface). By default it relays all traffic through Valve's servers so peers never learn your
-public IP, blocks inbound access to common system services (SSH, SMB, RDP, databases…) and stops your
-system's service announcements (mDNS, NetBIOS, SSDP…) from reaching peers. Only peers that prove
-knowledge of the network key can exchange packets. Report vulnerabilities privately via
-**Security → Report a vulnerability**.
+These commands are never included in the regular packages.

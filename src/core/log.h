@@ -1,4 +1,4 @@
-// KettleLAN – proste logowanie na stderr.
+// KettleLAN – simple logging to stderr.
 #pragma once
 
 #include <chrono>
@@ -34,13 +34,13 @@ inline void write(const char* level, const std::string& msg) {
 #define KLOG_IMPL(level, expr)                                                                     \
     do {                                                                                           \
         std::ostringstream kettle_log_ss_;                                                         \
-        kettle_log_ss_ << expr; /* wyrażenia z ?: podawaj w nawiasach */                                                                    \
+        kettle_log_ss_ << expr; /* put ?: expressions in parentheses */                                                                    \
         ::kettle::log::write(level, kettle_log_ss_.str());                                         \
     } while (0)
 
 #define KLOG_INFO(expr) KLOG_IMPL("INFO ", expr)
-#define KLOG_WARN(expr) KLOG_IMPL("UWAGA", expr)
-#define KLOG_ERROR(expr) KLOG_IMPL("BŁĄD ", expr)
+#define KLOG_WARN(expr) KLOG_IMPL("WARN ", expr)
+#define KLOG_ERROR(expr) KLOG_IMPL("ERROR", expr)
 #ifdef KETTLELAN_DEBUG
 #define KLOG_DEBUG(expr) KLOG_IMPL("DEBUG", expr)
 #else

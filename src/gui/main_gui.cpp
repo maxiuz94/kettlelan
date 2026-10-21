@@ -1,4 +1,4 @@
-// KettleLAN – program z interfejsem graficznym (Qt 6 / QML).
+// KettleLAN – graphical application (Qt 6 / QML).
 #include <QApplication>
 #include <QCommandLineParser>
 #include <QFile>
@@ -25,7 +25,7 @@
 
 namespace {
 
-// Zapisuje dziennik jednocześnie na terminal i do pliku (Ustawienia → Otwórz dziennik).
+// Writes the log to the terminal and to a file at the same time (Settings → Open log).
 class TeeBuf : public std::streambuf {
 public:
     TeeBuf(std::streambuf* a, std::streambuf* b) : a_(a), b_(b) {}
@@ -66,15 +66,15 @@ int main(int argc, char** argv) {
     QApplication::setQuitOnLastWindowClosed(false);
 
     QCommandLineParser parser;
-    parser.setApplicationDescription(QStringLiteral("Wirtualny LAN przez sieć Steam"));
+    parser.setApplicationDescription(QStringLiteral("Virtual LAN over the Steam network"));
     parser.addHelpOption();
     parser.addVersionOption();
-    QCommandLineOption minimized(QStringLiteral("minimized"), QStringLiteral("Uruchom schowany w zasobniku."));
+    QCommandLineOption minimized(QStringLiteral("minimized"), QStringLiteral("Start hidden in the system tray."));
     parser.addOption(minimized);
-    QCommandLineOption writeIcon(QStringLiteral("write-icon"), QStringLiteral("Zapisz ikonę programu do pliku PNG."),
-                                 QStringLiteral("plik"));
+    QCommandLineOption writeIcon(QStringLiteral("write-icon"), QStringLiteral("Save the application icon to a PNG file."),
+                                 QStringLiteral("file"));
     parser.addOption(writeIcon);
-    QCommandLineOption iconSize(QStringLiteral("icon-size"), QStringLiteral("Rozmiar ikony w pikselach (domyślnie 256)."),
+    QCommandLineOption iconSize(QStringLiteral("icon-size"), QStringLiteral("Icon size in pixels (default 256)."),
                                 QStringLiteral("px"), QStringLiteral("256"));
     parser.addOption(iconSize);
     parser.process(app);
@@ -87,7 +87,7 @@ int main(int argc, char** argv) {
 
     const bool demo = qEnvironmentVariableIsSet("KETTLELAN_DEMO");
 
-    // Tylko jedna kopia programu – druga pokazuje okno pierwszej i kończy się.
+    // Only one instance – a second one shows the first one's window and exits.
     QLocalServer server;
     if (!demo) {
         QLocalSocket probe;
@@ -95,17 +95,17 @@ int main(int argc, char** argv) {
         if (probe.waitForConnected(300)) {
             probe.write("show\n");
             probe.waitForBytesWritten(300);
-            std::puts("KettleLAN już działa – pokazuję jego okno.");
+            std::puts("KettleLAN is already running – showing its window.");
             return 0;
         }
         QLocalServer::removeServer(instanceName());
-        server.setSocketOptions(QLocalServer::UserAccessOption); // tylko nasz użytkownik
+        server.setSocketOptions(QLocalServer::UserAccessOption); // our user only
         server.listen(instanceName());
     }
 
-    // Dziennik: terminal + plik.
+    // Log: terminal + file.
     std::ofstream logFile(kettle::gui::logFilePath().toStdString(), std::ios::trunc);
-    // dziennik zawiera nicki i adresy członków sieci – tylko dla właściciela
+    // the log contains members' names and addresses – owner only
     QFile::setPermissions(kettle::gui::logFilePath(), QFileDevice::ReadOwner | QFileDevice::WriteOwner);
     TeeBuf tee(std::clog.rdbuf(), logFile.is_open() ? logFile.rdbuf() : nullptr);
     std::clog.rdbuf(&tee);
@@ -113,6 +113,7 @@ int main(int argc, char** argv) {
     QQuickStyle::setStyle(QStringLiteral("Basic"));
 
     kettle::gui::Backend backend(demo);
+    backend.applyInitialLanguage();
     qmlRegisterSingletonInstance("KettleLAN.Core", 1, 0, "Backend", &backend);
 
     QObject::connect(&server, &QLocalServer::newConnection, &backend, [&server, &backend] {
@@ -123,6 +124,7 @@ int main(int argc, char** argv) {
     });
 
     QQmlApplicationEngine engine;
+    backend.attachEngine(&engine);
     engine.addImportPath(QStringLiteral("qrc:/qt/qml"));
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app, [] { std::_Exit(1); },
                      Qt::QueuedConnection);
@@ -134,7 +136,7 @@ int main(int argc, char** argv) {
     if (!parser.isSet(minimized) || !backend.trayAvailable()) backend.showWindow();
     backend.startEngine();
 
-    // Zrzut ekranu do dokumentacji: KETTLELAN_DEMO=1 KETTLELAN_SCREENSHOT=plik.png
+    // Screenshot for the docs: KETTLELAN_DEMO=1 KETTLELAN_SCREENSHOT=file.png
     const QString shot = qEnvironmentVariable("KETTLELAN_SCREENSHOT");
     if (!shot.isEmpty() && window) {
         QTimer::singleShot(1500, &app, [window, shot] {
@@ -146,6 +148,6 @@ int main(int argc, char** argv) {
     const int ret = app.exec();
     std::clog.flush();
     logFile.flush();
-    // Steam jest już rozłączony (Backend::quitApp) – kończymy bez dalszego sprzątania.
+    // Steam is already disconnected (Backend::quitApp) – exit without further cleanup.
     std::_Exit(ret);
 }
