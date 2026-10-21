@@ -158,6 +158,26 @@
             <source>Could not attach to the kettle0 adapter: %1</source>
             <translation type="unfinished" />
         </message>
+        <message>
+            <location line="+1" />
+            <source>On Windows KettleLAN needs administrator rights to create the virtual network adapter. Start it with “Run as administrator”.</source>
+            <translation type="unfinished" />
+        </message>
+        <message>
+            <location line="+1" />
+            <source>wintun.dll was not found next to KettleLAN. Extract the whole KettleLAN folder from the zip file again.</source>
+            <translation type="unfinished" />
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Could not create the KettleLAN network adapter (Wintun): %1</source>
+            <translation type="unfinished" />
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Could not set the address of the KettleLAN network adapter: %1</source>
+            <translation type="unfinished" />
+        </message>
     </context>
     <context>
         <name>NetworkPage</name>
@@ -553,7 +573,7 @@ Steam is a trademark of Valve Corporation.</source>
     <context>
         <name>kettle::gui::Backend</name>
         <message>
-            <location filename="../src/gui/backend.cpp" line="+206" />
+            <location filename="../src/gui/backend.cpp" line="+221" />
             <source>My network</source>
             <translation type="unfinished" />
         </message>
@@ -568,7 +588,7 @@ Steam is a trademark of Valve Corporation.</source>
             <translation type="unfinished" />
         </message>
         <message>
-            <location line="+277" />
+            <location line="+278" />
             <source>Copy IP: %1  (%2)</source>
             <translation type="unfinished" />
         </message>

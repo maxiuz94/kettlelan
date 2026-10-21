@@ -38,6 +38,17 @@ Please **do not open a public issue**. Use GitHub's private reporting instead:
   text – no HTML, so it cannot be used, for example, to load an image from someone's server.
 - The file with saved networks and the log are readable by your account only (permissions `600`).
 
+## Windows
+
+- Wintun needs administrator rights to create the adapter **and** to exchange packets, so on Windows the whole
+  program runs elevated (UAC prompt on start). This is a temporary design: a separate system service for the
+  adapter, with the interface running as a normal user, is planned.
+- `wintun.dll` is loaded only from the program's own folder (protection against DLL planting); the shipped file is
+  the official build signed by WireGuard LLC, verified with SHA256 at build time.
+- A Windows Firewall rule allows incoming traffic **only on the KettleLAN adapter and only from `100.64.0.0/10`**.
+  The KettleLAN network stays a "Public" network, so Windows does not share files or printers on it, and
+  KettleLAN's own filter blocks computer services as on Linux.
+
 ## The network code
 
 - The code (`KTL-XXXX-XXXX-XXXX`, 60 bits) works like a password. Without it nobody can find the network's

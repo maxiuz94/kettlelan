@@ -7,7 +7,9 @@ It uses or ships the components listed below, each under its own license.
 |-----------|----------|---------|-------|
 | PartyLAN | original idea and parts of the IPv4 code | BSD-3-Clause | source code |
 | Steamworks SDK – `libsteam_api.so` | talking to the Steam client | Valve proprietary (Steamworks SDK Access Agreement) | all packages |
-| Qt 6 | graphical interface | LGPL-3.0 | system library (.deb), bundled (AppImage) |
+| Qt 6 | graphical interface | LGPL-3.0 | system library (.deb), bundled (AppImage, Windows) |
+| Wintun | virtual network adapter on Windows | prebuilt binaries license; API header GPL-2.0 OR MIT | Windows package, `third_party/wintun` |
+| Microsoft Visual C++ runtime | needed by the Windows build | Microsoft redistributable | Windows package |
 | System libraries | needed by Qt | various open-source licenses | bundled (AppImage) |
 
 ## PartyLAN
@@ -43,6 +45,24 @@ It uses or ships the components listed below, each under its own license.
     (`./KettleLAN-*.AppImage --appimage-extract`) and swap the files in `squashfs-root/usr/lib` and
     `squashfs-root/usr/plugins`.
   - The license texts are included inside the AppImage in `usr/share/doc/kettlelan/licenses/`.
+
+## Wintun (WireGuard LLC)
+
+- Copyright (C) 2018-2021 WireGuard LLC – https://www.wintun.net
+- The Windows package ships the official, digitally signed `wintun.dll` (version 0.14.1) **unmodified**, under
+  the Wintun prebuilt binaries license. The license text is included in the Windows package as
+  `licenses/Wintun-LICENSE.txt`. The file is downloaded from wintun.net during the build and verified with SHA256
+  ([`cmake/Wintun.cmake`](cmake/Wintun.cmake)).
+- The API header [`third_party/wintun/wintun.h`](third_party/wintun/wintun.h) is dual-licensed
+  "GPL-2.0 OR MIT"; KettleLAN uses it under the **MIT** license.
+
+## Windows package
+
+- Qt 6 libraries, QML modules and plugins (unmodified official binaries, LGPL-3.0 – source code:
+  https://download.qt.io/archive/qt/6.8/6.8.3/single/). They are separate DLL files and can be replaced.
+- The Microsoft Visual C++ runtime DLLs, redistributed as permitted by Microsoft for applications built with
+  Visual Studio, and other Microsoft redistributable files added by Qt's `windeployqt` tool.
+- The full list of bundled files is in `licenses/bundled-files.txt` inside the package.
 
 ## Other libraries bundled in the AppImage
 

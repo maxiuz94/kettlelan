@@ -11,7 +11,7 @@ bez limitu osób, bez przekierowywania portów i bez własnego serwera.
 [![Build](https://github.com/maxiuz94/kettlelan/actions/workflows/build.yml/badge.svg)](https://github.com/maxiuz94/kettlelan/actions/workflows/build.yml)
 [![Release](https://img.shields.io/github/v/release/maxiuz94/kettlelan)](https://github.com/maxiuz94/kettlelan/releases/latest)
 [![License: BSD-3-Clause](https://img.shields.io/github/license/maxiuz94/kettlelan)](LICENSE)
-![Platform: Linux](https://img.shields.io/badge/platform-Linux-informational)
+![Platform: Linux | Windows](https://img.shields.io/badge/platform-Linux%20%7C%20Windows-informational)
 
 [English](README.md) · **Polski**
 
@@ -52,9 +52,10 @@ Najnowsza wersja jest na stronie [**Releases**](https://github.com/maxiuz94/kett
 | Dowolna dystrybucja Linuksa | `KettleLAN-…-x86_64.AppImage` | `chmod +x KettleLAN-*.AppImage`, potem uruchom |
 | Ubuntu 24.04+, Mint 22+, Pop!_OS, Debian 13 | `kettlelan_…_ubuntu24.04_amd64.deb` | `sudo apt install ./kettlelan_…_ubuntu24.04_amd64.deb` |
 | Debian 12, MX Linux 23 | `kettlelan_…_debian12_amd64.deb` | `sudo apt install ./kettlelan_…_debian12_amd64.deb` |
+| Windows 10/11 (64-bit) – od wersji 0.2.0 | `KettleLAN-…-windows-x64.zip` | rozpakuj i uruchom `KettleLAN.exe` (prosi o uprawnienia administratora) |
 
-Potrzebny jest zainstalowany i zalogowany **Steam** (zwykła wersja z repozytorium dystrybucji albo ze strony
-Valve; wersje Flatpak i Snap mogą nie współpracować). Wersja dla Windowsa jest w przygotowaniu.
+Potrzebny jest zainstalowany i zalogowany **Steam** (na Linuksie zwykła wersja z repozytorium dystrybucji
+albo ze strony Valve; wersje Flatpak i Snap mogą nie współpracować).
 
 Wszystkie pliki buduje GitHub Actions z tego repozytorium. Przy każdym wydaniu są sumy SHA256 i atestacja
 pochodzenia – sprawdzisz plik poleceniem `gh attestation verify PLIK -R maxiuz94/kettlelan`.

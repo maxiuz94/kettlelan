@@ -160,6 +160,26 @@
             <source>Could not attach to the kettle0 adapter: %1</source>
             <translation>Nie można podłączyć się do karty kettle0: %1</translation>
         </message>
+        <message>
+            <location line="+1" />
+            <source>On Windows KettleLAN needs administrator rights to create the virtual network adapter. Start it with “Run as administrator”.</source>
+            <translation>Na Windowsie KettleLAN potrzebuje uprawnień administratora, żeby utworzyć wirtualną kartę sieciową. Uruchom go opcją „Uruchom jako administrator”.</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>wintun.dll was not found next to KettleLAN. Extract the whole KettleLAN folder from the zip file again.</source>
+            <translation>Nie znaleziono pliku wintun.dll obok KettleLAN. Rozpakuj ponownie cały folder KettleLAN z pliku zip.</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Could not create the KettleLAN network adapter (Wintun): %1</source>
+            <translation>Nie udało się utworzyć karty sieciowej KettleLAN (Wintun): %1</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Could not set the address of the KettleLAN network adapter: %1</source>
+            <translation>Nie udało się ustawić adresu karty sieciowej KettleLAN: %1</translation>
+        </message>
     </context>
     <context>
         <name>NetworkPage</name>
@@ -558,7 +578,7 @@ Steam jest znakiem towarowym Valve Corporation.</translation>
     <context>
         <name>kettle::gui::Backend</name>
         <message>
-            <location filename="../src/gui/backend.cpp" line="+206" />
+            <location filename="../src/gui/backend.cpp" line="+221" />
             <source>My network</source>
             <translation>Moja sieć</translation>
         </message>
@@ -573,7 +593,7 @@ Steam jest znakiem towarowym Valve Corporation.</translation>
             <translation>Usunięto „%1” z Twoich sieci</translation>
         </message>
         <message>
-            <location line="+277" />
+            <location line="+278" />
             <source>Copy IP: %1  (%2)</source>
             <translation>Kopiuj IP: %1  (%2)</translation>
         </message>

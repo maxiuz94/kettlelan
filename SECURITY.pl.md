@@ -38,6 +38,17 @@ zakładka **Security → Report a vulnerability** w repozytorium.
   jako zwykły tekst – bez HTML, więc nie da się nim np. wczytać obrazka z obcego serwera.
 - Plik z zapisanymi sieciami i dziennik są dostępne tylko dla Twojego konta (uprawnienia `600`).
 
+## Windows
+
+- Wintun wymaga uprawnień administratora do utworzenia karty **i** do przesyłania pakietów, dlatego na Windowsie
+  cały program działa jako administrator (monit UAC przy starcie). To rozwiązanie tymczasowe – w planach jest
+  osobna usługa systemowa dla karty, a interfejs będzie działał jako zwykły użytkownik.
+- `wintun.dll` jest ładowany wyłącznie z katalogu programu (ochrona przed podstawieniem biblioteki); dołączony plik
+  to oficjalna wersja podpisana przez WireGuard LLC, sprawdzana sumą SHA256 przy budowaniu.
+- Reguła Zapory Windows wpuszcza ruch przychodzący **tylko na karcie KettleLAN i tylko z adresów `100.64.0.0/10`**.
+  Sieć KettleLAN zostaje siecią „Publiczną”, więc Windows nie udostępnia w niej plików ani drukarek, a filtr
+  KettleLAN blokuje usługi komputera tak jak na Linuksie.
+
 ## Kod sieci
 
 - Kod (`KTL-XXXX-XXXX-XXXX`, 60 bitów) działa jak hasło. Bez niego nie da się znaleźć lobby sieci

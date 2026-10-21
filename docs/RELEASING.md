@@ -14,8 +14,8 @@
    git push origin main v0.2.0
    ```
 
-5. GitHub Actions (the **Release** workflow) builds the .deb packages (Debian 12, Ubuntu 24.04) and the
-   AppImage, runs the tests, computes SHA256 checksums, adds a build attestation and publishes the release
+5. GitHub Actions (the **Release** workflow) builds the .deb packages (Debian 12, Ubuntu 24.04), the
+   AppImage and the Windows zip, runs the tests, computes SHA256 checksums, adds a build attestation and publishes the release
    on the **Releases** page with the description from `CHANGELOG.md`. Progress is visible in the **Actions** tab.
 
 ## One-time setup

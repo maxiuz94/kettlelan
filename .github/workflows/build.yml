@@ -32,3 +32,15 @@ jobs:
         run: ctest --test-dir build --output-on-failure
       - name: Long fuzzing (5 million inputs)
         run: ./build/kettlelan_fuzz 5000000
+
+  windows:
+    name: Tests on Windows (MSVC)
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v6
+      - name: Configure
+        run: cmake -B build -DKETTLELAN_BUILD_APP=OFF
+      - name: Build
+        run: cmake --build build --config Release --parallel
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure

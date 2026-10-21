@@ -11,7 +11,7 @@ no player limit, no port forwarding, no server of your own.
 [![Build](https://github.com/maxiuz94/kettlelan/actions/workflows/build.yml/badge.svg)](https://github.com/maxiuz94/kettlelan/actions/workflows/build.yml)
 [![Release](https://img.shields.io/github/v/release/maxiuz94/kettlelan)](https://github.com/maxiuz94/kettlelan/releases/latest)
 [![License: BSD-3-Clause](https://img.shields.io/github/license/maxiuz94/kettlelan)](LICENSE)
-![Platform: Linux](https://img.shields.io/badge/platform-Linux-informational)
+![Platform: Linux | Windows](https://img.shields.io/badge/platform-Linux%20%7C%20Windows-informational)
 
 **English** · [Polski](README.pl.md)
 
@@ -52,9 +52,10 @@ Get the latest version from the [**Releases**](https://github.com/maxiuz94/kettl
 | Any Linux distribution | `KettleLAN-…-x86_64.AppImage` | `chmod +x KettleLAN-*.AppImage`, then run it |
 | Ubuntu 24.04+, Mint 22+, Pop!_OS, Debian 13 | `kettlelan_…_ubuntu24.04_amd64.deb` | `sudo apt install ./kettlelan_…_ubuntu24.04_amd64.deb` |
 | Debian 12, MX Linux 23 | `kettlelan_…_debian12_amd64.deb` | `sudo apt install ./kettlelan_…_debian12_amd64.deb` |
+| Windows 10/11 (64-bit) – from 0.2.0 | `KettleLAN-…-windows-x64.zip` | extract and run `KettleLAN.exe` (asks for administrator rights) |
 
-You need **Steam** installed and signed in (the regular version from your distribution or from Valve;
-the Flatpak and Snap versions may not work). Windows support is in progress.
+You need **Steam** installed and signed in (on Linux the regular version from your distribution or from
+Valve; the Flatpak and Snap versions may not work).
 
 All files are built by GitHub Actions from this repository. Each release comes with SHA256 checksums and
 a build attestation – verify a file with `gh attestation verify FILE -R maxiuz94/kettlelan`.
@@ -135,6 +136,10 @@ your Downloads folder. Releases are built from the official SDK file listed in
 (source: https://partner.steamgames.com/downloads/list).
 
 Packages: `packaging/linux/build-appimage.sh` (AppImage) and `cpack` with `-DKETTLELAN_PACKAGE=deb` (.deb).
+
+**Windows:** Visual Studio 2022 (C++ workload), CMake and Qt 6.8 for MSVC 2022 64-bit; in Git Bash run
+`packaging/windows/build-zip.sh build-windows /path/to/steamworks_sdk_XXX.zip` – it builds, runs the tests and
+creates the zip package. Wintun is downloaded automatically from wintun.net and verified with SHA256.
 Releasing a new version: [docs/RELEASING.md](docs/RELEASING.md).
 
 ## Translations

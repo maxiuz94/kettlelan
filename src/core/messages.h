@@ -43,6 +43,11 @@ enum class Msg {
     TunOpenFailed,     // %1 = system error
     TunBusy,
     TunAttachFailed,   // %1 = system error
+    // Windows
+    TunNeedsAdmin,
+    TunWintunMissing,
+    TunWintunFailed,   // %1 = system error
+    TunAddressFailed,  // %1 = system error
 };
 
 struct Message {

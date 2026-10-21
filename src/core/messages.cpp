@@ -38,6 +38,10 @@ const char* messageTemplate(Msg id) {
     case Msg::TunOpenFailed: return QT_TRANSLATE_NOOP("Messages", "Could not open /dev/net/tun: %1");
     case Msg::TunBusy: return QT_TRANSLATE_NOOP("Messages", "KettleLAN is already running in another window or terminal – close it and try again.");
     case Msg::TunAttachFailed: return QT_TRANSLATE_NOOP("Messages", "Could not attach to the kettle0 adapter: %1");
+    case Msg::TunNeedsAdmin: return QT_TRANSLATE_NOOP("Messages", "On Windows KettleLAN needs administrator rights to create the virtual network adapter. Start it with “Run as administrator”.");
+    case Msg::TunWintunMissing: return QT_TRANSLATE_NOOP("Messages", "wintun.dll was not found next to KettleLAN. Extract the whole KettleLAN folder from the zip file again.");
+    case Msg::TunWintunFailed: return QT_TRANSLATE_NOOP("Messages", "Could not create the KettleLAN network adapter (Wintun): %1");
+    case Msg::TunAddressFailed: return QT_TRANSLATE_NOOP("Messages", "Could not set the address of the KettleLAN network adapter: %1");
     }
     return "";
 }

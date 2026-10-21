@@ -89,7 +89,11 @@ if(KETTLELAN_BUILD_APP)
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         target_sources(kettle_net PRIVATE src/platform/linux/tun_linux.cpp)
     elseif(WIN32)
-        message(FATAL_ERROR "The Windows version is not available yet.")
+        include(cmake/Wintun.cmake)
+        target_sources(kettle_net PRIVATE src/platform/windows/tun_windows.cpp)
+        target_include_directories(kettle_net PRIVATE third_party/wintun)
+        target_compile_definitions(kettle_net PUBLIC NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00)
+        target_link_libraries(kettle_net PUBLIC iphlpapi ws2_32 ole32 oleaut32 advapi32)
     else()
         message(FATAL_ERROR "Unsupported system: ${CMAKE_SYSTEM_NAME}")
     endif()
@@ -158,15 +162,35 @@ if(KETTLELAN_BUILD_APP)
         list(APPEND KETTLELAN_TARGETS kettlelan)
     endif()
 
+    if(WIN32)
+        # Windows resources (icon, version) and administrator rights (Wintun needs them).
+        set(_rc "${CMAKE_SOURCE_DIR}/packaging/windows/kettlelan.rc")
+        set_source_files_properties("${_rc}" PROPERTIES COMPILE_DEFINITIONS
+            "KETTLELAN_VERSION_MAJOR=${PROJECT_VERSION_MAJOR};KETTLELAN_VERSION_MINOR=${PROJECT_VERSION_MINOR};KETTLELAN_VERSION_PATCH=${PROJECT_VERSION_PATCH};KETTLELAN_VERSION_STRING=\"${PROJECT_VERSION}\"")
+        foreach(t ${KETTLELAN_TARGETS})
+            target_sources(${t} PRIVATE "${_rc}")
+            if(MSVC)
+                target_link_options(${t} PRIVATE "/MANIFESTUAC:level='requireAdministrator'")
+            endif()
+            add_custom_command(TARGET ${t} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${WINTUN_DLL}" "$<TARGET_FILE_DIR:${t}>")
+        endforeach()
+        if(TARGET kettlelan)
+            set_target_properties(kettlelan PROPERTIES OUTPUT_NAME KettleLAN)
+        endif()
+    endif()
+
     foreach(t ${KETTLELAN_TARGETS})
         if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
             # libsteam_api.so sits next to the program
             set_target_properties(${t} PROPERTIES BUILD_RPATH "$ORIGIN" INSTALL_RPATH "$ORIGIN")
         endif()
         add_custom_command(TARGET ${t} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${STEAMWORKS_REDIST}" "$<TARGET_FILE_DIR:${t}>"
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/scripts/kettlelan-helper" "$<TARGET_FILE_DIR:${t}>"
-        )
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${STEAMWORKS_REDIST}" "$<TARGET_FILE_DIR:${t}>")
+        if(UNIX)
+            add_custom_command(TARGET ${t} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/scripts/kettlelan-helper" "$<TARGET_FILE_DIR:${t}>")
+        endif()
     endforeach()
 endif()
 
