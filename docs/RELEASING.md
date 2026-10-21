@@ -1,9 +1,10 @@
 # Releasing a new version
 
 1. Bump the version in `CMakeLists.txt`: `project(KettleLAN VERSION 0.2.0 …)`.
-2. Add a `## [0.2.0] – date` section at the top of [`CHANGELOG.md`](../CHANGELOG.md) describing what changed
-   (new features, fixes, known limitations). This text becomes the description of the GitHub release –
-   preview it with `scripts/release-notes.sh 0.2.0`. The release workflow stops if the entry is missing.
+2. In [`CHANGELOG.md`](../CHANGELOG.md) rename `## [Unreleased]` to `## [0.2.0] – date` (and start a new empty
+   `## [Unreleased]` above it). Keep the format: a flat list, one line per change – `Area: what changed`.
+   This text becomes the description of the GitHub release – preview it with `scripts/release-notes.sh 0.2.0`.
+   The release workflow stops if the entry is missing.
 3. Make sure the tests pass: `ctest --test-dir build --output-on-failure`.
 4. Commit and create a tag with the same version:
 
