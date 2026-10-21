@@ -40,10 +40,21 @@ DESTDIR="$APPDIR" cmake --install "$BUILD" --prefix /usr
 
 # QML używany przez program (moduły QtQuick, Controls, Layouts, Shapes…)
 export QML_SOURCES_PATHS="$ROOT/src/gui/qml"
-# Wayland obok X11, jeśli instalacja Qt go zawiera
+# Wayland obok X11 – tylko razem z dodatkami „shell integration”, bez których Qt i tak spadłby na X11.
 QT_PLUGINS="$("${QMAKE:-qmake6}" -query QT_INSTALL_PLUGINS)"
-if [ -f "$QT_PLUGINS/platforms/libqwayland-generic.so" ]; then
+WAYLAND_ARGS=()
+if [ -f "$QT_PLUGINS/platforms/libqwayland-generic.so" ] && [ -d "$QT_PLUGINS/wayland-shell-integration" ]; then
     export EXTRA_PLATFORM_PLUGINS="libqwayland-generic.so"
+    for d in wayland-shell-integration wayland-decoration-client wayland-graphics-integration-client; do
+        if [ -d "$QT_PLUGINS/$d" ]; then
+            mkdir -p "$APPDIR/usr/plugins/$d"
+            cp -a "$QT_PLUGINS/$d/." "$APPDIR/usr/plugins/$d/"
+            WAYLAND_ARGS+=(--deploy-deps-only "$APPDIR/usr/plugins/$d")
+        fi
+    done
+    echo "Wayland: dołączono wtyczkę i dodatki (${#WAYLAND_ARGS[@]} parametrów)"
+else
+    echo "Wayland: brak dodatków w instalacji Qt – AppImage użyje X11 (XWayland)"
 fi
 export QMAKE="${QMAKE:-qmake6}"
 export APPIMAGE_EXTRACT_AND_RUN=1   # bez FUSE (np. w GitHub Actions)
@@ -56,6 +67,7 @@ PATH="$TOOLS:$PATH" "$TOOLS/linuxdeploy-x86_64.AppImage" \
     --executable "$APPDIR/usr/bin/kettlelan-cli" \
     --desktop-file "$APPDIR/usr/share/applications/kettlelan.desktop" \
     --icon-file "$APPDIR/usr/share/icons/hicolor/256x256/apps/kettlelan.png" \
+    "${WAYLAND_ARGS[@]}" \
     --plugin qt \
     --output appimage
 

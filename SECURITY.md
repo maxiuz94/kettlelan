@@ -19,7 +19,8 @@ zakładka **Security → Report a vulnerability** w repozytorium.
 ## Ochrona komputera
 
 - **Program nie działa jako root.** Uprawnienia administratora ma tylko skrypt `kettlelan-helper`,
-  który umie wyłącznie utworzyć lub usunąć kartę `kettle0` i ściśle sprawdza argumenty.
+  który umie wyłącznie utworzyć lub usunąć kartę `kettle0` i ściśle sprawdza argumenty. Hasło zbiera
+  systemowe okno polkit; w terminalu bez pulpitu (np. przez SSH) KettleLAN prosi o nie przez `sudo`.
 - **„Chroń usługi tego komputera”** (domyślnie włączone): pakiety od członków sieci do SSH, udostępniania
   plików (SMB, NFS, AFP), zdalnego pulpitu (RDP, VNC), baz danych, paneli administracyjnych, KDE Connect,
   Steam Remote Play itp. są odrzucane, zanim dotrą do systemu. Odrzucane są też protokoły inne niż

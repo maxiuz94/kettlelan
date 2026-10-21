@@ -158,26 +158,45 @@ bool runHelper(ip::Address4 address, std::string& error) {
     const std::string addr = address.toString();
     KLOG_INFO("Tworzę kartę " << kIfName << " (" << addr << "/10) – system poprosi o hasło administratora.");
 
-    const pid_t pid = ::fork();
-    if (pid == 0) {
-        const char* argv[] = {"pkexec", helper.c_str(), "up", uid.c_str(), addr.c_str(), nullptr};
-        ::execvp("pkexec", const_cast<char* const*>(argv));
-        ::_exit(127);
+    // Uruchamia „<narzędzie> <pomocnik> up <uid> <adres>” i zwraca kod wyjścia (kExecFailed = brak narzędzia).
+    constexpr int kExecFailed = 120;
+    auto run = [&](const char* tool) {
+        const pid_t pid = ::fork();
+        if (pid == 0) {
+            const char* argv[] = {tool, helper.c_str(), "up", uid.c_str(), addr.c_str(), nullptr};
+            ::execvp(tool, const_cast<char* const*>(argv));
+            ::_exit(kExecFailed);
+        }
+        if (pid < 0) return -1;
+        int status = 0;
+        ::waitpid(pid, &status, 0);
+        return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+    };
+
+    int code = run("pkexec");
+    // pkexec: 126 = anulowano okno hasła, 127 = brak zgody / nie udało się uwierzytelnić
+    // (np. przez SSH, gdzie polkit nie widzi sesji pulpitu). W terminalu próbujemy wtedy sudo.
+    if ((code == 127 || code == kExecFailed) && ::isatty(STDIN_FILENO)) {
+        KLOG_INFO("Okno hasła systemu nie jest dostępne – próbuję sudo.");
+        const int sudoCode = run("sudo");
+        if (sudoCode != kExecFailed) code = sudoCode;
     }
-    if (pid < 0) {
-        error = std::string("fork(): ") + std::strerror(errno);
-        return false;
-    }
-    int status = 0;
-    ::waitpid(pid, &status, 0);
-    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-        const int code = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
-        if (code == 127) error = "Brak programu pkexec (pakiet polkit). Zainstaluj go albo uruchom pomocnika ręcznie przez sudo.";
-        else if (code == 126) error = "Anulowano okno hasła – bez tego nie da się utworzyć karty sieciowej.";
-        else error = "Pomocnik kettlelan-helper zakończył się błędem (kod " + std::to_string(code) + ").";
-        return false;
-    }
-    return true;
+    if (code == 0) return true;
+
+    // W AppImage kopia pomocnika znika po wyjściu z funkcji – tam ręczne polecenie nie ma sensu.
+    const bool appImage = std::getenv("APPIMAGE") != nullptr;
+    const std::string manual = appImage ? std::string("(uruchom KettleLAN z menu pulpitu)")
+                                        : "sudo " + helper.string() + " up " + uid + " " + addr;
+    if (code == kExecFailed)
+        error = "Brak programu pkexec (pakiet polkit). Zainstaluj go albo utwórz kartę ręcznie:\n  " + manual;
+    else if (code == 126)
+        error = "Anulowano okno hasła – bez tego nie da się utworzyć karty sieciowej.";
+    else if (code == 127)
+        error = "Nie udało się potwierdzić uprawnień administratora (np. w sesji SSH bez pulpitu). "
+                "Uruchom KettleLAN z pulpitu albo utwórz kartę ręcznie:\n  " + manual;
+    else
+        error = "Pomocnik kettlelan-helper zakończył się błędem (kod " + std::to_string(code) + ").";
+    return false;
 }
 
 } // namespace
