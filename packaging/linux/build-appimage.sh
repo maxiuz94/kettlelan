@@ -8,6 +8,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 BUILD="${1:-$ROOT/build-appimage}"
+mkdir -p "$BUILD"
+BUILD="$(cd "$BUILD" && pwd)"   # pełna ścieżka – skrypt później zmienia katalog
 TOOLS="$BUILD/tools"
 VERSION="$(sed -n 's/^project(KettleLAN VERSION \([0-9.]*\).*/\1/p' "$ROOT/CMakeLists.txt")"
 
