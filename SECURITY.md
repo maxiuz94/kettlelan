@@ -44,12 +44,11 @@ Please **do not open a public issue**. Use GitHub's private reporting instead:
 - `wintun.dll` is loaded only from the program's own folder (protection against DLL planting), and only after
   KettleLAN has checked its digital signature (WireGuard LLC) on a file locked against changes. The shipped file is
   the official build, verified with SHA256 at build time.
-- Because the program runs elevated, its folder must not be writable by ordinary programs: the Qt libraries and
-  `steam_api64.dll` are loaded by Windows before KettleLAN starts and cannot be checked by it. Extract KettleLAN to
-  `C:\Program Files\KettleLAN` (or copy the folder there – a moved folder keeps its old permissions). At start
-  KettleLAN checks the permissions of its folder and shows a warning when the current user without elevation,
-  Users, Authenticated Users or Everyone can change files in it (Downloads, Desktop, other drives…).
-  The planned system service will be installed there automatically.
+- Because the program runs elevated, a program already running on your account could replace the Qt libraries or
+  `steam_api64.dll` in a folder you can write to (Windows loads them before KettleLAN starts, so it cannot check them).
+  For the strongest protection keep KettleLAN in a folder only administrators can change, such as
+  `C:\Program Files\KettleLAN` (copy the folder there – a moved folder keeps its old permissions). The planned system
+  service will install itself in such a folder automatically.
 - A Windows Firewall rule allows incoming traffic **only on the KettleLAN adapter and only from `100.64.0.0/10`**.
   The KettleLAN network stays a "Public" network, so Windows does not share files or printers on it, and
   KettleLAN's own filter blocks computer services as on Linux.

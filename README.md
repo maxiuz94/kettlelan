@@ -50,7 +50,7 @@ Get the latest version from the [**Releases**](https://github.com/maxiuz94/kettl
 | Any Linux distribution | `KettleLAN-…-x86_64.AppImage` | `chmod +x KettleLAN-*.AppImage`, then run it |
 | Ubuntu 24.04+, Mint 22+, Pop!_OS, Debian 13 | `kettlelan_…_ubuntu24.04_amd64.deb` | `sudo apt install ./kettlelan_…_ubuntu24.04_amd64.deb` |
 | Debian 12, MX Linux 23 | `kettlelan_…_debian12_amd64.deb` | `sudo apt install ./kettlelan_…_debian12_amd64.deb` |
-| Windows 10/11 (64-bit) – from 0.2.0 | `KettleLAN-…-windows-x64.zip` | extract to `C:\Program Files\KettleLAN` and run `KettleLAN.exe` (asks for administrator rights) |
+| Windows 10/11 (64-bit) – from 0.2.0 | `KettleLAN-…-windows-x64.zip` | extract and run `KettleLAN.exe` (asks for administrator rights) |
 
 You need **Steam** installed and signed in (on Linux the regular version from your distribution or from
 Valve; the Flatpak and Snap versions may not work).
@@ -62,11 +62,6 @@ a build attestation – see [Verifying a download](SECURITY.md#verifying-a-downl
 > **The Windows version is not code-signed yet.** Windows SmartScreen shows "Windows protected your PC"
 > (click *More info* → *Run anyway*), and some antivirus programs may flag KettleLAN with a generic
 > heuristic label (see the [FAQ](#faq)).
->
-> On Windows KettleLAN runs as administrator, so keep it in a folder that only administrators can change –
-> **extract it to `C:\Program Files\KettleLAN`** (or copy the extracted folder there – copy, do not move), not to
-> Downloads, the Desktop or another drive, where any program could replace its files. KettleLAN shows a warning
-> when it runs from a folder that ordinary programs can change.
 >
 > **Download KettleLAN only from the [Releases page](https://github.com/maxiuz94/kettlelan/releases) of this
 > repository.** Copies from other websites may be modified. Before running a file, check that its SHA256

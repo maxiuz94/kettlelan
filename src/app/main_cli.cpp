@@ -182,7 +182,7 @@ int main() {
     net.setPacketHandler([&tun](std::span<const uint8_t> p) { tun->write(p); });
     tun->start([&net](std::span<const uint8_t> p) { net.sendPacket(p); });
 
-    if (const auto warning = platform::startupWarning()) std::cout << "WARNING: " << english(*warning) << "\n";
+    if (const auto note = platform::startupWarning()) KLOG_WARN(english(*note)); // log only, for diagnostics
     std::cout << "Your KettleLAN address: " << net.selfAddress().toString() << "\n";
     printHelp();
 

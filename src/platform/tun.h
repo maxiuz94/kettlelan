@@ -32,7 +32,7 @@ public:
 // On failure returns nullptr and fills `error`.
 std::unique_ptr<Tun> openTun(ip::Address4 address, Message& error);
 
-// A warning to show after start (e.g. an unsafe install folder), or nothing.
+// A note for the log after start (e.g. the program runs elevated from a folder others can change), or nothing.
 std::optional<Message> startupWarning();
 
 } // namespace kettle::platform

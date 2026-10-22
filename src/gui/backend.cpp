@@ -198,13 +198,6 @@ QString Backend::messageText(const Message& message) const {
 
 void Backend::handleEvent(const Message& message) {
     const QString text = messageText(message);
-    if (message.id == Msg::UnsafeFolder) {
-        // Lasting warning at the top of the window, and a notification when the window is hidden.
-        warningText_ = text;
-        emit changed();
-        if (tray_ && (!window_ || !window_->isVisible())) tray_->showMessage(QStringLiteral("KettleLAN"), text, QSystemTrayIcon::Warning, 10000);
-        return;
-    }
     emit toast(text);
     // System notifications only about people, and only when the window is hidden.
     const bool hidden = !window_ || !window_->isVisible();
@@ -520,8 +513,6 @@ void Backend::rebuildTrayMenu() {
 // ---------------------------------------------------------------- demo mode (for screenshots)
 
 void Backend::loadDemo() {
-    if (qEnvironmentVariableIsSet("KETTLELAN_DEMO_WARNING"))
-        warningText_ = messageText({Msg::UnsafeFolder, {"C:\\Users\\Player\\Desktop\\KettleLAN-0.2.1-windows-x64"}});
     demoPage_ = qEnvironmentVariable("KETTLELAN_DEMO_PAGE", QStringLiteral("start"));
     personaName_ = QStringLiteral("maxiuZ");
     selfAddress_ = QStringLiteral("100.80.46.79");
