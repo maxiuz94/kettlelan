@@ -46,7 +46,9 @@ Please **do not open a public issue**. Use GitHub's private reporting instead:
   the official build, verified with SHA256 at build time.
 - Because the program runs elevated, its folder must not be writable by ordinary programs: the Qt libraries and
   `steam_api64.dll` are loaded by Windows before KettleLAN starts and cannot be checked by it. Extract KettleLAN to
-  `C:\Program Files\KettleLAN`; KettleLAN warns when it runs from inside your user profile (Downloads, Desktop…).
+  `C:\Program Files\KettleLAN` (or copy the folder there – a moved folder keeps its old permissions). At start
+  KettleLAN checks the permissions of its folder and shows a warning when the current user without elevation,
+  Users, Authenticated Users or Everyone can change files in it (Downloads, Desktop, other drives…).
   The planned system service will be installed there automatically.
 - A Windows Firewall rule allows incoming traffic **only on the KettleLAN adapter and only from `100.64.0.0/10`**.
   The KettleLAN network stays a "Public" network, so Windows does not share files or printers on it, and

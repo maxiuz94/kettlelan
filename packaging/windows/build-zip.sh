@@ -32,8 +32,9 @@ cat > "$DIST/README.txt" << README
 KettleLAN ${VERSION} for Windows 10/11 (64-bit)
 Open-source virtual LAN over the Steam network.
 
-1. Move this KettleLAN folder to C:\\Program Files\\KettleLAN. KettleLAN runs as administrator,
-   so keep it where only administrators can change its files (not in Downloads or on the Desktop).
+1. Copy this KettleLAN folder to C:\\Program Files\\KettleLAN (copy, do not move - a moved folder keeps
+   its old permissions). KettleLAN runs as administrator, so keep it where only administrators can change
+   its files (not in Downloads, on the Desktop or on another drive).
 2. Start Steam and sign in, then run KettleLAN.exe. Windows asks for administrator rights - they are needed to create
    the virtual network adapter (Wintun).
 3. If Windows SmartScreen shows "Windows protected your PC", click "More info" and "Run anyway"

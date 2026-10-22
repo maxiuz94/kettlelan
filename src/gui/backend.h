@@ -20,6 +20,7 @@ class Backend : public QObject {
     // program state
     Q_PROPERTY(QString status READ status NOTIFY changed)
     Q_PROPERTY(QString errorText READ errorText NOTIFY changed)
+    Q_PROPERTY(QString warningText READ warningText NOTIFY changed)
     Q_PROPERTY(QString personaName READ personaName NOTIFY changed)
     Q_PROPERTY(QString selfAddress READ selfAddress NOTIFY changed)
     Q_PROPERTY(QString netState READ netState NOTIFY changed)
@@ -52,6 +53,7 @@ public:
     void startEngine();
 
     QString status() const { return status_; }
+    QString warningText() const { return warningText_; }
     QString errorText() const { return errorText_; }
     QString personaName() const { return personaName_; }
     QString selfAddress() const { return selfAddress_; }
@@ -126,6 +128,7 @@ private:
     QString trayMenuSignature_;
 
     QString status_ = QStringLiteral("starting");
+    QString warningText_;   // a lasting warning shown at the top of the window (e.g. unsafe folder)
     QString errorText_;
     QString personaName_;
     QString selfAddress_;

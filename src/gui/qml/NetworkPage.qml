@@ -29,7 +29,7 @@ Item {
                 RowLayout {
                     spacing: 6
                     Rectangle { width: 8; height: 8; radius: 4; color: Theme.ok }
-                    Text { textFormat: Text.PlainText; text: qsTr("Connected · %n member(s)", "", Backend.memberCount); color: Theme.muted; font.pixelSize: 13 }
+                    Text { textFormat: Text.PlainText; text: (Backend.memberCount === 1 ? qsTr("Connected · 1 member") : qsTr("Connected · %1 members").arg(Backend.memberCount)); color: Theme.muted; font.pixelSize: 13 }
                 }
             }
             IconButton { iconName: "settings"; label: qsTr("Settings"); onClicked: page.openSettings() }

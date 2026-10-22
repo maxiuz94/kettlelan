@@ -64,8 +64,9 @@ a build attestation – see [Verifying a download](SECURITY.md#verifying-a-downl
 > heuristic label (see the [FAQ](#faq)).
 >
 > On Windows KettleLAN runs as administrator, so keep it in a folder that only administrators can change –
-> **extract it to `C:\Program Files\KettleLAN`**, not to Downloads or the Desktop, where any program could replace
-> its files. KettleLAN shows a warning when it runs from your user folder.
+> **extract it to `C:\Program Files\KettleLAN`** (or copy the extracted folder there – copy, do not move), not to
+> Downloads, the Desktop or another drive, where any program could replace its files. KettleLAN shows a warning
+> when it runs from a folder that ordinary programs can change.
 >
 > **Download KettleLAN only from the [Releases page](https://github.com/maxiuz94/kettlelan/releases) of this
 > repository.** Copies from other websites may be modified. Before running a file, check that its SHA256

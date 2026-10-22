@@ -11,7 +11,8 @@
 #include <netioapi.h>
 #include <netfw.h>
 #include <oleauto.h>
-#include <shlobj.h>
+#include <aclapi.h>
+#include <sddl.h>
 #include <softpub.h>
 #include <wincrypt.h>
 #include <wintrust.h>
@@ -21,6 +22,7 @@
 #include <cwchar>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "log.h"
 #include "tun.h"
@@ -371,22 +373,68 @@ std::unique_ptr<Tun> openTun(ip::Address4 address, Message& error) {
     return std::make_unique<WindowsTun>(adapter, session);
 }
 
-// KettleLAN runs elevated, so its folder must not be writable by ordinary programs: anything in the
-// user's profile (Downloads, Desktop…) is. Program Files is writable only by administrators.
-std::optional<Message> startupWarning() {
-    const std::wstring dir = programFolder();
-    PWSTR profile = nullptr;
-    std::optional<Message> warning;
-    if (!dir.empty() && SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Profile, 0, nullptr, &profile)) && profile) {
-        const std::wstring prefix = std::wstring(profile) + L"\\";
-        if (CompareStringOrdinal(dir.c_str(), int(prefix.size()), prefix.c_str(), int(prefix.size()), TRUE) == CSTR_EQUAL) {
-            std::wstring shown = dir;
-            if (!shown.empty() && shown.back() == L'\\') shown.pop_back();
-            warning = Message{Msg::UnsafeFolder, {toUtf8(shown.c_str())}};
-        }
+// KettleLAN runs elevated, so its folder must not be changeable by ordinary programs. Checks the folder's
+// permissions: unsafe when it is owned by the current user, or when the current user (without
+// elevation), Users, Authenticated Users, INTERACTIVE or Everyone may add, change or delete files in it.
+// Works on any drive and with redirected folders (Desktop on another drive, OneDrive…).
+bool folderChangeableByNonAdmins(const std::wstring& dir) {
+    PSECURITY_DESCRIPTOR sd = nullptr;
+    PSID owner = nullptr;
+    PACL dacl = nullptr;
+    if (GetNamedSecurityInfoW(dir.c_str(), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
+                              &owner, nullptr, &dacl, nullptr, &sd) != ERROR_SUCCESS)
+        return false; // cannot tell – no warning rather than a false one
+
+    // the current user's own SID
+    std::vector<BYTE> userBuf;
+    PSID user = nullptr;
+    HANDLE token = nullptr;
+    if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) {
+        DWORD size = 0;
+        GetTokenInformation(token, TokenUser, nullptr, 0, &size);
+        userBuf.resize(size);
+        if (size && GetTokenInformation(token, TokenUser, userBuf.data(), size, &size))
+            user = reinterpret_cast<TOKEN_USER*>(userBuf.data())->User.Sid;
+        CloseHandle(token);
     }
-    if (profile) CoTaskMemFree(profile);
-    return warning;
+
+    // well-known groups every ordinary program runs with
+    BYTE everyone[SECURITY_MAX_SID_SIZE], users[SECURITY_MAX_SID_SIZE], authUsers[SECURITY_MAX_SID_SIZE],
+        interactive[SECURITY_MAX_SID_SIZE];
+    PSID groups[4] = {everyone, users, authUsers, interactive};
+    const WELL_KNOWN_SID_TYPE types[4] = {WinWorldSid, WinBuiltinUsersSid, WinAuthenticatedUserSid, WinInteractiveSid};
+    for (int i = 0; i < 4; ++i) {
+        DWORD size = SECURITY_MAX_SID_SIZE;
+        if (!CreateWellKnownSid(types[i], nullptr, groups[i], &size)) groups[i] = nullptr;
+    }
+    auto isNonAdmin = [&](PSID sid) {
+        if (user && EqualSid(sid, user)) return true;
+        for (PSID g : groups)
+            if (g && EqualSid(sid, g)) return true;
+        return false;
+    };
+
+    constexpr ACCESS_MASK kChange = FILE_ADD_FILE | FILE_WRITE_DATA | FILE_APPEND_DATA | FILE_ADD_SUBDIRECTORY |
+                                    FILE_DELETE_CHILD | DELETE | WRITE_DAC | WRITE_OWNER | GENERIC_WRITE | GENERIC_ALL;
+    bool unsafe = (user && owner && EqualSid(owner, user)) || dacl == nullptr; // owner can change permissions; no DACL = full access
+    for (DWORD i = 0; !unsafe && dacl && i < dacl->AceCount; ++i) {
+        void* ace = nullptr;
+        if (!GetAce(dacl, i, &ace)) continue;
+        const auto* header = static_cast<ACE_HEADER*>(ace);
+        if (header->AceType != ACCESS_ALLOWED_ACE_TYPE || (header->AceFlags & INHERIT_ONLY_ACE)) continue;
+        const auto* allowed = static_cast<ACCESS_ALLOWED_ACE*>(ace);
+        if ((allowed->Mask & kChange) && isNonAdmin(const_cast<DWORD*>(&allowed->SidStart))) unsafe = true;
+    }
+    LocalFree(sd);
+    return unsafe;
+}
+
+std::optional<Message> startupWarning() {
+    std::wstring dir = programFolder();
+    if (dir.empty()) return std::nullopt;
+    if (dir.back() == L'\\' || dir.back() == L'/') dir.pop_back();
+    if (!folderChangeableByNonAdmins(dir)) return std::nullopt;
+    return Message{Msg::UnsafeFolder, {toUtf8(dir.c_str())}};
 }
 
 } // namespace kettle::platform

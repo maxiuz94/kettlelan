@@ -39,22 +39,67 @@ ApplicationWindow {
         }
     }
 
+    // Lasting warning (e.g. KettleLAN runs as administrator from a folder others can change).
+    Rectangle {
+        id: warningBanner
+        visible: Backend.warningText !== ""
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        height: visible ? warningRow.implicitHeight + 24 : 0
+        color: Theme.dark ? "#3a2f18" : "#fff1d6"
+        z: 5
+        Row {
+            id: warningRow
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.leftMargin: 14
+            anchors.rightMargin: 14
+            spacing: 10
+            SvgIcon {
+                name: "alert"
+                size: 18
+                color: warningLabel.color
+                anchors.top: parent.top
+                anchors.topMargin: 1
+            }
+            Text {
+                id: warningLabel
+                textFormat: Text.PlainText
+                width: parent.width - 28
+                wrapMode: Text.WordWrap
+                text: Backend.warningText
+                color: Theme.dark ? "#f2c86a" : "#6b4a00"
+                font.pixelSize: 13
+                lineHeight: 1.25
+            }
+        }
+    }
+    Item {
+        id: pageArea
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.top: warningBanner.bottom
+    }
+
     StatusPage {
-        anchors.fill: parent
+        anchors.fill: pageArea
         visible: !win.settingsOpen && Backend.status !== "ready"
     }
     StartPage {
-        anchors.fill: parent
+        anchors.fill: pageArea
         visible: !win.settingsOpen && Backend.status === "ready" && Backend.netState !== "connected"
         onOpenSettings: win.settingsOpen = true
     }
     NetworkPage {
-        anchors.fill: parent
+        anchors.fill: pageArea
         visible: !win.settingsOpen && Backend.status === "ready" && Backend.netState === "connected"
         onOpenSettings: win.settingsOpen = true
     }
     SettingsPage {
-        anchors.fill: parent
+        anchors.fill: pageArea
         visible: win.settingsOpen
         onBack: win.settingsOpen = false
     }
