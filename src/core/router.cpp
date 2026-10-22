@@ -15,9 +15,10 @@ bool equalConstantTime(uint64_t a, uint64_t b) {
 
 Router::Router(uint64_t selfSteamId) : selfId_(selfSteamId), selfAddress_(ip::addressForSteamId(selfSteamId)) {}
 
-void Router::setCode(std::optional<netcode::NetworkCode> code) {
+void Router::setNetwork(const netcode::NetworkCode& code, const netkeys::Keys& keys) {
     std::unique_lock lk(mutex_);
     code_ = code;
+    keys_ = keys;
 }
 
 std::optional<netcode::NetworkCode> Router::code() const {
@@ -56,6 +57,7 @@ void Router::clear() {
     peers_.clear();
     routes_.clear();
     code_.reset();
+    keys_.reset();
 }
 
 HelloResult Router::onHello(uint64_t from, const protocol::HelloMessage& msg) {
@@ -65,7 +67,7 @@ HelloResult Router::onHello(uint64_t from, const protocol::HelloMessage& msg) {
     if (it == peers_.end()) return HelloResult::UnknownPeer;
     Peer& peer = it->second;
 
-    if (!equalConstantTime(msg.proof, protocol::computeProof(*code_, from, selfId_))) return HelloResult::BadProof;
+    if (!equalConstantTime(msg.proof, protocol::computeProof(*keys_, from, selfId_))) return HelloResult::BadProof;
     if (msg.version != protocol::kVersion) return HelloResult::BadVersion;
     if (msg.address != peer.address) return HelloResult::BadAddress;
 
@@ -86,7 +88,7 @@ std::optional<protocol::HelloMessage> Router::makeHello(uint64_t to, bool ack) c
     protocol::HelloMessage msg;
     msg.type = ack ? protocol::MessageType::HelloAck : protocol::MessageType::Hello;
     msg.address = selfAddress_;
-    msg.proof = protocol::computeProof(*code_, selfId_, to);
+    msg.proof = protocol::computeProof(*keys_, selfId_, to);
     return msg;
 }
 

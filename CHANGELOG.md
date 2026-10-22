@@ -8,6 +8,11 @@ Before tagging a release add a `## [x.y.z] – date` section (see [docs/RELEASIN
 
 ## [Unreleased]
 
+- Network: new protocol version 3 – not compatible with KettleLAN 0.2, everyone in a network needs 0.3
+- Security: derive the lobby tag, the HELLO proof key and the name key from the network code with Argon2id, so the code cannot be guessed from lobby data or received proofs
+- Security: encrypt the network name in Steam lobby data (XChaCha20-Poly1305)
+- Security: generate network codes and nonces with the system's cryptographic random generator (getrandom, BCryptGenRandom)
+
 ## [0.2.1] – 2026-10-22
 
 - Windows: allow only UDP and ping from KettleLAN network members in Windows Firewall (was: all protocols), remove the old rule

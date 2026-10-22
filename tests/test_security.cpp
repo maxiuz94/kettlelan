@@ -33,6 +33,8 @@ constexpr uint64_t STRANGER = 76561198000000002ull;
 
 static const netcode::NetworkCode CODE{0x12345678, 0x0ABCDEF};
 static const netcode::NetworkCode OTHER_CODE{0x12345678, 0x0ABCDEE}; // same network id, different key
+static const netkeys::Keys KEYS = netkeys::derive(CODE, netkeys::Cost::Test);
+static const netkeys::Keys OTHER_KEYS = netkeys::derive(OTHER_CODE, netkeys::Cost::Test);
 
 static ip::Address4 addr(uint64_t id) { return ip::addressForSteamId(id); }
 
@@ -51,20 +53,20 @@ static std::vector<uint8_t> packet(ip::Address4 src, ip::Address4 dst, uint8_t p
     return p;
 }
 
-static protocol::HelloMessage hello(const netcode::NetworkCode& code, uint64_t from, uint64_t to,
+static protocol::HelloMessage hello(const netkeys::Keys& keys, uint64_t from, uint64_t to,
                                     ip::Address4 address, uint8_t version = protocol::kVersion) {
     protocol::HelloMessage m;
     m.address = address;
     m.version = version;
-    m.proof = protocol::computeProof(code, from, to);
+    m.proof = protocol::computeProof(keys, from, to);
     return m;
 }
 
 // Network: ME, ALICE and EVE in the lobby; ALICE verified.
 static void setUp(router::Router& r) {
-    r.setCode(CODE);
+    r.setNetwork(CODE, KEYS);
     r.syncMembers({ME, ALICE, EVE});
-    r.onHello(ALICE, hello(CODE, ALICE, ME, addr(ALICE)));
+    r.onHello(ALICE, hello(KEYS, ALICE, ME, addr(ALICE)));
 }
 
 int main() {
@@ -73,10 +75,10 @@ int main() {
     SCENARIO("An honest member with the right code gets verified");
     {
         router::Router r(ME);
-        r.setCode(CODE);
+        r.setNetwork(CODE, KEYS);
         r.syncMembers({ME, ALICE});
-        EXPECT(r.onHello(ALICE, hello(CODE, ALICE, ME, addr(ALICE))) == HelloResult::Verified, "first HELLO verifies");
-        EXPECT(r.onHello(ALICE, hello(CODE, ALICE, ME, addr(ALICE))) == HelloResult::Repeated, "a repeated HELLO breaks nothing");
+        EXPECT(r.onHello(ALICE, hello(KEYS, ALICE, ME, addr(ALICE))) == HelloResult::Verified, "first HELLO verifies");
+        EXPECT(r.onHello(ALICE, hello(KEYS, ALICE, ME, addr(ALICE))) == HelloResult::Repeated, "a repeated HELLO breaks nothing");
         EXPECT(r.onData(ALICE, packet(addr(ALICE), addr(ME))) == InboundResult::Deliver, "their game packet is delivered");
     }
 
@@ -84,10 +86,10 @@ int main() {
     {
         router::Router r(ME);
         setUp(r);
-        EXPECT(r.onHello(EVE, hello(OTHER_CODE, EVE, ME, addr(EVE))) == HelloResult::BadProof, "wrong key rejected");
-        EXPECT(r.onHello(EVE, hello(CODE, EVE, ALICE, addr(EVE))) == HelloResult::BadProof,
+        EXPECT(r.onHello(EVE, hello(OTHER_KEYS, EVE, ME, addr(EVE))) == HelloResult::BadProof, "wrong key rejected");
+        EXPECT(r.onHello(EVE, hello(KEYS, EVE, ALICE, addr(EVE))) == HelloResult::BadProof,
                "a proof made for another receiver does not work");
-        protocol::HelloMessage guessed = hello(CODE, EVE, ME, addr(EVE));
+        protocol::HelloMessage guessed = hello(KEYS, EVE, ME, addr(EVE));
         guessed.proof ^= 1;
         EXPECT(r.onHello(EVE, guessed) == HelloResult::BadProof, "a proof off by one bit is rejected");
         EXPECT(r.onData(EVE, packet(addr(EVE), addr(ME))) == InboundResult::UnknownSender, "her packets are not delivered");
@@ -98,15 +100,15 @@ int main() {
         router::Router r(ME);
         setUp(r);
         // EVE captured ALICE's proof sent to us (in practice encrypted by Steam) and sends it as her own
-        EXPECT(r.onHello(EVE, hello(CODE, ALICE, ME, addr(EVE))) == HelloResult::BadProof, "ALICE's proof does not work for EVE");
-        EXPECT(r.onHello(EVE, hello(CODE, ALICE, ME, addr(ALICE))) == HelloResult::BadProof, "not even with ALICE's address");
+        EXPECT(r.onHello(EVE, hello(KEYS, ALICE, ME, addr(EVE))) == HelloResult::BadProof, "ALICE's proof does not work for EVE");
+        EXPECT(r.onHello(EVE, hello(KEYS, ALICE, ME, addr(ALICE))) == HelloResult::BadProof, "not even with ALICE's address");
     }
 
     SCENARIO("A STRANGER outside the lobby sends valid-looking data");
     {
         router::Router r(ME);
         setUp(r);
-        EXPECT(r.onHello(STRANGER, hello(CODE, STRANGER, ME, addr(STRANGER))) == HelloResult::UnknownPeer, "HELLO from a stranger rejected");
+        EXPECT(r.onHello(STRANGER, hello(KEYS, STRANGER, ME, addr(STRANGER))) == HelloResult::UnknownPeer, "HELLO from a stranger rejected");
         EXPECT(r.onData(STRANGER, packet(addr(STRANGER), addr(ME))) == InboundResult::UnknownSender, "their packets rejected");
         EXPECT(r.onData(STRANGER, packet(addr(ALICE), addr(ME))) == InboundResult::UnknownSender,
                "also when pretending to be ALICE");
@@ -115,11 +117,11 @@ int main() {
     SCENARIO("A member tries to take over someone else's address during verification");
     {
         router::Router r(ME);
-        r.setCode(CODE);
+        r.setNetwork(CODE, KEYS);
         r.syncMembers({ME, ALICE, EVE});
         // EVE knows the code (e.g. she was invited once) but announces ALICE's address
-        EXPECT(r.onHello(EVE, hello(CODE, EVE, ME, addr(ALICE))) == HelloResult::BadAddress, "someone else's address rejected");
-        EXPECT(r.onHello(EVE, hello(CODE, EVE, ME, addr(ME))) == HelloResult::BadAddress, "our address rejected");
+        EXPECT(r.onHello(EVE, hello(KEYS, EVE, ME, addr(ALICE))) == HelloResult::BadAddress, "someone else's address rejected");
+        EXPECT(r.onHello(EVE, hello(KEYS, EVE, ME, addr(ME))) == HelloResult::BadAddress, "our address rejected");
         EXPECT(r.onData(EVE, packet(addr(ALICE), addr(ME))) == InboundResult::UnknownSender, "still no traffic");
     }
 
@@ -127,7 +129,7 @@ int main() {
     {
         router::Router r(ME);
         setUp(r);
-        r.onHello(EVE, hello(CODE, EVE, ME, addr(EVE))); // EVE verified too
+        r.onHello(EVE, hello(KEYS, EVE, ME, addr(EVE))); // EVE verified too
         EXPECT(r.onData(ALICE, packet(addr(EVE), addr(ME))) == InboundResult::Spoofed, "ALICE as EVE – rejected");
         EXPECT(r.onData(ALICE, packet(addr(ME), addr(ME))) == InboundResult::Spoofed, "ALICE as us – rejected");
         EXPECT(r.onData(ALICE, packet(ip::Address4(192, 168, 8, 1), addr(ME))) == InboundResult::Spoofed,
@@ -210,15 +212,15 @@ int main() {
         r.clear();
         EXPECT(r.onData(ALICE, packet(addr(ALICE), addr(ME))) == InboundResult::UnknownSender, "nothing accepted");
         EXPECT(r.recipients(packet(addr(ME), ip::Address4(255, 255, 255, 255))).empty(), "nothing sent");
-        EXPECT(r.onHello(ALICE, hello(CODE, ALICE, ME, addr(ALICE))) == HelloResult::NoNetwork, "no verification");
+        EXPECT(r.onHello(ALICE, hello(KEYS, ALICE, ME, addr(ALICE))) == HelloResult::NoNetwork, "no verification");
     }
 
     SCENARIO("A different program version is not let in");
     {
         router::Router r(ME);
-        r.setCode(CODE);
+        r.setNetwork(CODE, KEYS);
         r.syncMembers({ME, ALICE});
-        EXPECT(r.onHello(ALICE, hello(CODE, ALICE, ME, addr(ALICE), protocol::kVersion + 1)) == HelloResult::BadVersion,
+        EXPECT(r.onHello(ALICE, hello(KEYS, ALICE, ME, addr(ALICE), protocol::kVersion + 1)) == HelloResult::BadVersion,
                "different protocol version rejected");
     }
 
@@ -232,10 +234,10 @@ int main() {
             if (!ok) { a = it->second; b = id; }
         }
         router::Router r(ME);
-        r.setCode(CODE);
+        r.setNetwork(CODE, KEYS);
         r.syncMembers({ME, a, b});
-        EXPECT(r.onHello(a, hello(CODE, a, ME, addr(a))) == HelloResult::Verified, "first person verified");
-        EXPECT(r.onHello(b, hello(CODE, b, ME, addr(b))) == HelloResult::Conflict, "second one – conflict");
+        EXPECT(r.onHello(a, hello(KEYS, a, ME, addr(a))) == HelloResult::Verified, "first person verified");
+        EXPECT(r.onHello(b, hello(KEYS, b, ME, addr(b))) == HelloResult::Conflict, "second one – conflict");
         EXPECT(r.onData(b, packet(addr(b), addr(ME))) == InboundResult::UnknownSender, "the second cannot send as the first");
         EXPECT(r.recipients(packet(addr(ME), addr(a))) == std::vector<uint64_t>{a}, "traffic goes to the first");
     }
@@ -259,7 +261,7 @@ int main() {
     SCENARIO("HELLO retries are limited (no flooding)");
     {
         router::Router r(ME);
-        r.setCode(CODE);
+        r.setNetwork(CODE, KEYS);
         r.syncMembers({ME, EVE});
         auto t = router::Router::Clock::now();
         int sent = 0;

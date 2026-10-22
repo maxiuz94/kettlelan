@@ -15,13 +15,13 @@
 #include <vector>
 
 #include "ip.h"
-#include "netcode.h"
+#include "netkeys.h"
 
 namespace kettle::protocol {
 
 inline constexpr int kChannelData = 0;    // IP packets
 inline constexpr int kChannelControl = 1; // HELLO / HELLO_ACK
-inline constexpr uint8_t kVersion = 2;
+inline constexpr uint8_t kVersion = 3; // 3: keys derived with Argon2id (KettleLAN 0.3)
 
 enum class MessageType : uint8_t { Hello = 1, HelloAck = 2 };
 
@@ -35,10 +35,7 @@ struct HelloMessage {
 std::vector<uint8_t> encode(const HelloMessage& msg);
 std::optional<HelloMessage> decode(std::span<const uint8_t> data);
 
-// Tag used to find the network's lobby on Steam (16 hex characters).
-// Derived from the whole code, so without the code nobody can find or peek into a network.
-std::string lobbyTag(const netcode::NetworkCode& code);
 
-uint64_t computeProof(const netcode::NetworkCode& code, uint64_t senderSteamId, uint64_t receiverSteamId);
+uint64_t computeProof(const netkeys::Keys& keys, uint64_t senderSteamId, uint64_t receiverSteamId);
 
 } // namespace kettle::protocol

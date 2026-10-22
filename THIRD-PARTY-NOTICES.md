@@ -8,6 +8,7 @@ It uses or ships the components listed below, each under its own license.
 | PartyLAN | original idea and parts of the IPv4 code | BSD-3-Clause | source code |
 | Steamworks SDK – `libsteam_api.so` | talking to the Steam client | Valve proprietary (Steamworks SDK Access Agreement) | all packages |
 | Qt 6 | graphical interface | LGPL-3.0 | system library (.deb), bundled (AppImage, Windows) |
+| Monocypher | Argon2id and authenticated encryption of network keys and names | BSD-2-Clause OR CC0-1.0 | source code (`third_party/monocypher`) |
 | Wintun | virtual network adapter on Windows | prebuilt binaries license; API header GPL-2.0 OR MIT | Windows package, `third_party/wintun` |
 | Microsoft Visual C++ runtime | needed by the Windows build | Microsoft redistributable | Windows package |
 | System libraries | needed by Qt | various open-source licenses | bundled (AppImage) |
@@ -45,6 +46,14 @@ It uses or ships the components listed below, each under its own license.
     (`./KettleLAN-*.AppImage --appimage-extract`) and swap the files in `squashfs-root/usr/lib` and
     `squashfs-root/usr/plugins`.
   - The license texts are included inside the AppImage in `usr/share/doc/kettlelan/licenses/`.
+
+## Monocypher
+
+- Copyright (c) 2017-2023 Loup Vaillant, Michael Savage, Fabio Scotoni – https://monocypher.org
+- Version 4.0.3, unmodified, in [`third_party/monocypher`](third_party/monocypher) (from the official repository
+  https://github.com/LoupVaillant/Monocypher, tag `4.0.3`). Dual-licensed under the 2-clause BSD license or CC0 1.0;
+  KettleLAN uses it under the **2-clause BSD license** – see [`third_party/monocypher/LICENCE.md`](third_party/monocypher/LICENCE.md).
+- The unit tests check it against the Argon2id test vector from RFC 9106.
 
 ## Wintun (WireGuard LLC)
 

@@ -10,6 +10,7 @@
 #include "filter.h"
 #include "ip.h"
 #include "netcode.h"
+#include "netkeys.h"
 #include "protocol.h"
 #include "text.h"
 
@@ -46,6 +47,7 @@ int main(int argc, char** argv) {
     std::mt19937 rng(12345);
     long allowed = 0, blocked = 0, parsed = 0, codes = 0;
 
+    const auto fuzzKeys = netkeys::derive(netcode::NetworkCode{1, 2}, netkeys::Cost::Test);
     for (long it = 0; it < iterations; ++it) {
         std::vector<uint8_t> d;
         if (it % 3 == 0) {
@@ -71,6 +73,8 @@ int main(int argc, char** argv) {
 
         // network codes typed / pasted by the user
         if (netcode::parse(str)) ++codes;
+        // encrypted network names from lobby data (text from strangers)
+        if (netkeys::openName(fuzzKeys, str)) { std::printf("ERROR: a random string opened as a network name\n"); return 1; }
         std::string code = "KTL-";
         for (int i = 0; i < 14; ++i) code += char(32 + rng() % 95);
         if (const auto c = netcode::parse(code)) {

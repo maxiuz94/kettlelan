@@ -16,6 +16,7 @@
 #include "filter.h"
 #include "ip.h"
 #include "netcode.h"
+#include "netkeys.h"
 #include "protocol.h"
 
 namespace kettle::router {
@@ -56,7 +57,8 @@ public:
     uint64_t selfId() const { return selfId_; }
     ip::Address4 selfAddress() const { return selfAddress_; }
 
-    void setCode(std::optional<netcode::NetworkCode> code);
+    // Network to use; the keys are derived once with netkeys::derive (slow), not here.
+    void setNetwork(const netcode::NetworkCode& code, const netkeys::Keys& keys);
     std::optional<netcode::NetworkCode> code() const;
     void setProtectServices(bool on) { protect_ = on; }
     bool protectServices() const { return protect_; }
@@ -96,6 +98,7 @@ private:
 
     mutable std::shared_mutex mutex_;
     std::optional<netcode::NetworkCode> code_;
+    std::optional<netkeys::Keys> keys_;
     std::map<uint64_t, Peer> peers_;
     std::map<uint32_t, uint64_t> routes_; // address → SteamID (verified members without conflicts only)
 };

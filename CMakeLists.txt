@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(KettleLAN VERSION 0.2.1 LANGUAGES CXX)
+project(KettleLAN VERSION 0.2.1 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -44,19 +44,27 @@ add_library(kettle_core STATIC
     src/core/filter.cpp
     src/core/ip.cpp
     src/core/messages.cpp
+    src/core/netkeys.cpp
+    src/core/random.cpp
+    third_party/monocypher/monocypher.c
     src/core/netcode.cpp
     src/core/protocol.cpp
     src/core/router.cpp
     src/core/siphash.cpp
     src/core/text.cpp
 )
-target_include_directories(kettle_core PUBLIC src/core)
-target_compile_options(kettle_core PRIVATE ${KETTLELAN_WARNINGS})
+target_include_directories(kettle_core PUBLIC src/core PRIVATE third_party/monocypher)
+# our own warnings for our code; Monocypher (third_party, C) is built as it is
+target_compile_options(kettle_core PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${KETTLELAN_WARNINGS}>")
+if(WIN32)
+    target_link_libraries(kettle_core PUBLIC bcrypt) # BCryptGenRandom
+endif()
 
 if(KETTLELAN_BUILD_TESTS)
     enable_testing()
     add_executable(kettlelan_tests tests/test_core.cpp)
     target_link_libraries(kettlelan_tests PRIVATE kettle_core)
+    target_include_directories(kettlelan_tests PRIVATE third_party/monocypher) # RFC 9106 test vector
     target_compile_options(kettlelan_tests PRIVATE ${KETTLELAN_WARNINGS})
     add_test(NAME core COMMAND kettlelan_tests)
 

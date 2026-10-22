@@ -23,6 +23,7 @@
 
 #include "ip.h"
 #include "messages.h"
+#include "netkeys.h"
 #include "netcode.h"
 #include "router.h"
 
@@ -116,6 +117,7 @@ private:
     std::atomic<State> state_{State::Idle};
     CSteamID lobby_;
     std::optional<netcode::NetworkCode> code_;
+    std::optional<netkeys::Keys> keys_; // derived once per connect (Argon2id)
     std::string tag_;
     std::string nameHint_;
     bool searchPending_ = false;

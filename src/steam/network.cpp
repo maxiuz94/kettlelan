@@ -24,7 +24,7 @@ constexpr auto kMergeInterval = std::chrono::seconds(30);
 constexpr int kMaxJoinRetries = 3;
 
 constexpr const char* kKeyMarker = "kettlelan";
-constexpr const char* kMarkerValue = "2";
+constexpr const char* kMarkerValue = "3"; // lobby format of KettleLAN 0.3
 constexpr const char* kKeyTag = "tag";
 constexpr const char* kKeyName = "name";
 constexpr const char* kKeyProto = "proto";
@@ -74,7 +74,11 @@ void Network::connect(const netcode::NetworkCode& code, const std::string& nameH
         return;
     }
     code_ = code;
-    tag_ = protocol::lobbyTag(code);
+    const auto started = Clock::now();
+    keys_ = netkeys::derive(code); // deliberately slow (Argon2id) – once per connect
+    KLOG_INFO("Network keys derived in "
+               << std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - started).count() << " ms");
+    tag_ = keys_->tag;
     nameHint_ = nameHint;
     joinRetries_ = 0;
     state_ = State::Connecting;
@@ -135,7 +139,9 @@ void Network::onLobbyCreated(LobbyCreated_t* r, bool ioFailure) {
     SteamMatchmaking()->SetLobbyData(lobby_, kKeyMarker, kMarkerValue);
     SteamMatchmaking()->SetLobbyData(lobby_, kKeyTag, tag_.c_str());
     const std::string name = text::sanitize(nameHint_, 60);
-    SteamMatchmaking()->SetLobbyData(lobby_, kKeyName, (name.empty() ? std::string("KettleLAN network") : name).c_str());
+    // encrypted: only people who know the code can read the network's name
+    SteamMatchmaking()->SetLobbyData(lobby_, kKeyName,
+                                     netkeys::sealName(*keys_, name.empty() ? std::string("KettleLAN network") : name).c_str());
     SteamMatchmaking()->SetLobbyData(lobby_, kKeyProto, std::to_string(protocol::kVersion).c_str());
     // The creator is in the lobby right away – Steam does not send a separate join result.
     enterConnected();
@@ -170,7 +176,7 @@ void Network::onLobbyEntered(LobbyEnter_t* r, bool ioFailure) {
 }
 
 void Network::enterConnected() {
-    router_.setCode(code_);
+    router_.setNetwork(*code_, *keys_);
     SteamMatchmaking()->SetLobbyMemberData(lobby_, "ip", selfAddress_.toString().c_str());
     state_ = State::Connected;
     nextMergeCheck_ = Clock::now() + kFirstMergeCheck;
@@ -185,9 +191,8 @@ void Network::closeAllSessions() {
 void Network::leaveLobbyOnly() {
     if (lobby_.IsValid()) SteamMatchmaking()->LeaveLobby(lobby_);
     closeAllSessions();
-    const auto code = router_.code();
     router_.clear();
-    router_.setCode(code); // when merging two lobbies the code stays the same
+    if (code_ && keys_) router_.setNetwork(*code_, *keys_); // when merging two lobbies the code stays the same
     lobby_ = CSteamID();
 }
 
@@ -203,6 +208,7 @@ void Network::resetState() {
     reportedBad_.clear();
     lobby_ = CSteamID();
     code_.reset();
+    keys_.reset();
     tag_.clear();
     searchPending_ = false;
     state_ = State::Idle;
@@ -428,8 +434,9 @@ std::string Network::codeText() const { return code_ ? netcode::format(*code_) :
 
 std::string Network::networkName() const {
     if (!lobby_.IsValid()) return {};
-    // the name is set by whoever opened the network – text from strangers
-    const std::string clean = text::sanitize(SteamMatchmaking()->GetLobbyData(lobby_, kKeyName), 60);
+    // the name is set by whoever opened the network – encrypted, and still text from other people
+    const auto name = keys_ ? netkeys::openName(*keys_, SteamMatchmaking()->GetLobbyData(lobby_, kKeyName)) : std::nullopt;
+    const std::string clean = name ? text::sanitize(*name, 60) : std::string();
     return clean.empty() ? std::string("KettleLAN network") : clean;
 }
 

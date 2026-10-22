@@ -1,7 +1,7 @@
 #include "netcode.h"
+#include "random.h"
 
 #include <cctype>
-#include <random>
 
 namespace kettle::netcode {
 
@@ -29,11 +29,12 @@ std::string format(const NetworkCode& code) {
 }
 
 NetworkCode generate() {
-    std::random_device rd;
-    NetworkCode c;
-    while (c.networkId == 0) c.networkId = uint32_t(rd());
-    while (c.secret == 0) c.secret = uint32_t(rd()) & kSecretMask;
-    return c;
+    uint8_t bytes[8];
+    random::fill(bytes);
+    NetworkCode code;
+    code.networkId = uint32_t(bytes[0]) | uint32_t(bytes[1]) << 8 | uint32_t(bytes[2]) << 16 | uint32_t(bytes[3]) << 24;
+    code.secret = (uint32_t(bytes[4]) | uint32_t(bytes[5]) << 8 | uint32_t(bytes[6]) << 16 | uint32_t(bytes[7]) << 24) & 0x0FFFFFFF;
+    return code;
 }
 
 std::optional<NetworkCode> parse(const std::string& text) {

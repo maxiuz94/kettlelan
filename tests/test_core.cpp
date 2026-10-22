@@ -1,12 +1,16 @@
 // KettleLAN – core tests (no Steam needed). Run: ctest --test-dir build
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <optional>
 #include <set>
 #include <vector>
 
 #include "filter.h"
 #include "ip.h"
 #include "netcode.h"
+#include "netkeys.h"
+#include "monocypher.h"
 #include "protocol.h"
 #include "siphash.h"
 #include "text.h"
@@ -82,24 +86,80 @@ static void testIPv4Parse() {
 
 static void testProtocol() {
     netcode::NetworkCode code{12345, 0x1234567};
+    netcode::NetworkCode other = code;
+    other.secret ^= 1;
+    const auto keys = netkeys::derive(code, netkeys::Cost::Test);
+    const auto otherKeys = netkeys::derive(other, netkeys::Cost::Test);
     protocol::HelloMessage m;
     m.type = protocol::MessageType::HelloAck;
     m.address = ip::Address4(100, 70, 1, 9);
-    m.proof = protocol::computeProof(code, 111, 222);
+    m.proof = protocol::computeProof(keys, 111, 222);
     auto bytes = protocol::encode(m);
     auto back = protocol::decode(bytes);
     CHECK(back && back->type == m.type && back->address == m.address && back->proof == m.proof);
-    CHECK(protocol::computeProof(code, 111, 222) != protocol::computeProof(code, 222, 111));
-    netcode::NetworkCode other = code;
-    other.secret ^= 1;
-    CHECK(protocol::computeProof(code, 111, 222) != protocol::computeProof(other, 111, 222));
+    CHECK(protocol::computeProof(keys, 111, 222) != protocol::computeProof(keys, 222, 111));
+    CHECK(protocol::computeProof(keys, 111, 222) != protocol::computeProof(otherKeys, 111, 222));
     bytes[0] = 'X';
     CHECK(!protocol::decode(bytes));
+}
 
-    const auto tag = protocol::lobbyTag(code);
-    CHECK(tag.size() == 16);
-    CHECK(tag == protocol::lobbyTag(code));
-    CHECK(tag != protocol::lobbyTag(other));
+// Argon2id test vector from RFC 9106, section 5.3 – checks the bundled Monocypher.
+static void testArgon2Vector() {
+    uint8_t pass[32], salt[16], secret[8], ad[12];
+    std::fill(std::begin(pass), std::end(pass), uint8_t(0x01));
+    std::fill(std::begin(salt), std::end(salt), uint8_t(0x02));
+    std::fill(std::begin(secret), std::end(secret), uint8_t(0x03));
+    std::fill(std::begin(ad), std::end(ad), uint8_t(0x04));
+    crypto_argon2_config config{CRYPTO_ARGON2_ID, 32, 3, 4};
+    crypto_argon2_inputs inputs{pass, salt, sizeof(pass), sizeof(salt)};
+    crypto_argon2_extras extras{secret, ad, sizeof(secret), sizeof(ad)};
+    std::vector<uint8_t> work(32 * 1024);
+    uint8_t out[32];
+    crypto_argon2(out, sizeof(out), work.data(), config, inputs, extras);
+    const uint8_t expected[32] = {0x0d, 0x64, 0x0d, 0xf5, 0x8d, 0x78, 0x76, 0x6c, 0x08, 0xc0, 0x37,
+                                  0xa3, 0x4a, 0x8b, 0x53, 0xc9, 0xd0, 0x1e, 0xf0, 0x45, 0x2d, 0x75,
+                                  0xb6, 0x5e, 0xb5, 0x25, 0x20, 0xe9, 0x6b, 0x01, 0xe6, 0x59};
+    CHECK(std::equal(std::begin(out), std::end(out), std::begin(expected)));
+}
+
+static void testNetworkKeys() {
+    const netcode::NetworkCode code{0xCAFE1234, 0x0ABCDEF};
+    netcode::NetworkCode other = code;
+    other.secret ^= 1;
+
+    // the real parameters: same code -> same keys, any other code -> different keys
+    const auto keys = netkeys::derive(code);
+    CHECK(keys.tag.size() == 32);
+    CHECK(keys.tag == netkeys::derive(code).tag);
+    CHECK(keys.proofKey == netkeys::derive(code).proofKey);
+    const auto otherKeys = netkeys::derive(other);
+    CHECK(keys.tag != otherKeys.tag && keys.proofKey != otherKeys.proofKey && keys.nameKey != otherKeys.nameKey);
+    CHECK(keys.tag != netkeys::derive(code, netkeys::Cost::Test).tag);
+
+    // encrypted network name
+    const auto sealed = netkeys::sealName(keys, "Quake night");
+    CHECK(netkeys::openName(keys, sealed) == std::optional<std::string>("Quake night"));
+    CHECK(sealed.find("Quake") == std::string::npos);                    // not readable without the code
+    CHECK(netkeys::sealName(keys, "Quake night") != sealed);              // random nonce every time
+    CHECK(!netkeys::openName(otherKeys, sealed));                         // wrong key
+    netkeys::Keys moved = keys;
+    moved.tag = otherKeys.tag;
+    CHECK(!netkeys::openName(moved, sealed));                             // copied to another lobby
+    std::string changed = sealed;
+    changed[changed.size() - 1] = changed.back() == '0' ? '1' : '0';
+    CHECK(!netkeys::openName(keys, changed));                             // modified
+    CHECK(!netkeys::openName(keys, sealed.substr(0, sealed.size() - 2))); // cut
+    CHECK(!netkeys::openName(keys, ""));
+    CHECK(!netkeys::openName(keys, "zz"));
+    CHECK(!netkeys::openName(keys, std::string(1000, 'a')));
+    CHECK(!netkeys::openName(keys, "Quake night"));                       // plain text from an old version
+
+    // long names are cut to 60 bytes without breaking a UTF-8 character
+    const std::string longName(30, 'x');
+    const auto opened = netkeys::openName(keys, netkeys::sealName(keys, longName + std::string(20, '\xC5') + "ąąąąąąąąąą"));
+    CHECK(opened && opened->size() <= 60);
+    const auto emoji = netkeys::openName(keys, netkeys::sealName(keys, std::string(59, 'a') + "ą"));
+    CHECK(emoji && *emoji == std::string(59, 'a'));
 }
 
 static void testGenerate() {
@@ -170,6 +230,8 @@ int main() {
     testAddresses();
     testIPv4Parse();
     testProtocol();
+    testArgon2Vector();
+    testNetworkKeys();
     testGenerate();
     testFilter();
     testSanitize();
