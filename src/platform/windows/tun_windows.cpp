@@ -37,7 +37,9 @@ constexpr wchar_t kTunnelType[] = L"KettleLAN";
 // Fixed adapter id, so Windows recognises the same adapter on every start.
 constexpr GUID kAdapterGuid = {0x7e1a0c42, 0x5b6e, 0x4e0d, {0x9c, 0x8b, 0x4b, 0x3a, 0x2f, 0x1e, 0x6d, 0x90}};
 constexpr DWORD kRingCapacity = 0x400000; // 4 MiB
-constexpr wchar_t kFirewallRuleName[] = L"KettleLAN - incoming game connections";
+constexpr wchar_t kFirewallRuleUdp[] = L"KettleLAN - incoming UDP from network members";
+constexpr wchar_t kFirewallRulePing[] = L"KettleLAN - ping from network members";
+constexpr wchar_t kLegacyFirewallRule[] = L"KettleLAN - incoming game connections"; // 0.2.0, all protocols
 constexpr wchar_t kWintunSigner[] = L"WireGuard LLC";
 
 std::string toUtf8(const wchar_t* w) {
@@ -266,36 +268,36 @@ bool configureAddress(const NET_LUID& luid, ip::Address4 address, Message& error
     return true;
 }
 
-// Firewall rule: allow incoming traffic only on the KettleLAN adapter and only from KettleLAN
-// addresses. The network stays "Public" (no Windows file sharing); computer services are also
-// blocked by KettleLAN's own filter.
-void ensureFirewallRule() {
-    const HRESULT init = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-    INetFwPolicy2* policy = nullptr;
-    INetFwRules* rules = nullptr;
+// Firewall rules for the KettleLAN adapter, only for KettleLAN addresses (100.64.0.0/10):
+//  * UDP – most LAN games (Quake 3, Counter-Strike, Unreal Tournament…) work without any prompt,
+//  * ping (ICMP echo request).
+// TCP is not opened: a game server on TCP gets the usual Windows "Allow access?" prompt for that
+// program. The network stays "Public" (no Windows file sharing), and KettleLAN's own filter blocks
+// computer services as well.
+bool addFirewallRule(INetFwRules* rules, const wchar_t* ruleName, const wchar_t* text, LONG protocol, const wchar_t* icmp) {
+    BSTR name = SysAllocString(ruleName);
+    INetFwRule* existing = nullptr;
+    if (SUCCEEDED(rules->Item(name, &existing)) && existing) {
+        existing->Release();
+        SysFreeString(name);
+        return true; // already there
+    }
     INetFwRule* rule = nullptr;
-    BSTR name = SysAllocString(kFirewallRuleName);
-    do {
-        if (FAILED(CoCreateInstance(CLSID_NetFwPolicy2, nullptr, CLSCTX_INPROC_SERVER, IID_INetFwPolicy2,
-                                    reinterpret_cast<void**>(&policy))))
-            break;
-        if (FAILED(policy->get_Rules(&rules))) break;
-        INetFwRule* existing = nullptr;
-        if (SUCCEEDED(rules->Item(name, &existing)) && existing) {
-            existing->Release();
-            break; // already there
-        }
-        if (FAILED(CoCreateInstance(CLSID_NetFwRule, nullptr, CLSCTX_INPROC_SERVER, IID_INetFwRule,
-                                    reinterpret_cast<void**>(&rule))))
-            break;
-        BSTR description = SysAllocString(
-            L"Lets games receive connections from KettleLAN network members (KettleLAN adapter, 100.64.0.0/10 only).");
+    bool ok = false;
+    if (SUCCEEDED(CoCreateInstance(CLSID_NetFwRule, nullptr, CLSCTX_INPROC_SERVER, IID_INetFwRule,
+                                   reinterpret_cast<void**>(&rule)))) {
+        BSTR description = SysAllocString(text);
         BSTR remote = SysAllocString(L"100.64.0.0/255.192.0.0");
         rule->put_Name(name);
         rule->put_Description(description);
         rule->put_Direction(NET_FW_RULE_DIR_IN);
         rule->put_Action(NET_FW_ACTION_ALLOW);
-        rule->put_Protocol(256); // NET_FW_IP_PROTOCOL_ANY (missing from some SDK headers)
+        rule->put_Protocol(protocol);
+        if (icmp) {
+            BSTR types = SysAllocString(icmp);
+            rule->put_IcmpTypesAndCodes(types);
+            SysFreeString(types);
+        }
         rule->put_RemoteAddresses(remote);
         rule->put_Profiles(NET_FW_PROFILE2_ALL);
         rule->put_Enabled(VARIANT_TRUE);
@@ -316,15 +318,41 @@ void ensureFirewallRule() {
         rule->put_Interfaces(list);
         VariantClear(&list);
 
-        if (SUCCEEDED(rules->Add(rule))) KLOG_INFO("Added the Windows Firewall rule for the KettleLAN adapter");
-        else KLOG_WARN("Could not add the Windows Firewall rule – Windows may ask to allow games");
+        ok = SUCCEEDED(rules->Add(rule));
         SysFreeString(description);
         SysFreeString(remote);
-    } while (false);
-    if (rule) rule->Release();
+        rule->Release();
+    }
+    SysFreeString(name);
+    return ok;
+}
+
+void ensureFirewallRules() {
+    const HRESULT init = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    INetFwPolicy2* policy = nullptr;
+    INetFwRules* rules = nullptr;
+    if (SUCCEEDED(CoCreateInstance(CLSID_NetFwPolicy2, nullptr, CLSCTX_INPROC_SERVER, IID_INetFwPolicy2,
+                                   reinterpret_cast<void**>(&policy))) &&
+        SUCCEEDED(policy->get_Rules(&rules))) {
+        // KettleLAN 0.2.0 allowed all protocols with a single rule – remove it.
+        BSTR legacy = SysAllocString(kLegacyFirewallRule);
+        INetFwRule* old = nullptr;
+        if (SUCCEEDED(rules->Item(legacy, &old)) && old) {
+            old->Release();
+            if (SUCCEEDED(rules->Remove(legacy))) KLOG_INFO("Removed the old KettleLAN firewall rule (all protocols)");
+        }
+        SysFreeString(legacy);
+
+        const bool udp = addFirewallRule(rules, kFirewallRuleUdp,
+            L"Lets games receive UDP traffic from KettleLAN network members (KettleLAN adapter, 100.64.0.0/10 only).",
+            NET_FW_IP_PROTOCOL_UDP, nullptr);
+        const bool ping = addFirewallRule(rules, kFirewallRulePing,
+            L"Lets KettleLAN network members ping this computer (KettleLAN adapter, 100.64.0.0/10 only).",
+            1 /* ICMPv4 */, L"8:*");
+        if (!udp || !ping) KLOG_WARN("Could not add the Windows Firewall rules – Windows may ask to allow games");
+    }
     if (rules) rules->Release();
     if (policy) policy->Release();
-    SysFreeString(name);
     if (SUCCEEDED(init)) CoUninitialize();
 }
 
@@ -359,7 +387,7 @@ std::unique_ptr<Tun> openTun(ip::Address4 address, Message& error) {
         g_wintun.CloseAdapter(adapter);
         return nullptr;
     }
-    ensureFirewallRule();
+    ensureFirewallRules();
 
     WINTUN_SESSION_HANDLE session = g_wintun.StartSession(adapter, kRingCapacity);
     if (!session) {

@@ -8,6 +8,9 @@ Before tagging a release add a `## [x.y.z] – date` section (see [docs/RELEASIN
 
 ## [Unreleased]
 
+## [0.2.1] – 2026-10-22
+
+- Windows: allow only UDP and ping from KettleLAN network members in Windows Firewall (was: all protocols), remove the old rule
 - Windows: load wintun.dll only after checking its WireGuard LLC signature on a file locked against changes
 - GUI: fix "member(s)" in the member count
 - CI: pin all GitHub Actions to commit SHAs, keep them updated with Dependabot

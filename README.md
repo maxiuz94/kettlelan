@@ -107,6 +107,10 @@ Details and how to report a vulnerability: [SECURITY.md](SECURITY.md).
 **Does the game have to support LAN?** Yes – KettleLAN creates a LAN, so the game needs a LAN or
 "direct IP" multiplayer mode. Games that only use online matchmaking do not benefit.
 
+**Windows asks "Allow access?" when I start a game server.** KettleLAN opens only UDP and ping in Windows
+Firewall. Games that host over TCP (for example Minecraft or Warcraft III) trigger the standard Windows prompt
+once – allow it for the game.
+
 **The server does not show up in the game's LAN list.** Connect by typing the host's KettleLAN address
 (`100.x.x.x`). LAN discovery over KettleLAN does not work in every game yet.
 

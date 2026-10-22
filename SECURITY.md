@@ -49,9 +49,10 @@ Please **do not open a public issue**. Use GitHub's private reporting instead:
   For the strongest protection keep KettleLAN in a folder only administrators can change, such as
   `C:\Program Files\KettleLAN` (copy the folder there – a moved folder keeps its old permissions). The planned system
   service will install itself in such a folder automatically.
-- A Windows Firewall rule allows incoming traffic **only on the KettleLAN adapter and only from `100.64.0.0/10`**.
-  The KettleLAN network stays a "Public" network, so Windows does not share files or printers on it, and
-  KettleLAN's own filter blocks computer services as on Linux.
+- Windows Firewall rules allow incoming **UDP and ping only, only on the KettleLAN adapter and only from
+  `100.64.0.0/10`**. Incoming TCP is not opened: a game server on TCP gets the usual Windows "Allow access?" prompt
+  for that program. The KettleLAN network stays a "Public" network, so Windows does not share files or printers on
+  it, and KettleLAN's own filter blocks computer services as on Linux.
 
 ## The network code
 
