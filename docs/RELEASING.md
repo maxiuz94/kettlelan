@@ -37,14 +37,3 @@
 scripts/release-notes.sh 0.1.0 > /tmp/notes.md
 gh release edit v0.1.0 --notes-file /tmp/notes.md
 ```
-
-## Translations
-
-After changing user-visible texts in the code, refresh the translation files and translate new entries:
-
-```sh
-cmake --build build --target update_translations
-```
-
-Then edit `translations/kettlelan_pl.ts` (Qt Linguist or a text editor). English is the source language;
-`kettlelan_en.ts` only holds plural forms.

@@ -112,7 +112,7 @@ if(KETTLELAN_BUILD_APP)
     set(KETTLELAN_TARGETS kettlelan-cli)
 
     if(KETTLELAN_BUILD_GUI)
-        find_package(Qt6 6.4 REQUIRED COMPONENTS Quick QuickControls2 Widgets Network LinguistTools)
+        find_package(Qt6 6.4 REQUIRED COMPONENTS Quick QuickControls2 Widgets Network)
         qt_standard_project_setup()
 
         qt_add_executable(kettlelan
@@ -146,13 +146,6 @@ if(KETTLELAN_BUILD_APP)
             VERSION 1.0
             RESOURCE_PREFIX /qt/qml
             QML_FILES ${KETTLELAN_QML}
-        )
-        # Translations: translations/*.ts (edit with Qt Linguist or a text editor).
-        # Refresh after changing texts in the code: cmake --build build --target update_translations
-        qt_add_translations(kettlelan
-            TS_FILES translations/kettlelan_en.ts translations/kettlelan_pl.ts
-            SOURCES ${KETTLELAN_QML} src/gui/backend.cpp src/gui/main_gui.cpp src/core/messages.cpp
-            LUPDATE_OPTIONS -locations relative
         )
         target_include_directories(kettlelan PRIVATE src/gui)
         target_compile_definitions(kettlelan PRIVATE KETTLELAN_VERSION="${PROJECT_VERSION}")

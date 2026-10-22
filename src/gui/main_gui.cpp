@@ -113,7 +113,6 @@ int main(int argc, char** argv) {
     QQuickStyle::setStyle(QStringLiteral("Basic"));
 
     kettle::gui::Backend backend(demo);
-    backend.applyInitialLanguage();
     qmlRegisterSingletonInstance("KettleLAN.Core", 1, 0, "Backend", &backend);
 
     QObject::connect(&server, &QLocalServer::newConnection, &backend, [&server, &backend] {
@@ -124,7 +123,6 @@ int main(int argc, char** argv) {
     });
 
     QQmlApplicationEngine engine;
-    backend.attachEngine(&engine);
     engine.addImportPath(QStringLiteral("qrc:/qt/qml"));
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app, [] { std::_Exit(1); },
                      Qt::QueuedConnection);

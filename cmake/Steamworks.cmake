@@ -8,7 +8,7 @@
 #   1. -DSTEAMWORKS_SDK_DIR=<folder with a public/steam subfolder>
 #   2. -DSTEAMWORKS_SDK_ZIP=<steamworks_sdk_XXX.zip file>
 #   3. STEAMWORKS_SDK_URL environment variable
-#   4. the newest steamworks_sdk_*.zip in ~/Downloads, ~/Pobrane or the project folder
+#   4. the newest steamworks_sdk_*.zip in your Downloads folder (XDG user dirs) or the project folder
 
 set(STEAMWORKS_SDK_DIR "" CACHE PATH "Folder of the extracted Steamworks SDK")
 set(STEAMWORKS_SDK_ZIP "" CACHE FILEPATH "steamworks_sdk_XXX.zip file")
@@ -66,7 +66,16 @@ if(NOT _sw_root)
             list(APPEND _dirs "$ENV{XDG_DOWNLOAD_DIR}")
         endif()
         if(DEFINED ENV{HOME})
-            list(APPEND _dirs "$ENV{HOME}/Downloads" "$ENV{HOME}/Pobrane")
+            list(APPEND _dirs "$ENV{HOME}/Downloads")
+            # localized Downloads folder from ~/.config/user-dirs.dirs (e.g. on non-English systems)
+            if(EXISTS "$ENV{HOME}/.config/user-dirs.dirs")
+                file(STRINGS "$ENV{HOME}/.config/user-dirs.dirs" _ud REGEX "^XDG_DOWNLOAD_DIR=")
+                if(_ud)
+                    string(REGEX REPLACE "^XDG_DOWNLOAD_DIR=\"?([^\"]*)\"?$" "\\1" _ud "${_ud}")
+                    string(REPLACE "$HOME" "$ENV{HOME}" _ud "${_ud}")
+                    list(APPEND _dirs "${_ud}")
+                endif()
+            endif()
         endif()
         if(DEFINED ENV{USERPROFILE})
             list(APPEND _dirs "$ENV{USERPROFILE}/Downloads")

@@ -1,7 +1,5 @@
 # KettleLAN security
 
-**English** · [Polski](SECURITY.pl.md)
-
 This document describes what KettleLAN protects, what it does not, and how to report a problem.
 
 ## Reporting a vulnerability

@@ -7,7 +7,7 @@ SDK_URL="https://partner.steamgames.com/downloads/list"
 
 find_sdk_zip() {
     local d
-    for d in "${XDG_DOWNLOAD_DIR:-}" "$HOME/Downloads" "$HOME/Pobrane" "$PWD"; do
+    for d in "${XDG_DOWNLOAD_DIR:-}" "$(xdg-user-dir DOWNLOAD 2>/dev/null || true)" "$HOME/Downloads" "$PWD"; do
         [ -n "$d" ] && ls "$d"/steamworks_sdk_*.zip 2>/dev/null | sort -V | tail -n1
     done | tail -n1
 }

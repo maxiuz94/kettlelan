@@ -132,30 +132,6 @@ Item {
                         Layout.fillWidth: true
                         Layout.margins: 10
                         Layout.leftMargin: 14
-                        Text { textFormat: Text.PlainText; text: qsTr("Language"); color: Theme.text; font.pixelSize: 14; Layout.fillWidth: true }
-                        ComboBox {
-                            id: languageBox
-                            implicitWidth: 170
-                            implicitHeight: 40
-                            textRole: "label"
-                            valueRole: "value"
-                            // language names are always shown in their own language
-                            model: [
-                                { label: "English", value: "en" },
-                                { label: "Polski", value: "pl" }
-                            ]
-                            Component.onCompleted: currentIndex = indexOfValue(Backend.language)
-                            onActivated: Backend.language = currentValue
-                            Accessible.name: qsTr("Language")
-                            background: Rectangle { radius: Theme.smallRadius + 2; color: Theme.bg; border.color: languageBox.visualFocus ? Theme.accent : Theme.border }
-                            contentItem: Text { textFormat: Text.PlainText; leftPadding: 12; text: languageBox.displayText; color: Theme.text; font.pixelSize: 14; verticalAlignment: Text.AlignVCenter }
-                        }
-                    }
-                    Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Layout.margins: 10
-                        Layout.leftMargin: 14
                         Text { textFormat: Text.PlainText; text: qsTr("Theme"); color: Theme.text; font.pixelSize: 14; Layout.fillWidth: true }
                         ComboBox {
                             id: themeBox
@@ -168,8 +144,6 @@ Item {
                                 { label: qsTr("Dark"), value: "dark" },
                                 { label: qsTr("Light"), value: "light" }
                             ]
-                            // the model is rebuilt after a language change – keep the selection
-                            onModelChanged: currentIndex = indexOfValue(Backend.theme)
                             Component.onCompleted: currentIndex = indexOfValue(Backend.theme)
                             onActivated: Backend.theme = currentValue
                             Accessible.name: qsTr("Theme")
@@ -204,7 +178,6 @@ Item {
                 }
                 Text {
                     Layout.alignment: Qt.AlignHCenter
-                    // fixed link, only the label comes from the translation
                     text: "<a href=\"https://github.com/maxiuz94/kettlelan/blob/main/THIRD-PARTY-NOTICES.md\">" + qsTr("Licenses of third-party components") + "</a>"
                     textFormat: Text.StyledText
                     linkColor: Theme.muted

@@ -13,11 +13,9 @@ no player limit, no port forwarding, no server of your own.
 [![License: BSD-3-Clause](https://img.shields.io/github/license/maxiuz94/kettlelan)](LICENSE)
 ![Platform: Linux | Windows](https://img.shields.io/badge/platform-Linux%20%7C%20Windows-informational)
 
-**English** · [Polski](README.pl.md)
-
-<img src="docs/screenshots/start-en.png" width="250" alt="Start screen">&nbsp;
-<img src="docs/screenshots/network-en.png" width="250" alt="Network screen">&nbsp;
-<img src="docs/screenshots/settings-en.png" width="250" alt="Settings">
+<img src="docs/screenshots/start.png" width="250" alt="Start screen">&nbsp;
+<img src="docs/screenshots/network.png" width="250" alt="Network screen">&nbsp;
+<img src="docs/screenshots/settings.png" width="250" alt="Settings">
 
 </div>
 
@@ -39,7 +37,7 @@ networking (directly or via Valve's relays), so it works behind any router and e
 - **Saved networks**, automatic reconnect and start with the system – like Hamachi.
 - **Private by default** – your IP address is hidden from other players and your computer's services
   (SSH, file sharing, remote desktop, databases…) are blocked for them.
-- System tray icon, notifications, dark and light theme, English and Polish interface.
+- System tray icon, notifications, dark and light theme.
 - Command-line version (`kettlelan-cli`) for diagnostics and SSH sessions.
 
 ## Download
@@ -116,9 +114,9 @@ Required packages:
 
 | Distribution | Command |
 |--------------|---------|
-| Arch / Manjaro | `sudo pacman -S --needed base-devel cmake git polkit iproute2 qt6-base qt6-declarative qt6-tools` |
-| Ubuntu 24.04+ / Debian 12+ | `sudo apt install build-essential cmake git pkexec iproute2 qt6-base-dev qt6-declarative-dev qt6-tools-dev qt6-l10n-tools qml6-module-qtquick qml6-module-qtqml qml6-module-qtquick-controls qml6-module-qtquick-layouts qml6-module-qtquick-shapes qml6-module-qtquick-templates qml6-module-qtquick-window qml6-module-qtqml-workerscript` |
-| Fedora | `sudo dnf install gcc-c++ cmake git polkit iproute qt6-qtbase-devel qt6-qtdeclarative-devel qt6-qttools-devel` |
+| Arch / Manjaro | `sudo pacman -S --needed base-devel cmake git polkit iproute2 qt6-base qt6-declarative` |
+| Ubuntu 24.04+ / Debian 12+ | `sudo apt install build-essential cmake git pkexec iproute2 qt6-base-dev qt6-declarative-dev qml6-module-qtquick qml6-module-qtqml qml6-module-qtquick-controls qml6-module-qtquick-layouts qml6-module-qtquick-shapes qml6-module-qtquick-templates qml6-module-qtquick-window qml6-module-qtqml-workerscript` |
+| Fedora | `sudo dnf install gcc-c++ cmake git polkit iproute qt6-qtbase-devel qt6-qtdeclarative-devel` |
 
 Then:
 
@@ -141,12 +139,6 @@ Packages: `packaging/linux/build-appimage.sh` (AppImage) and `cpack` with `-DKET
 `packaging/windows/build-zip.sh build-windows /path/to/steamworks_sdk_XXX.zip` – it builds, runs the tests and
 creates the zip package. Wintun is downloaded automatically from wintun.net and verified with SHA256.
 Releasing a new version: [docs/RELEASING.md](docs/RELEASING.md).
-
-## Translations
-
-The interface is translated with Qt Linguist files in [`translations/`](translations). To add a language,
-copy `kettlelan_pl.ts`, translate it (with Qt Linguist or a text editor) and add it to `CMakeLists.txt`.
-After changing texts in the code run `cmake --build build --target update_translations`.
 
 ## Built with AI assistance
 

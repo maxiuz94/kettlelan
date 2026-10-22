@@ -8,9 +8,7 @@
   <vendor_url>https://github.com/maxiuz94/kettlelan</vendor_url>
   <action id="io.github.maxiuz94.kettlelan.helper">
     <description>Create the KettleLAN virtual network adapter</description>
-    <description xml:lang="pl">Tworzenie wirtualnej karty sieciowej KettleLAN</description>
     <message>KettleLAN needs to create a virtual network adapter (kettle0) for playing LAN games with friends.</message>
-    <message xml:lang="pl">KettleLAN chce utworzyć wirtualną kartę sieciową (kettle0) do gry w sieci LAN ze znajomymi.</message>
     <icon_name>kettlelan</icon_name>
     <defaults>
       <allow_any>auth_admin</allow_any>

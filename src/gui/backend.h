@@ -3,7 +3,6 @@
 
 #include <QObject>
 #include <QPointer>
-#include <QTranslator>
 #include <QString>
 #include <QVariantList>
 #include <QWindow>
@@ -13,7 +12,6 @@
 
 class QSystemTrayIcon;
 class QMenu;
-class QQmlEngine;
 
 namespace kettle::gui {
 
@@ -40,8 +38,6 @@ class Backend : public QObject {
     Q_PROPERTY(QString blockedCount READ blockedCount NOTIFY changed)
     Q_PROPERTY(QString theme READ theme WRITE setTheme NOTIFY settingsChanged)
     Q_PROPERTY(bool darkMode READ darkMode NOTIFY themeChanged)
-    Q_PROPERTY(QString language READ language WRITE setLanguage NOTIFY languageChanged)
-    Q_PROPERTY(bool askLanguage READ askLanguage NOTIFY languageChanged)
     // information
     Q_PROPERTY(bool trayAvailable READ trayAvailable CONSTANT)
     Q_PROPERTY(QString version READ version CONSTANT)
@@ -53,9 +49,6 @@ public:
     ~Backend() override;
 
     void attachWindow(QWindow* window);
-    void attachEngine(QQmlEngine* engine) { qmlEngine_ = engine; }
-    // Loads the translation chosen in the settings (before the QML is loaded).
-    void applyInitialLanguage();
     void startEngine();
 
     QString status() const { return status_; }
@@ -85,9 +78,6 @@ public:
     QString theme() const { return theme_; }
     void setTheme(const QString& v);
     bool darkMode() const;
-    QString language() const { return language_; }
-    void setLanguage(const QString& language);
-    bool askLanguage() const { return askLanguage_; }
 
     bool trayAvailable() const;
     QString version() const;
@@ -107,21 +97,18 @@ public:
     Q_INVOKABLE void showWindow();
     Q_INVOKABLE void quitApp();
     Q_INVOKABLE QString defaultNetworkName() const;
-    Q_INVOKABLE void keepEnglish();
 
 signals:
     void changed();
     void settingsChanged();
     void savedChanged();
     void themeChanged();
-    void languageChanged();
     void toast(const QString& text);
 
 private:
     void applySnapshot(const Snapshot& snap);
     void handleEvent(const Message& message);
-    QString translate(const Message& message) const;
-    void loadTranslator(const QString& language);
+    QString messageText(const Message& message) const;
     void setupTray();
     void rebuildTrayMenu();
     void loadDemo();
@@ -159,12 +146,7 @@ private:
     qulonglong blockedPackets_ = 0;
     bool notifications_ = true;
     QString theme_ = QStringLiteral("system");
-    QString language_ = QStringLiteral("en");
-    bool askLanguage_ = false;
-    QTranslator translator_;
-    QQmlEngine* qmlEngine_ = nullptr;
-    Message errorMessage_;
-    bool hasError_ = false;
+
 };
 
 } // namespace kettle::gui

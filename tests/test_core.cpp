@@ -155,7 +155,7 @@ static void testFilter() {
 
 static void testSanitize() {
     CHECK(text::sanitize("maxiuZ") == "maxiuZ");
-    CHECK(text::sanitize("Zażółć gęślą jaźń") == "Zażółć gęślą jaźń");
+    CHECK(text::sanitize("Grüße, naïve café – 日本") == "Grüße, naïve café – 日本"); // non-ASCII is kept
     CHECK(text::sanitize("bad\x1b[2Jname") == "bad[2Jname");       // ESC removed
     CHECK(text::sanitize("a\xe2\x80\xae" "b") == "ab");               // U+202E (right-to-left override)
     CHECK(text::sanitize("\xc2\x9b" "31m") == "31m");                  // C1 control character

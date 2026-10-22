@@ -3,7 +3,7 @@
 All notable changes to KettleLAN. The entry for a version becomes the description of its GitHub release.
 
 Format: one flat list per version, one line per change – `Area: what changed`, imperative, no intro text.
-Areas: Network, Security, GUI, CLI, Linux, AppImage, Packaging, Translations, Docs, CI.
+Areas: Network, Security, GUI, CLI, Linux, Windows, AppImage, Packaging, Docs, CI.
 Before tagging a release add a `## [x.y.z] – date` section (see [docs/RELEASING.md](docs/RELEASING.md)).
 
 ## [Unreleased]
@@ -14,15 +14,12 @@ Before tagging a release add a `## [x.y.z] – date` section (see [docs/RELEASIN
 - Windows: run as administrator (needed by Wintun), start with the system through Task Scheduler
 - Windows: allow incoming game traffic with a firewall rule limited to the KettleLAN adapter and 100.64.0.0/10
 - CI: build and test the Windows version with MSVC, add the zip to releases
-- GUI: use English by default, add Polish translation
-- GUI: offer Polish on first start on a Polish system
-- GUI: add language selection to Settings, switch without restart
-- GUI: use correct Polish plural forms for the member count
+- GUI: switch the interface to English
 - CLI: rename commands to English (`create`, `join`, `list`, `code`, `leave`, `help`, `quit`)
 - CLI: ask for the password through `sudo` when the polkit prompt is not available (e.g. over SSH)
 - Linux: show a clear message when administrator authentication fails instead of "pkexec is not installed"
 - AppImage: run natively on Wayland
-- Docs: translate README, SECURITY and CHANGELOG to English, add Polish README and SECURITY
+- Docs: translate README, SECURITY and CHANGELOG to English
 - CI: use only the CHANGELOG entry as the release description
 - Docs: state that KettleLAN is developed with the help of Claude (Anthropic)
 - Docs: add THIRD-PARTY-NOTICES.md with the licenses of all third-party components

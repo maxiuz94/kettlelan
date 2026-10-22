@@ -1,8 +1,8 @@
 // KettleLAN – user-facing messages.
 //
-// Every message shown to the user has an id and arguments. The CLI and the log use the English
-// templates below; the GUI translates the same templates with Qt (they are marked with
-// QT_TRANSLATE_NOOP, so lupdate extracts them into translations/*.ts).
+// Every message shown to the user has an id and arguments, so the core does not build user-facing
+// sentences itself. The templates are marked with QT_TRANSLATE_NOOP, so they could be translated
+// with Qt's tools if that is ever needed.
 #pragma once
 
 #include <string>
@@ -55,7 +55,7 @@ struct Message {
     std::vector<std::string> args;
 };
 
-// English template with %1, %2… placeholders (the source text for translations).
+// English template with %1, %2… placeholders.
 const char* messageTemplate(Msg id);
 
 // Message in English with the arguments filled in.

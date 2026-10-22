@@ -11,8 +11,6 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QGuiApplication>
-#include <QLocale>
-#include <QQmlEngine>
 #include <QMenu>
 #include <QPalette>
 #include <QProcess>
@@ -129,6 +127,7 @@ Backend::Backend(bool demo, QObject* parent) : QObject(parent), demo_(demo) {
     connect(this, &Backend::settingsChanged, this, &Backend::themeChanged);
 
     setupTray();
+    if (demo_) loadDemo();
 }
 
 Backend::~Backend() = default;
@@ -153,9 +152,8 @@ void Backend::startEngine() {
 
 void Backend::applySnapshot(const Snapshot& snap) {
     status_ = statusName(snap.status);
-    hasError_ = snap.status == EngineStatus::SteamMissing || snap.status == EngineStatus::TunError;
-    errorMessage_ = snap.error;
-    errorText_ = hasError_ ? translate(errorMessage_) : QString();
+    const bool hasError = snap.status == EngineStatus::SteamMissing || snap.status == EngineStatus::TunError;
+    errorText_ = hasError ? messageText(snap.error) : QString();
     personaName_ = QString::fromStdString(snap.personaName);
     selfAddress_ = QString::fromStdString(snap.selfAddress);
     netState_ = netStateName(snap.netState);
@@ -192,14 +190,14 @@ void Backend::applySnapshot(const Snapshot& snap) {
     rebuildTrayMenu();
 }
 
-QString Backend::translate(const Message& message) const {
-    QString text = QCoreApplication::translate("Messages", messageTemplate(message.id));
+QString Backend::messageText(const Message& message) const {
+    QString text = QString::fromUtf8(messageTemplate(message.id));
     for (const auto& arg : message.args) text = text.arg(QString::fromStdString(arg));
     return text;
 }
 
 void Backend::handleEvent(const Message& message) {
-    const QString text = translate(message);
+    const QString text = messageText(message);
     emit toast(text);
     // System notifications only about people, and only when the window is hidden.
     const bool hidden = !window_ || !window_->isVisible();
@@ -236,7 +234,7 @@ bool Backend::isCodeValid(const QString& code) const { return netcode::parse(cod
 
 void Backend::joinNetwork(const QString& code) {
     if (!isCodeValid(code)) {
-        emit toast(translate({Msg::InvalidCode, {}}));
+        emit toast(messageText({Msg::InvalidCode, {}}));
         return;
     }
     const QString normalized = normalizeCode(code);
@@ -325,51 +323,6 @@ void Backend::setProtectServices(bool v) {
     if (engine_) engine_->setProtectServices(v);
     emit settingsChanged();
 }
-
-// ---------------------------------------------------------------- language
-
-void Backend::loadTranslator(const QString& language) {
-    QCoreApplication::removeTranslator(&translator_);
-    // English is the source language; its file only holds plural forms ("1 member", "2 members").
-    const QString lang = language == QLatin1String("pl") ? QStringLiteral("pl") : QStringLiteral("en");
-    if (translator_.load(QStringLiteral(":/i18n/kettlelan_%1.qm").arg(lang))) QCoreApplication::installTranslator(&translator_);
-}
-
-void Backend::applyInitialLanguage() {
-    QSettings s;
-    const QString forced = qEnvironmentVariable("KETTLELAN_LANG"); // e.g. for screenshots
-    if (!forced.isEmpty()) {
-        language_ = forced;
-    } else if (s.contains(QStringLiteral("language"))) {
-        language_ = s.value(QStringLiteral("language")).toString();
-    } else {
-        language_ = QStringLiteral("en");
-        // First start on a Polish system: offer Polish (the user can always change it in the settings).
-        askLanguage_ = QLocale::system().language() == QLocale::Polish;
-        if (!askLanguage_) s.setValue(QStringLiteral("language"), language_);
-    }
-    loadTranslator(language_);
-    if (demo_) loadDemo(); // demo texts in the chosen language
-}
-
-void Backend::setLanguage(const QString& language) {
-    const bool isNew = language != language_;
-    language_ = language;
-    askLanguage_ = false;
-    QSettings().setValue(QStringLiteral("language"), language_);
-    if (isNew) {
-        loadTranslator(language_);
-        if (qmlEngine_) qmlEngine_->retranslate();
-        if (hasError_) errorText_ = translate(errorMessage_);
-        if (demo_) loadDemo();
-        trayMenuSignature_.clear();
-        rebuildTrayMenu();
-        emit changed();
-    }
-    emit languageChanged();
-}
-
-void Backend::keepEnglish() { setLanguage(QStringLiteral("en")); }
 
 // ---------------------------------------------------------------- saved networks
 
@@ -565,9 +518,7 @@ void Backend::loadDemo() {
     selfAddress_ = QStringLiteral("100.80.46.79");
     if (demoPage_ == QLatin1String("steam")) {
         status_ = QStringLiteral("steamMissing");
-        hasError_ = true;
-        errorMessage_ = {Msg::SteamNotRunning, {}};
-        errorText_ = translate(errorMessage_);
+        errorText_ = messageText({Msg::SteamNotRunning, {}});
     } else {
         status_ = QStringLiteral("ready");
     }

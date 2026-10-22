@@ -26,9 +26,7 @@ cat > "$APPS/kettlelan.desktop" << DESKTOP
 Type=Application
 Name=KettleLAN
 GenericName=Virtual LAN
-GenericName[pl]=Wirtualny LAN
 Comment=Play LAN games with friends over the Steam network
-Comment[pl]=Graj ze znajomymi w gry LAN przez sieć Steam
 Exec="$DEST/kettlelan"
 Icon=kettlelan
 Terminal=false
