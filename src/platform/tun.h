@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 
@@ -30,5 +31,8 @@ public:
 // Prepares the adapter (asking for administrator rights if needed) and opens it.
 // On failure returns nullptr and fills `error`.
 std::unique_ptr<Tun> openTun(ip::Address4 address, Message& error);
+
+// A warning to show after start (e.g. an unsafe install folder), or nothing.
+std::optional<Message> startupWarning();
 
 } // namespace kettle::platform

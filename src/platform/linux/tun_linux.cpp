@@ -228,4 +228,6 @@ std::unique_ptr<Tun> openTun(ip::Address4 address, Message& error) {
     return std::make_unique<LinuxTun>(fd);
 }
 
+std::optional<Message> startupWarning() { return std::nullopt; }
+
 } // namespace kettle::platform

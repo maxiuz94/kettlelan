@@ -18,7 +18,7 @@ jobs:
     name: CHANGELOG.md entry
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - name: Check the version entry
         run: |
           VERSION="$(sed -n 's/^project(KettleLAN VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)"
@@ -48,7 +48,7 @@ jobs:
             qt6-base-dev qt6-declarative-dev qml6-module-qtquick qml6-module-qtqml \
             qml6-module-qtquick-controls qml6-module-qtquick-layouts qml6-module-qtquick-shapes \
             qml6-module-qtquick-templates qml6-module-qtquick-window qml6-module-qtqml-workerscript
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - name: Steamworks SDK (official Valve file, verified with SHA256)
         env:
           GH_TOKEN: ${{ secrets.SDK_REPO_TOKEN }}
@@ -65,7 +65,7 @@ jobs:
         run: ctest --test-dir build --output-on-failure
       - name: Package
         run: cd build && cpack --config CPackConfig.cmake && dpkg-deb -I kettlelan_*.deb
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: deb-${{ matrix.distro }}
           path: build/kettlelan_*.deb
@@ -75,9 +75,9 @@ jobs:
     name: AppImage
     runs-on: ubuntu-22.04   # an older system, so the AppImage also runs on older distributions
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - name: Qt 6.8 (LTS)
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4.4.1
         with:
           version: '6.8.3'
           cache: true
@@ -95,7 +95,7 @@ jobs:
           QMAKE: ${{ env.QT_ROOT_DIR }}/bin/qmake
           CMAKE_EXTRA_ARGS: -DSTEAMWORKS_SDK_ZIP=${{ runner.temp }}/steamworks_sdk_165.zip
         run: packaging/linux/build-appimage.sh build-appimage
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: appimage
           path: build-appimage/KettleLAN-*-x86_64.AppImage
@@ -105,9 +105,9 @@ jobs:
     name: Windows package (zip)
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       - name: Qt 6.8 (LTS)
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4.4.1
         with:
           version: '6.8.3'
           arch: win64_msvc2022_64
@@ -123,7 +123,7 @@ jobs:
       - name: Build, test and package
         shell: bash
         run: packaging/windows/build-zip.sh build-windows "$RUNNER_TEMP/$SDK_FILE"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows
           path: dist/KettleLAN-*-windows-x64.zip
@@ -139,15 +139,15 @@ jobs:
       id-token: write       # build attestation
       attestations: write
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/download-artifact@v8
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: dist
           merge-multiple: true
       - name: Checksums
         run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
       - name: Build attestation (who built the files, from which code and how)
-        uses: actions/attest-build-provenance@v4
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: 'dist/*'
       - name: Publish the release (description from CHANGELOG.md)

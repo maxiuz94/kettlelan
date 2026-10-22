@@ -8,6 +8,11 @@ Before tagging a release add a `## [x.y.z] – date` section (see [docs/RELEASIN
 
 ## [Unreleased]
 
+- Windows: load wintun.dll only after checking its WireGuard LLC signature on a file locked against changes
+- Windows: warn when KettleLAN runs as administrator from the user's folder (Downloads, Desktop…)
+- Docs: recommend extracting the Windows version to C:\Program Files\KettleLAN
+- CI: pin all GitHub Actions to commit SHAs, keep them updated with Dependabot
+- CI: set read-only permissions for the test workflow
 - Docs: warn that the Windows version is not code-signed yet, download only from the official Releases page
 - Docs: add instructions for verifying a download (PowerShell, sha256sum, build attestation)
 - Docs: add an FAQ entry about antivirus and SmartScreen warnings

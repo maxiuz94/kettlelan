@@ -48,6 +48,8 @@ enum class Msg {
     TunWintunMissing,
     TunWintunFailed,   // %1 = system error
     TunAddressFailed,  // %1 = system error
+    TunWintunUntrusted,
+    UnsafeFolder,      // %1 = the program's folder
 };
 
 struct Message {

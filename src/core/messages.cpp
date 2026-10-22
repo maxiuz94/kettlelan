@@ -42,6 +42,8 @@ const char* messageTemplate(Msg id) {
     case Msg::TunWintunMissing: return QT_TRANSLATE_NOOP("Messages", "wintun.dll was not found next to KettleLAN. Extract the whole KettleLAN folder from the zip file again.");
     case Msg::TunWintunFailed: return QT_TRANSLATE_NOOP("Messages", "Could not create the KettleLAN network adapter (Wintun): %1");
     case Msg::TunAddressFailed: return QT_TRANSLATE_NOOP("Messages", "Could not set the address of the KettleLAN network adapter: %1");
+    case Msg::TunWintunUntrusted: return QT_TRANSLATE_NOOP("Messages", "wintun.dll in the KettleLAN folder is not the official file signed by WireGuard LLC – it may have been replaced. Download KettleLAN again from the official Releases page.");
+    case Msg::UnsafeFolder: return QT_TRANSLATE_NOOP("Messages", "KettleLAN runs as administrator from a folder that other programs can change (%1). Move the KettleLAN folder to C:\\Program Files\\KettleLAN.");
     }
     return "";
 }

@@ -114,6 +114,10 @@ void Engine::initialize() {
         auto* net = s.net.get();
         net->setPacketHandler([tun](std::span<const uint8_t> p) { tun->write(p); });
         tun->start([net](std::span<const uint8_t> p) { net->sendPacket(p); });
+        if (const auto warning = platform::startupWarning()) {
+            KLOG_WARN(english(*warning));
+            if (onEvent_) onEvent_(*warning);
+        }
     }
     s.status = EngineStatus::Ready;
     publish();
