@@ -8,6 +8,11 @@ Before tagging a release add a `## [x.y.z] – date` section (see [docs/RELEASIN
 
 ## [Unreleased]
 
+- Docs: warn that the Windows version is not code-signed yet, download only from the official Releases page
+- Docs: add instructions for verifying a download (PowerShell, sha256sum, build attestation)
+- Docs: add an FAQ entry about antivirus and SmartScreen warnings
+- Windows: point to the official download page in README.txt inside the zip
+
 ## [0.2.0] – 2026-10-22
 
 - Windows: add a Windows 10/11 (64-bit) version – portable zip with the official signed Wintun driver

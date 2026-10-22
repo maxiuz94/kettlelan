@@ -38,6 +38,10 @@ Open-source virtual LAN over the Steam network.
 3. If Windows SmartScreen shows "Windows protected your PC", click "More info" and "Run anyway"
    (the program is not code-signed yet).
 
+Download KettleLAN only from the official page: https://github.com/maxiuz94/kettlelan/releases
+Copies from other websites may be modified. How to verify a download:
+https://github.com/maxiuz94/kettlelan/blob/main/SECURITY.md#verifying-a-download
+
 Instructions, source code and security information: https://github.com/maxiuz94/kettlelan
 Licenses of KettleLAN and the bundled components: LICENSE, THIRD-PARTY-NOTICES.md, licenses\\
 README

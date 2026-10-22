@@ -68,6 +68,39 @@ Please **do not open a public issue**. Use GitHub's private reporting instead:
   from your account. Before creating the adapter the helper is copied into a fresh private folder (`0700`),
   because root cannot access the inside of a mounted AppImage.
 
+## Unsigned Windows builds
+
+The Windows version is **not code-signed yet**. This means:
+
+- Windows SmartScreen shows "Windows protected your PC" and the UAC prompt shows "Unknown publisher".
+- Some antivirus programs may report a generic heuristic detection.
+- You cannot rely on a publisher name to know that a file is genuine – **download KettleLAN only from the
+  [Releases page](https://github.com/maxiuz94/kettlelan/releases) of this repository** and verify it as described
+  below. Any other source (mirrors, download sites, files sent by other people) may be modified.
+
+Code signing for open-source projects is planned.
+
+## Verifying a download
+
+Every file on the Releases page shows its SHA256 next to it, and `SHA256SUMS.txt` lists all of them.
+
+- **Windows** (PowerShell):
+  ```powershell
+  Get-FileHash .\KettleLAN-0.2.0-windows-x64.zip -Algorithm SHA256
+  ```
+- **Linux**:
+  ```sh
+  sha256sum -c SHA256SUMS.txt --ignore-missing
+  ```
+- **Build origin** (any system with the [GitHub CLI](https://cli.github.com)) – proves that the file was built by
+  GitHub Actions in this repository from a tagged release:
+  ```sh
+  gh attestation verify KettleLAN-0.2.0-windows-x64.zip -R maxiuz94/kettlelan
+  ```
+
+The bundled `wintun.dll` and `steam_api64.dll` keep their original digital signatures (WireGuard LLC and Valve);
+you can see them in the file's *Properties → Digital Signatures*.
+
 ## Where the release files come from
 
 - Packages are built by GitHub Actions from the public code

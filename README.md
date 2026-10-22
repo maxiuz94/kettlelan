@@ -56,7 +56,16 @@ You need **Steam** installed and signed in (on Linux the regular version from yo
 Valve; the Flatpak and Snap versions may not work).
 
 All files are built by GitHub Actions from this repository. Each release comes with SHA256 checksums and
-a build attestation – verify a file with `gh attestation verify FILE -R maxiuz94/kettlelan`.
+a build attestation – see [Verifying a download](SECURITY.md#verifying-a-download).
+
+> [!WARNING]
+> **The Windows version is not code-signed yet.** Windows SmartScreen shows "Windows protected your PC"
+> (click *More info* → *Run anyway*), and some antivirus programs may flag KettleLAN with a generic
+> heuristic label (see the [FAQ](#faq)).
+>
+> **Download KettleLAN only from the [Releases page](https://github.com/maxiuz94/kettlelan/releases) of this
+> repository.** Copies from other websites may be modified. Before running a file, check that its SHA256
+> matches the one shown next to it on the Releases page.
 
 ## Quick start
 
@@ -104,6 +113,15 @@ Details and how to report a vulnerability: [SECURITY.md](SECURITY.md).
 **Can I play with someone who is not my Steam friend?** Yes – anyone with the network code can join.
 
 **Is there a player limit?** Steam lobbies allow up to 250 members.
+
+**My antivirus or Windows SmartScreen warns about KettleLAN.** The Windows version is new and not yet
+code-signed, and it does things that heuristic scanners treat as suspicious: it asks for administrator rights,
+installs a network driver (Wintun), adds a firewall rule and a scheduled task for autostart. A single generic
+detection (for example `Trojan.Malware.300983.susgen` from MaxSecure) is a known false-positive pattern for
+new, unsigned programs. Make sure the file comes from the [Releases page](https://github.com/maxiuz94/kettlelan/releases)
+and [verify it](SECURITY.md#verifying-a-download). If a well-known antivirus flags an official release,
+please [open an issue](https://github.com/maxiuz94/kettlelan/issues) with the scan link – we report false
+positives to the vendors.
 
 **Why "Spacewar"?** It is Valve's free test App ID that every Steam account can use. A dedicated App ID
 would require publishing KettleLAN on Steam.
