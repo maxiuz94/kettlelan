@@ -9,7 +9,8 @@ namespace kettle {
 
 const char* messageTemplate(Msg id) {
     switch (id) {
-    case Msg::AlreadyInNetwork: return QT_TRANSLATE_NOOP("Messages", "Leave the current network first.");
+    case Msg::AlreadyInThisNetwork: return QT_TRANSLATE_NOOP("Messages", "You are already in the network %1.");
+    case Msg::NetworkLimit: return QT_TRANSLATE_NOOP("Messages", "You can be in at most %1 networks at the same time – leave one first.");
     case Msg::Connecting: return QT_TRANSLATE_NOOP("Messages", "Connecting to network %1…");
     case Msg::Merging: return QT_TRANSLATE_NOOP("Messages", "Joining the other people in this network…");
     case Msg::OpenFailed: return QT_TRANSLATE_NOOP("Messages", "Could not open the network (Steam error %1).");
@@ -17,11 +18,12 @@ const char* messageTemplate(Msg id) {
     case Msg::WrongLobby: return QT_TRANSLATE_NOOP("Messages", "This lobby does not belong to this KettleLAN network.");
     case Msg::Connected: return QT_TRANSLATE_NOOP("Messages", "Connected to “%1”. Your address: %2, network code: %3");
     case Msg::Left: return QT_TRANSLATE_NOOP("Messages", "You left the network.");
-    case Msg::PeerJoined: return QT_TRANSLATE_NOOP("Messages", "%1 joined – address %2");
-    case Msg::PeerLeft: return QT_TRANSLATE_NOOP("Messages", "%1 left the network.");
+    case Msg::PeerJoined: return QT_TRANSLATE_NOOP("Messages", "%1 joined “%3” – address %2");
+    case Msg::PeerLeft: return QT_TRANSLATE_NOOP("Messages", "%1 left “%2”.");
     case Msg::PeerConflict: return QT_TRANSLATE_NOOP("Messages", "%1 has the same address as someone else – traffic to them will not work.");
     case Msg::PeerBadKey: return QT_TRANSLATE_NOOP("Messages", "%1 is in the lobby but does not know the network key – ignoring.");
     case Msg::PeerBadVersion: return QT_TRANSLATE_NOOP("Messages", "%1 uses a different version of KettleLAN – please update.");
+    case Msg::OldVersionInNetwork: return QT_TRANSLATE_NOOP("Messages", "Someone in “%1” uses an older KettleLAN (0.2) – older versions cannot see this network, ask them to update.");
     case Msg::InvalidCode: return QT_TRANSLATE_NOOP("Messages", "That does not look like a network code. Codes look like KTL-XXXX-XXXX-XXXX.");
     case Msg::SteamNotRunning: return QT_TRANSLATE_NOOP("Messages", "Steam is not running. Start Steam, sign in and try again.");
     case Msg::SteamOutdated: return QT_TRANSLATE_NOOP("Messages", "Your Steam client is too old – please update Steam.");

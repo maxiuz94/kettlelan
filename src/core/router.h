@@ -48,62 +48,95 @@ struct PeerState {
     bool conflict = false;
 };
 
+using NetworkId = uint32_t; // handle given by the router, never 0
+
+struct HelloOutcome {
+    HelloResult result = HelloResult::NoNetwork;
+    NetworkId network = 0; // the network the proof belongs to (Verified/Repeated/Conflict)
+};
+
+struct SyncResult {
+    std::vector<uint64_t> left;      // people who left this network
+    std::vector<uint64_t> goneEverywhere; // …and are in none of our networks any more (close their sessions)
+};
+
 class Router {
 public:
     using Clock = std::chrono::steady_clock;
+    // Steam allows a user in at most two "invisible" lobbies at the same time.
+    static constexpr size_t kMaxNetworks = 2;
 
     explicit Router(uint64_t selfSteamId);
+
+    // Security/limit tests only: allow more networks to see how Steam itself reacts.
+    void setMaxNetworksForTests(size_t n) { maxNetworks_ = n; }
+    size_t maxNetworks() const { return maxNetworks_; }
 
     uint64_t selfId() const { return selfId_; }
     ip::Address4 selfAddress() const { return selfAddress_; }
 
-    // Network to use; the keys are derived once with netkeys::derive (slow), not here.
-    void setNetwork(const netcode::NetworkCode& code, const netkeys::Keys& keys);
-    std::optional<netcode::NetworkCode> code() const;
+    // --- networks. Keys are derived once with netkeys::derive (slow), not here.
+    // Returns nothing when the limit of networks is reached.
+    std::optional<NetworkId> addNetwork(const netcode::NetworkCode& code, const netkeys::Keys& keys);
+    // Returns the people who are in none of our networks any more.
+    std::vector<uint64_t> removeNetwork(NetworkId network);
+    std::vector<NetworkId> networks() const;
+    std::optional<netcode::NetworkCode> code(NetworkId network) const;
+    void clear(); // all networks
+
     void setProtectServices(bool on) { protect_ = on; }
     bool protectServices() const { return protect_; }
 
-    // --- lobby members (from Steam's list)
-    // Sets the current member list; returns the SteamIDs of people who disappeared from it.
-    std::vector<uint64_t> syncMembers(const std::vector<uint64_t>& members);
-    bool isMember(uint64_t steamId) const;
-    void clear();
+    // --- lobby members of one network (from Steam's list)
+    SyncResult syncMembers(NetworkId network, const std::vector<uint64_t>& members);
+    bool isMember(uint64_t steamId) const; // member of any of our networks
 
-    // --- verification
-    HelloResult onHello(uint64_t from, const protocol::HelloMessage& msg);
-    // The proof we send to `to`. Empty when we are not in a network.
-    std::optional<protocol::HelloMessage> makeHello(uint64_t to, bool ack) const;
-    // Who should get a (repeated) HELLO – unverified people, with a delay between attempts.
-    std::vector<uint64_t> dueHellos(Clock::time_point now, std::chrono::milliseconds interval, int maxAttempts);
+    // --- verification. A proof verifies a person only in the network whose key made it.
+    HelloOutcome onHello(uint64_t from, const protocol::HelloMessage& msg);
+    // The proof we send to `to` for `network`. Empty for an unknown network.
+    std::optional<protocol::HelloMessage> makeHello(NetworkId network, uint64_t to, bool ack) const;
+    // Who should get a (repeated) HELLO for which network – with a delay between attempts.
+    std::vector<std::pair<NetworkId, uint64_t>> dueHellos(Clock::time_point now, std::chrono::milliseconds interval,
+                                                          int maxAttempts);
 
-    // --- packets
+    // --- packets (across all networks: one adapter, one address)
     InboundResult onData(uint64_t from, std::span<const uint8_t> packet, filter::Result* filterResult = nullptr) const;
-    // Where to send a packet from our system (empty = do not send).
+    // Where to send a packet from our system (empty = do not send). Each person at most once.
     std::vector<uint64_t> recipients(std::span<const uint8_t> packet) const;
 
-    std::vector<PeerState> peers() const;
+    // Members of one network; `verified` means verified in that network.
+    std::vector<PeerState> peers(NetworkId network) const;
 
 private:
-    struct Peer {
-        ip::Address4 address;
+    struct Membership {
         bool verified = false;
-        bool conflict = false;
         int hellosSent = 0;
         Clock::time_point nextHello{};
     };
+    struct Network {
+        netcode::NetworkCode code;
+        netkeys::Keys keys;
+        std::map<uint64_t, Membership> members;
+    };
+    struct Peer {
+        ip::Address4 address;
+        bool conflict = false;
+    };
+
+    bool verifiedAnywhere(uint64_t id) const;  // caller holds the lock
+    bool memberAnywhere(uint64_t id) const;    // caller holds the lock
+    void forgetIfUnused(uint64_t id, std::vector<uint64_t>& goneEverywhere); // caller holds the lock
 
     const uint64_t selfId_;
     const ip::Address4 selfAddress_;
     std::atomic<bool> protect_{true};
 
     mutable std::shared_mutex mutex_;
-    std::optional<netcode::NetworkCode> code_;
-    std::optional<netkeys::Keys> keys_;
-    std::map<uint64_t, Peer> peers_;
-    std::map<uint32_t, uint64_t> routes_; // address → SteamID (verified members without conflicts only)
+    NetworkId nextId_ = 1;
+    size_t maxNetworks_ = kMaxNetworks;
+    std::map<NetworkId, Network> nets_;
+    std::map<uint64_t, Peer> peers_;      // everyone in at least one of our networks
+    std::map<uint32_t, uint64_t> routes_; // address → SteamID (verified somewhere, without conflicts)
 };
-
-// Constant-time comparison.
-bool equalConstantTime(uint64_t a, uint64_t b);
 
 } // namespace kettle::router

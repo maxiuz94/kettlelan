@@ -55,41 +55,46 @@ private:
 };
 
 void printHelp() {
-    std::cout << "\nCommands:\n"
+    std::cout << "\nCommands (up to " << steam::Network::kMaxNetworks << " networks at the same time):\n"
                  "  create [name]   create a new network and show its code\n"
                  "  join <code>     connect to a network, e.g. join KTL-7F3Q-9XM2-A4KD\n"
-                 "  list            network members, their addresses and ping\n"
-                 "  code            show the code of the current network\n"
-                 "  leave           leave the network\n"
+                 "  list            your networks, their members, addresses and ping\n"
+                 "  code            show the codes of your networks\n"
+                 "  leave [n|all]   leave network n from \"list\" (or the only one), or all of them\n"
                  "  help            show this help\n"
                  "  quit            exit KettleLAN\n";
 #ifdef KETTLELAN_SECURITY_TESTS
     std::cout << "\nSecurity test mode (simulated intruder):\n"
                  "  test-wrong-key <code>   join the network's lobby with a forged key proof\n"
-                 "  test-spoof <address>    send members a ping with a forged source address\n";
+                 "  test-spoof <address>    send members a ping with a forged source address\n"
+                 "  test-max-networks <n>   allow n networks at the same time (to see Steam's own limit)\n";
 #endif
     std::cout << "\n";
 }
 
-void printPeers(const steam::Network& net) {
-    if (net.state() == steam::State::Connecting) {
-        std::cout << "Connecting to the network, please wait…\n";
-        return;
-    }
-    if (net.state() != steam::State::Connected) {
+void printNetworks(const steam::Network& net) {
+    const auto networks = net.networks();
+    if (networks.empty()) {
         std::cout << "You are not in a network.\n";
         return;
     }
-    std::cout << "\nNetwork \"" << net.networkName() << "\"  (" << net.codeText() << ")\n";
-    for (const auto& p : net.peers()) {
-        std::string status;
-        if (p.self) status = "you";
-        else if (p.conflict) status = "address conflict";
-        else if (!p.verified) status = "connecting…";
-        else if (p.pingMs >= 0) status = std::to_string(p.pingMs) + " ms, " + (p.relayed ? "Steam relay" : "direct");
-        else status = "connected";
-        std::cout << "  " << std::left << std::setw(16) << p.address.toString() << std::setw(24)
-                  << (p.name + (p.owner ? " *" : "")) << status << "\n";
+    int n = 1;
+    for (const auto& info : networks) {
+        if (info.state != steam::State::Connected) {
+            std::cout << "\n" << n++ << ". " << info.code << " – connecting, please wait…\n";
+            continue;
+        }
+        std::cout << "\n" << n++ << ". Network \"" << info.name << "\"  (" << info.code << ")\n";
+        for (const auto& p : info.peers) {
+            std::string status;
+            if (p.self) status = "you";
+            else if (p.conflict) status = "address conflict";
+            else if (!p.verified) status = "connecting…";
+            else if (p.pingMs >= 0) status = std::to_string(p.pingMs) + " ms, " + (p.relayed ? "Steam relay" : "direct");
+            else status = "connected";
+            std::cout << "  " << std::left << std::setw(16) << p.address.toString() << std::setw(24)
+                      << (p.name + (p.owner ? " *" : "")) << status << "\n";
+        }
     }
     std::cout << "\n";
 }
@@ -126,11 +131,25 @@ void handleCommand(const std::string& rawLine, steam::Network& net) {
         const auto code = netcode::parse(rest);
         if (!code) std::cout << english({Msg::InvalidCode, {}}) << "\n";
         else net.connect(*code, "");
-    } else if (cmd == "list") printPeers(net);
+    } else if (cmd == "list") printNetworks(net);
     else if (cmd == "code") {
-        if (net.state() == steam::State::Connected) std::cout << "Network code: " << net.codeText() << "\n";
-        else std::cout << "You are not in a network.\n";
-    } else if (cmd == "leave") net.leave();
+        const auto networks = net.networks();
+        if (networks.empty()) std::cout << "You are not in a network.\n";
+        int n = 1;
+        for (const auto& info : networks)
+            std::cout << n++ << ". " << info.code << (info.name.empty() ? "" : "  \"" + info.name + "\"") << "\n";
+    } else if (cmd == "leave") {
+        const auto networks = net.networks();
+        if (networks.empty()) std::cout << "You are not in a network.\n";
+        else if (rest == "all") net.leaveAll();
+        else if (rest.empty() && networks.size() == 1) net.leave(networks.front().id);
+        else if (rest.empty()) std::cout << "You are in " << networks.size() << " networks – type \"leave 1\", \"leave 2\" or \"leave all\".\n";
+        else {
+            const int n = std::atoi(rest.c_str());
+            if (n >= 1 && n <= int(networks.size())) net.leave(networks[size_t(n - 1)].id);
+            else std::cout << "There is no network " << rest << " – see \"list\".\n";
+        }
+    }
     else if (cmd == "quit" || cmd == "exit") g_quit = true;
     else if (cmd == "help" || cmd == "?") printHelp();
 #ifdef KETTLELAN_SECURITY_TESTS
@@ -148,6 +167,16 @@ void handleCommand(const std::string& rawLine, steam::Network& net) {
         if (!fake) std::cout << "Give an address to forge, e.g. test-spoof 100.65.115.91\n";
         else std::cout << "TEST: sent a forged ping (source " << fake->toString() << ") to "
                        << net.debugSendSpoofed(*fake) << " member(s). It should be dropped.\n";
+    }
+#endif
+#ifdef KETTLELAN_SECURITY_TESTS
+    else if (cmd == "test-max-networks") {
+        const int n = std::atoi(rest.c_str());
+        if (n < 1 || n > 10) std::cout << "Give a number from 1 to 10.\n";
+        else {
+            net.setDebugMaxNetworks(size_t(n));
+            std::cout << "TEST: up to " << n << " networks allowed. Steam may refuse to join more lobbies.\n";
+        }
     }
 #endif
     else std::cout << "Unknown command \"" << cmd << "\". Type \"help\".\n";

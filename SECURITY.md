@@ -32,6 +32,9 @@ Please **do not open a public issue**. Use GitHub's private reporting instead:
   `100.64.0.0/10` range goes through `kettle0`.
 - **Verified members only.** Steam connections are accepted only from people in the network's lobby, and
   packets only from those who proved that they know the key from the code – and only with their own address.
+- **Several networks at once** (up to two): members are verified separately in each network with that network's
+  key. A member of one network cannot reach members of the other through you (nothing is forwarded), and does not
+  learn who is in your other network.
 - **Text from other people** (Steam names, network names) is cleaned of control characters and shown as plain
   text – no HTML, so it cannot be used, for example, to load an image from someone's server.
 - The file with saved networks and the log are readable by your account only (permissions `600`).

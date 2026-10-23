@@ -38,4 +38,8 @@ std::optional<HelloMessage> decode(std::span<const uint8_t> data);
 
 uint64_t computeProof(const netkeys::Keys& keys, uint64_t senderSteamId, uint64_t receiverSteamId);
 
+// Lobby tag of KettleLAN 0.2 (protocol 2). Used only to tell the user that someone in the same
+// network still runs an old version – never to join such a lobby.
+std::string legacyLobbyTag(const netcode::NetworkCode& code);
+
 } // namespace kettle::protocol

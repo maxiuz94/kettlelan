@@ -9,6 +9,8 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
+#include <memory>
+#include <deque>
 #include <map>
 #include <mutex>
 #include <optional>
@@ -43,28 +45,50 @@ struct PeerInfo {
     bool relayed = false;
 };
 
+using NetworkHandle = router::NetworkId;
+
+struct NetworkInfo {
+    NetworkHandle id = 0;
+    State state = State::Connecting;
+    std::string code;
+    std::string name;            // decrypted network name ("" while connecting)
+    std::vector<PeerInfo> peers; // we are first
+};
+
+enum class ConnectResult { Started, AlreadyConnected, LimitReached };
+
+// All KettleLAN networks of this computer: one virtual adapter, one address, up to
+// router::Router::kMaxNetworks Steam lobbies at the same time. Steam messages (packets and
+// HELLO) are shared by all networks, so they are handled here, in one place.
 class Network {
 public:
     using EventHandler = std::function<void(const Message&)>;
     using PacketHandler = std::function<void(std::span<const uint8_t>)>;
+    static constexpr size_t kMaxNetworks = router::Router::kMaxNetworks;
 
     Network(uint64_t selfSteamId, EventHandler onEvent);
     ~Network();
 
     // --- Steam thread ---
-    void create(const std::string& name);  // new network with a new code
+    ConnectResult create(const std::string& name, NetworkHandle* handle = nullptr); // new network with a new code
     // Connects to the network with this code: joins the people already in it, or opens it if
     // nobody is there. `nameHint` – name used when we are the ones opening the network.
-    void connect(const netcode::NetworkCode& code, const std::string& nameHint);
-    void leave();
-    void poll();   // receive messages – call as often as possible
-    void tick();   // periodic work – every ~0.5 s
+    ConnectResult connect(const netcode::NetworkCode& code, const std::string& nameHint, NetworkHandle* handle = nullptr);
+    void leave(NetworkHandle network);
+    void leaveAll();
+    void poll(); // receive messages – call as often as possible
+    void tick(); // periodic work – every ~0.5 s
 
-    State state() const { return state_; }
+    std::vector<NetworkInfo> networks() const;
+    size_t networkCount() const { return lobbies_.size(); }
+    ip::Address4 selfAddress() const { return selfAddress_; }
+
+    // The first network – for the single-network user interface.
+    State state() const;
     std::string codeText() const;
     std::string networkName() const;
     std::vector<PeerInfo> peers() const;
-    ip::Address4 selfAddress() const { return selfAddress_; }
+    void leave() { leaveAll(); }
 
     // Privacy and security (Steam thread).
     // hideAddress: Steam relay only – network members never learn our IP address.
@@ -77,6 +101,8 @@ public:
     // Security tests only: sends every member a ping with a forged source address.
     // Returns the number of people it was sent to.
     int debugSendSpoofed(ip::Address4 fakeSource);
+    // Limit tests only: raise the network limit to see whether Steam allows more lobbies.
+    void setDebugMaxNetworks(size_t n) { router_.setMaxNetworksForTests(n); }
 #endif
     uint64_t blockedPackets() const { return blockedPackets_; }
 
@@ -85,48 +111,47 @@ public:
     void sendPacket(std::span<const uint8_t> packet);
 
 private:
+    class Lobby;
+    friend class Lobby;
+
     STEAM_CALLBACK(Network, onLobbyChatUpdate, LobbyChatUpdate_t);
     STEAM_CALLBACK(Network, onSessionRequest, SteamNetworkingMessagesSessionRequest_t);
     STEAM_CALLBACK(Network, onSessionFailed, SteamNetworkingMessagesSessionFailed_t);
 
-    void startSearch(bool merge);
+    // Steam has one set of lobby search filters, so searches run one after another.
+    using SearchDone = std::function<void(const std::vector<uint64_t>& lobbies)>;
+    void searchLobbies(const Lobby* owner, const std::string& tag, SearchDone done);
+    void runNextSearch();
     void onLobbyList(LobbyMatchList_t* result, bool ioFailure);
-    void onLobbyCreated(LobbyCreated_t* result, bool ioFailure);
-    void onLobbyEntered(LobbyEnter_t* result, bool ioFailure);
-    void enterLobby(CSteamID id);
-    void leaveLobbyOnly();
     CCallResult<Network, LobbyMatchList_t> listCall_;
-    CCallResult<Network, LobbyCreated_t> createCall_;
-    CCallResult<Network, LobbyEnter_t> enterCall_;
+    struct Search {
+        const Lobby* owner;
+        std::string tag;
+        SearchDone done;
+    };
+    std::deque<Search> searches_;
+    bool searching_ = false;
 
-    void enterConnected();
-    void syncMembers();
-    bool isLobbyMember(uint64_t steamId) const;
-    void sendHello(uint64_t to, bool ack);
+    Lobby* lobbyFor(NetworkHandle network) const;
+    bool inAnyLobby(uint64_t steamId) const;
+    void removeLobby(Lobby* lobby);
+    void closeSessions(const std::vector<uint64_t>& people);
+    void sendHello(NetworkHandle network, uint64_t to, bool ack);
     void handleControl(uint64_t from, std::span<const uint8_t> data);
     void handleData(uint64_t from, std::span<const uint8_t> data);
     void sendTo(uint64_t steamId, std::span<const uint8_t> data, int channel);
-    void closeAllSessions();
-    void resetState();
+    std::vector<PeerInfo> peersOf(const Lobby& lobby) const;
     void notify(Msg id, std::vector<std::string> args = {});
 
     const uint64_t selfId_;
     const ip::Address4 selfAddress_;
     EventHandler onEvent_;
 
-    std::atomic<State> state_{State::Idle};
-    CSteamID lobby_;
-    std::optional<netcode::NetworkCode> code_;
-    std::optional<netkeys::Keys> keys_; // derived once per connect (Argon2id)
-    std::string tag_;
-    std::string nameHint_;
-    bool searchPending_ = false;
-    bool mergeSearch_ = false;
-    int joinRetries_ = 0;
-    std::chrono::steady_clock::time_point nextMergeCheck_{};
+    std::vector<std::unique_ptr<Lobby>> lobbies_; // in the order they were joined
+    std::vector<std::unique_ptr<Lobby>> retired_; // left lobbies, kept until their Steam calls finish
 
-    router::Router router_;                    // who is verified and which packets we accept
-    std::set<uint64_t> reportedBad_;           // whom we already reported (no log flooding)
+    router::Router router_;          // who is verified and which packets we accept
+    std::set<uint64_t> reportedBad_; // whom we already reported (no log flooding)
 #ifdef KETTLELAN_SECURITY_TESTS
     bool debugWrongKey_ = false;
 #endif

@@ -12,7 +12,8 @@ namespace kettle {
 
 enum class Msg {
     // network
-    AlreadyInNetwork,
+    AlreadyInThisNetwork, // %1 = network code
+    NetworkLimit,      // %1 = maximum number of networks
     Connecting,        // %1 = network code
     Merging,
     OpenFailed,        // %1 = Steam error code
@@ -20,12 +21,13 @@ enum class Msg {
     WrongLobby,
     Connected,         // %1 = network name, %2 = our address, %3 = network code
     Left,
-    PeerJoined,        // %1 = name, %2 = address
-    PeerLeft,          // %1 = name
+    PeerJoined,        // %1 = name, %2 = address, %3 = network name
+    PeerLeft,          // %1 = name, %2 = network name
     PeerConflict,      // %1 = name
     PeerBadKey,        // %1 = name
     PeerBadVersion,    // %1 = name
     InvalidCode,
+    OldVersionInNetwork, // %1 = network name
     // Steam
     SteamNotRunning,
     SteamOutdated,
@@ -53,7 +55,7 @@ enum class Msg {
 };
 
 struct Message {
-    Msg id = Msg::AlreadyInNetwork;
+    Msg id = Msg::Left;
     std::vector<std::string> args;
 };
 
