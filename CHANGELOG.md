@@ -25,6 +25,8 @@ Before tagging a release add a `## [x.y.z] – date` section (see [docs/RELEASIN
 - GUI: add your own note to a network, shown under its name only on your computer
 - GUI: network details (name, note, code, forget) from the list or with the pencil on the network screen
 - GUI: at most 20 saved networks
+- Network: keep Steam sessions with members open (ping always shown, faster first game packet)
+- GUI: list members with you first, then by ping, then the ones still connecting
 - CLI: "join <code> [name]", "rename <n> <name>"
 - GUI: show a section for each connected network in the system tray menu
 

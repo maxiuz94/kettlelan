@@ -16,6 +16,9 @@ namespace {
 constexpr int kMaxMembers = 250;
 constexpr auto kHelloInterval = std::chrono::seconds(2);
 constexpr int kHelloAttempts = 15; // about 30 s of attempts
+// Keepalive: Steam closes idle sessions, and then no ping is known and the first game packet waits
+// for a new session. A HELLO_ACK every 10 s keeps the session open (receivers treat it as a repeat).
+constexpr auto kKeepaliveInterval = std::chrono::seconds(10);
 constexpr int kDataFlags = k_nSteamNetworkingSend_UnreliableNoNagle | k_nSteamNetworkingSend_AutoRestartBrokenSession;
 constexpr int kControlFlags = k_nSteamNetworkingSend_Reliable | k_nSteamNetworkingSend_AutoRestartBrokenSession;
 
@@ -590,6 +593,13 @@ void Network::tick() {
     for (const auto& l : lobbies_) current.push_back(l.get());
     for (Lobby* l : current) l->tick(now);
     for (const auto& [network, id] : router_.dueHellos(now, kHelloInterval, kHelloAttempts)) sendHello(network, id, false);
+    if (now >= nextKeepalive_) {
+        nextKeepalive_ = now + kKeepaliveInterval;
+        std::set<uint64_t> sent; // once per person, even when they are in several of our networks
+        for (const auto network : router_.networks())
+            for (const auto& peer : router_.peers(network))
+                if (peer.verified && !peer.conflict && sent.insert(peer.steamId).second) sendHello(network, peer.steamId, true);
+    }
     // forget left lobbies once Steam had time to deliver their pending results
     if (retired_.size() > 8) retired_.erase(retired_.begin(), retired_.begin() + long(retired_.size() - 8));
 }
@@ -677,6 +687,12 @@ std::vector<PeerInfo> Network::peersOf(const Lobby& lobby) const {
         }
         out.push_back(p);
     }
+    std::stable_sort(out.begin() + 1, out.end(), [](const PeerInfo& a, const PeerInfo& b) {
+        auto rank = [](const PeerInfo& p) { return p.conflict ? 3 : !p.verified ? 2 : p.pingMs < 0 ? 1 : 0; };
+        if (rank(a) != rank(b)) return rank(a) < rank(b);
+        if (a.verified && b.verified && a.pingMs >= 0 && b.pingMs >= 0 && a.pingMs != b.pingMs) return a.pingMs < b.pingMs;
+        return a.name < b.name;
+    });
     return out;
 }
 

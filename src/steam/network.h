@@ -157,6 +157,7 @@ private:
 
     router::Router router_;          // who is verified and which packets we accept
     std::set<uint64_t> reportedBad_; // whom we already reported (no log flooding)
+    std::chrono::steady_clock::time_point nextKeepalive_{};
 #ifdef KETTLELAN_SECURITY_TESTS
     bool debugWrongKey_ = false;
 #endif
