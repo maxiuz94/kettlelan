@@ -137,6 +137,7 @@ if(KETTLELAN_BUILD_APP)
             src/gui/qml/IconButton.qml
             src/gui/qml/InfoCard.qml
             src/gui/qml/Toggle.qml
+            src/gui/qml/NetworkDialog.qml
             src/gui/qml/Toast.qml
             src/gui/qml/StatusPage.qml
             src/gui/qml/StartPage.qml

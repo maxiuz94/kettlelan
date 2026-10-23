@@ -1,5 +1,6 @@
 #include "network.h"
 #include <algorithm>
+#include <map>
 #include "filter.h"
 #include "log.h"
 #include "protocol.h"
@@ -28,7 +29,10 @@ constexpr const char* kMarkerValue = "3"; // lobby format of KettleLAN 0.3
 constexpr const char* kKeyTag = "tag";
 constexpr const char* kKeyName = "name";
 constexpr const char* kKeyProto = "proto";
-constexpr const char* kDefaultName = "KettleLAN network";
+// KettleLAN 0.2 and early 0.3 builds wrote this when a network was opened without a name. It is
+// treated as "name not known", so a member who knows the real name can put it back.
+constexpr const char* kLegacyDefaultName = "KettleLAN network";
+constexpr auto kNameRepairInterval = std::chrono::seconds(5);
 
 SteamNetworkingIdentity identityFor(uint64_t steamId) {
     SteamNetworkingIdentity id;
@@ -54,7 +58,9 @@ std::string nameOf(uint64_t steamId) {
 class Network::Lobby {
 public:
     Lobby(Network& hub, NetworkHandle id, const netcode::NetworkCode& code, netkeys::Keys keys, std::string nameHint)
-        : hub_(hub), id_(id), code_(code), keys_(std::move(keys)), nameHint_(std::move(nameHint)) {}
+        : hub_(hub), id_(id), code_(code), keys_(std::move(keys)), knownName_(text::sanitize(nameHint, 60)) {
+        if (knownName_ == kLegacyDefaultName) knownName_.clear();
+    }
 
     NetworkHandle id() const { return id_; }
     State state() const { return state_; }
@@ -80,6 +86,11 @@ public:
             oldVersionChecked_ = true;
             checkOldVersion();
         }
+        if (now >= nextNameRepair_) {
+            nextNameRepair_ = now + kNameRepairInterval;
+            adoptLobbyName();
+            repairName();
+        }
     }
 
     bool isMember(uint64_t steamId) const {
@@ -98,12 +109,28 @@ public:
         applyMembers(current);
     }
 
+    // The network's shared name: the one in the lobby data, else the one most members know (member
+    // data), else empty ("not known yet"). Encrypted, and still text from other people.
     std::string name() const {
-        if (!lobby_.IsValid()) return {};
-        // the name is set by whoever opened the network – encrypted, and still text from other people
-        const auto name = netkeys::openName(keys_, SteamMatchmaking()->GetLobbyData(lobby_, kKeyName));
-        const std::string clean = name ? text::sanitize(*name, 60) : std::string();
-        return clean.empty() ? std::string(kDefaultName) : clean;
+        if (!lobby_.IsValid()) return knownName_;
+        const std::string fromLobby = lobbyName();
+        if (!fromLobby.empty()) return fromLobby;
+        const std::string fromMembers = membersName();
+        return fromMembers.empty() ? knownName_ : fromMembers;
+    }
+
+    bool isOwner() const {
+        return lobby_.IsValid() && SteamMatchmaking()->GetLobbyOwner(lobby_).ConvertToUint64() == hub_.selfId_;
+    }
+
+    // Renames the network for everyone – only whoever opened the lobby (its owner) can.
+    bool rename(const std::string& newName) {
+        const std::string clean = text::sanitize(newName, 60);
+        if (state_ != State::Connected || !isOwner() || clean.empty()) return false;
+        knownName_ = clean;
+        SteamMatchmaking()->SetLobbyData(lobby_, kKeyName, netkeys::sealName(keys_, clean).c_str());
+        publishKnownName();
+        return true;
     }
 
 private:
@@ -166,10 +193,10 @@ private:
         lobby_ = CSteamID(uint64(r->m_ulSteamIDLobby));
         SteamMatchmaking()->SetLobbyData(lobby_, kKeyMarker, kMarkerValue);
         SteamMatchmaking()->SetLobbyData(lobby_, kKeyTag, keys_.tag.c_str());
-        const std::string name = text::sanitize(nameHint_, 60);
-        // encrypted: only people who know the code can read the network's name
-        SteamMatchmaking()->SetLobbyData(lobby_, kKeyName,
-                                         netkeys::sealName(keys_, name.empty() ? std::string(kDefaultName) : name).c_str());
+        // encrypted: only people who know the code can read the network's name. Without a known name
+        // the lobby stays unnamed until a member who knows it arrives (see repairName).
+        if (!knownName_.empty())
+            SteamMatchmaking()->SetLobbyData(lobby_, kKeyName, netkeys::sealName(keys_, knownName_).c_str());
         SteamMatchmaking()->SetLobbyData(lobby_, kKeyProto, std::to_string(protocol::kVersion).c_str());
         // The creator is in the lobby right away – Steam does not send a separate join result.
         connected();
@@ -204,12 +231,60 @@ private:
 
     void connected() {
         SteamMatchmaking()->SetLobbyMemberData(lobby_, "ip", hub_.selfAddress_.toString().c_str());
+        adoptLobbyName();
+        publishKnownName();
         state_ = State::Connected;
         const auto now = Clock::now();
         nextMergeCheck_ = now + kFirstMergeCheck;
         oldVersionCheckAt_ = now + kOldVersionCheck;
         syncMembers();
-        hub_.notify(Msg::Connected, {name(), hub_.selfAddress_.toString(), netcode::format(code_)});
+        hub_.notify(Msg::Connected, {hub_.displayName(*this), hub_.selfAddress_.toString(), netcode::format(code_)});
+    }
+
+    std::string lobbyName() const {
+        const auto name = netkeys::openName(keys_, SteamMatchmaking()->GetLobbyData(lobby_, kKeyName));
+        const std::string clean = name ? text::sanitize(*name, 60) : std::string();
+        return clean == kLegacyDefaultName ? std::string() : clean;
+    }
+
+    // The name most members announce in their member data (ties: the first one seen).
+    std::string membersName() const {
+        std::map<std::string, int> votes;
+        std::string best;
+        const int n = SteamMatchmaking()->GetNumLobbyMembers(lobby_);
+        for (int i = 0; i < n; ++i) {
+            const CSteamID member = SteamMatchmaking()->GetLobbyMemberByIndex(lobby_, i);
+            const auto name = netkeys::openName(keys_, SteamMatchmaking()->GetLobbyMemberData(lobby_, member, kKeyName));
+            const std::string clean = name ? text::sanitize(*name, 60) : std::string();
+            if (clean.empty() || clean == kLegacyDefaultName) continue;
+            if (++votes[clean] > (best.empty() ? 0 : votes[best])) best = clean;
+        }
+        return best;
+    }
+
+    // The lobby's name wins: remember it (and announce it) when it differs from ours.
+    void adoptLobbyName() {
+        const std::string fromLobby = lobbyName();
+        if (!fromLobby.empty() && fromLobby != knownName_) {
+            knownName_ = fromLobby;
+            publishKnownName();
+        }
+    }
+
+    // Our known name in our member data, so the lobby owner can repair an unnamed lobby.
+    void publishKnownName() {
+        if (!lobby_.IsValid() || knownName_.empty()) return;
+        SteamMatchmaking()->SetLobbyMemberData(lobby_, kKeyName, netkeys::sealName(keys_, knownName_).c_str());
+    }
+
+    // The owner of an unnamed lobby takes the name its members know.
+    void repairName() {
+        if (!isOwner() || !lobbyName().empty()) return;
+        const std::string fromMembers = membersName();
+        const std::string name = !knownName_.empty() ? knownName_ : fromMembers;
+        if (name.empty()) return;
+        knownName_ = name;
+        SteamMatchmaking()->SetLobbyData(lobby_, kKeyName, netkeys::sealName(keys_, name).c_str());
     }
 
     // KettleLAN 0.2 used another tag for the same code: if such a lobby exists, someone is in it
@@ -231,7 +306,7 @@ private:
     const NetworkHandle id_;
     const netcode::NetworkCode code_;
     const netkeys::Keys keys_; // derived once per connect (Argon2id)
-    const std::string nameHint_;
+    std::string knownName_; // the shared name as far as we know it ("" = not known)
 
     State state_ = State::Connecting;
     bool alive_ = true;
@@ -241,6 +316,7 @@ private:
     bool oldVersionChecked_ = false;
     Clock::time_point nextMergeCheck_{};
     Clock::time_point oldVersionCheckAt_{};
+    Clock::time_point nextNameRepair_{};
     CCallResult<Lobby, LobbyCreated_t> createCall_;
     CCallResult<Lobby, LobbyEnter_t> enterCall_;
 };
@@ -260,7 +336,7 @@ void Network::notify(Msg id, std::vector<std::string> args) {
 }
 
 ConnectResult Network::create(const std::string& name, NetworkHandle* handle) {
-    return connect(netcode::generate(), name.empty() ? (std::string(SteamFriends()->GetPersonaName()) + "'s network") : name,
+    return connect(netcode::generate(), name.empty() ? (text::sanitize(SteamFriends()->GetPersonaName(), 32) + "'s network") : name,
                    handle);
 }
 
@@ -611,15 +687,24 @@ std::vector<NetworkInfo> Network::networks() const {
         info.id = l->id();
         info.state = l->state();
         info.code = netcode::format(l->code());
-        if (l->state() == State::Connected) info.name = l->name();
+        if (l->state() == State::Connected) {
+            info.name = l->name();
+            info.owner = l->isOwner();
+        }
         info.peers = peersOf(*l);
         out.push_back(std::move(info));
     }
     return out;
 }
 
+bool Network::rename(NetworkHandle network, const std::string& name) {
+    Lobby* lobby = lobbyFor(network);
+    return lobby && lobby->rename(name);
+}
+
 std::string Network::displayName(const Lobby& lobby) const {
     const std::string name = lobby.name();
+    if (name.empty()) return netcode::format(lobby.code());
     for (const auto& other : lobbies_)
         if (other.get() != &lobby && other->state() == State::Connected && other->name() == name)
             return name + " (" + netcode::format(lobby.code()) + ")";

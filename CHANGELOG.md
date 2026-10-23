@@ -20,7 +20,12 @@ Before tagging a release add a `## [x.y.z] – date` section (see [docs/RELEASIN
 - GUI: open a connected network to see its members, go back to the list with the arrow
 - GUI: join a network with a code in a dialog
 - GUI: rejoin all networks that were connected when KettleLAN was closed
-- GUI: keep your own names for saved networks, at most 20 saved networks
+- Network: the same network name for everyone with the same code, kept by every member and restored when an unnamed lobby is reopened
+- Network: only whoever opened the network (★) can rename it for everyone
+- GUI: add your own note to a network, shown under its name only on your computer
+- GUI: network details (name, note, code, forget) from the list or with the pencil on the network screen
+- GUI: at most 20 saved networks
+- CLI: "join <code> [name]", "rename <n> <name>"
 - GUI: show a section for each connected network in the system tray menu
 
 ## [0.2.1] – 2026-10-22

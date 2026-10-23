@@ -35,6 +35,9 @@ Please **do not open a public issue**. Use GitHub's private reporting instead:
 - **Several networks at once** (up to five): members are verified separately in each network with that network's
   key. A member of one network cannot reach members of the other through you (nothing is forwarded), and does not
   learn who is in your other network.
+- **The network name** is shared by everyone with the code. Any member who opens the network first publishes the
+  name they know, and only the person who opened it (★) can rename it; it is encrypted like the rest of the
+  lobby data. Your own note for a network never leaves your computer.
 - **Text from other people** (Steam names, network names) is cleaned of control characters and shown as plain
   text – no HTML, so it cannot be used, for example, to load an image from someone's server.
 - The file with saved networks and the log are readable by your account only (permissions `600`).

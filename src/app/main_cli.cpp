@@ -57,7 +57,9 @@ private:
 void printHelp() {
     std::cout << "\nCommands (up to " << steam::Network::kMaxNetworks << " networks at the same time):\n"
                  "  create [name]   create a new network and show its code\n"
-                 "  join <code>     connect to a network, e.g. join KTL-7F3Q-9XM2-A4KD\n"
+                 "  join <code> [name]  connect to a network, e.g. join KTL-7F3Q-9XM2-A4KD\n"
+                 "                  (the name is used only if you open the network and nobody knows it yet)\n"
+                 "  rename <n> <name>  rename network n for everyone (only if you opened it, marked *)\n"
                  "  list            your networks, their members, addresses and ping\n"
                  "  code            show the codes of your networks\n"
                  "  leave [n|all]   leave network n from \"list\" (or the only one), or all of them\n"
@@ -84,7 +86,8 @@ void printNetworks(const steam::Network& net) {
             std::cout << "\n" << n++ << ". " << info.code << " – connecting, please wait…\n";
             continue;
         }
-        std::cout << "\n" << n++ << ". Network \"" << info.name << "\"  (" << info.code << ")\n";
+        std::cout << "\n" << n++ << ". Network " << (info.name.empty() ? std::string("(name not known yet)") : "\"" + info.name + "\"")
+                  << "  (" << info.code << ")\n";
         for (const auto& p : info.peers) {
             std::string status;
             if (p.self) status = "you";
@@ -128,9 +131,16 @@ void handleCommand(const std::string& rawLine, steam::Network& net) {
     if (cmd.empty()) return;
     if (cmd == "create") net.create(rest);
     else if (cmd == "join") {
-        const auto code = netcode::parse(rest);
+        // "join <code> [name]"
+        std::istringstream args(rest);
+        std::string codeText;
+        args >> codeText;
+        std::string name;
+        std::getline(args, name);
+        if (!name.empty() && name.front() == ' ') name.erase(0, 1);
+        const auto code = netcode::parse(codeText);
         if (!code) std::cout << english({Msg::InvalidCode, {}}) << "\n";
-        else net.connect(*code, "");
+        else net.connect(*code, name);
     } else if (cmd == "list") printNetworks(net);
     else if (cmd == "code") {
         const auto networks = net.networks();
@@ -138,6 +148,17 @@ void handleCommand(const std::string& rawLine, steam::Network& net) {
         int n = 1;
         for (const auto& info : networks)
             std::cout << n++ << ". " << info.code << (info.name.empty() ? "" : "  \"" + info.name + "\"") << "\n";
+    } else if (cmd == "rename") {
+        std::istringstream args(rest);
+        int n = 0;
+        args >> n;
+        std::string name;
+        std::getline(args, name);
+        if (!name.empty() && name.front() == ' ') name.erase(0, 1);
+        const auto networks = net.networks();
+        if (n < 1 || n > int(networks.size()) || name.empty()) std::cout << "Usage: rename <n> <name> – see \"list\".\n";
+        else if (net.rename(networks[size_t(n - 1)].id, name)) std::cout << "Renamed for everyone.\n";
+        else std::cout << "Only the person who opened the network (marked *) can rename it.\n";
     } else if (cmd == "leave") {
         const auto networks = net.networks();
         if (networks.empty()) std::cout << "You are not in a network.\n";

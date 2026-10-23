@@ -51,7 +51,8 @@ struct NetworkInfo {
     NetworkHandle id = 0;
     State state = State::Connecting;
     std::string code;
-    std::string name;            // decrypted network name ("" while connecting)
+    std::string name;            // the shared network name ("" while connecting or while not known yet)
+    bool owner = false;          // we opened the lobby (only the owner can rename the network)
     std::vector<PeerInfo> peers; // we are first
 };
 
@@ -76,6 +77,8 @@ public:
     ConnectResult connect(const netcode::NetworkCode& code, const std::string& nameHint, NetworkHandle* handle = nullptr);
     void leave(NetworkHandle network);
     void leaveAll();
+    // Renames a network for everyone; only the lobby owner can. False when we are not the owner.
+    bool rename(NetworkHandle network, const std::string& name);
     void poll(); // receive messages – call as often as possible
     void tick(); // periodic work – every ~0.5 s
 

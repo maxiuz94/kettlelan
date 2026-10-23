@@ -26,12 +26,27 @@ Item {
             ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 2
-                Text { textFormat: Text.PlainText; text: Backend.networkName; color: Theme.text; font.pixelSize: 17; font.weight: Font.Bold; elide: Text.ElideRight; Layout.fillWidth: true }
+                Text {
+                    textFormat: Text.PlainText
+                    text: Backend.networkName !== "" ? Backend.networkName : qsTr("Unnamed network")
+                    color: Backend.networkName !== "" ? Theme.text : Theme.muted
+                    font.italic: Backend.networkName === ""
+                    font.pixelSize: 17
+                    font.weight: Font.Bold
+                    elide: Text.ElideRight
+                    Layout.fillWidth: true
+                }
+                Text { textFormat: Text.PlainText; visible: Backend.networkAlias !== ""; text: Backend.networkAlias; color: Theme.accentText; font.pixelSize: 12; elide: Text.ElideRight; Layout.fillWidth: true }
                 RowLayout {
                     spacing: 6
                     Rectangle { width: 8; height: 8; radius: 4; color: Theme.ok }
                     Text { textFormat: Text.PlainText; text: (Backend.memberCount === 1 ? qsTr("Connected · 1 member") : qsTr("Connected · %1 members").arg(Backend.memberCount)); color: Theme.muted; font.pixelSize: 13 }
                 }
+            }
+            IconButton {
+                iconName: "edit"
+                label: qsTr("Network details")
+                onClicked: details.openFor(Backend.networkCode, Backend.networkName, Backend.networkAlias, true, Backend.networkOwner)
             }
             IconButton { iconName: "settings"; label: qsTr("Settings"); onClicked: page.openSettings() }
         }
@@ -180,4 +195,9 @@ Item {
             }
         }
     }
+
+    NetworkDialog { id: details }
+    // demo mode screenshot of the dialog
+    Component.onCompleted: if (Backend.demoPage === "details")
+        Qt.callLater(() => details.openFor(Backend.networkCode, Backend.networkName, "my Quake friends", true, Backend.networkOwner))
 }

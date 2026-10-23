@@ -101,8 +101,8 @@ Item {
                         readonly property bool connecting: modelData.state === "connecting"
                         readonly property bool on: modelData.state !== "off"
                         width: networkList.width
-                        implicitHeight: 62
-                        color: openArea.containsMouse && row.connected ? Theme.surface2 : "transparent"
+                        implicitHeight: Math.max(62, texts.implicitHeight + 20)
+                        color: openArea.containsMouse ? Theme.surface2 : "transparent"
 
                         RowLayout {
                             anchors.fill: parent
@@ -122,9 +122,28 @@ Item {
                                 }
                             }
                             ColumnLayout {
+                                id: texts
                                 Layout.fillWidth: true
-                                spacing: 3
-                                Text { textFormat: Text.PlainText; text: row.modelData.name; color: Theme.text; font.pixelSize: 15; font.weight: Font.DemiBold; elide: Text.ElideRight; Layout.fillWidth: true }
+                                spacing: 2
+                                Text {
+                                    textFormat: Text.PlainText
+                                    Layout.fillWidth: true
+                                    elide: Text.ElideRight
+                                    text: row.modelData.name !== "" ? row.modelData.name : qsTr("Unnamed network")
+                                    color: row.modelData.name !== "" ? Theme.text : Theme.muted
+                                    font.pixelSize: 15
+                                    font.weight: Font.DemiBold
+                                    font.italic: row.modelData.name === ""
+                                }
+                                Text {
+                                    visible: row.modelData.alias !== ""
+                                    textFormat: Text.PlainText
+                                    Layout.fillWidth: true
+                                    elide: Text.ElideRight
+                                    text: row.modelData.alias
+                                    color: Theme.accentText
+                                    font.pixelSize: 12
+                                }
                                 Text {
                                     textFormat: Text.PlainText
                                     Layout.fillWidth: true
@@ -137,14 +156,7 @@ Item {
                                         : row.modelData.code
                                 }
                             }
-                            Text { textFormat: Text.PlainText; text: "›"; color: Theme.muted; font.pixelSize: 22; visible: row.connected }
-                            IconButton {
-                                visible: !row.on
-                                iconName: "trash"
-                                iconSize: 18
-                                label: qsTr("Forget %1").arg(row.modelData.name)
-                                onClicked: Backend.forgetNetwork(row.modelData.code)
-                            }
+                            Text { textFormat: Text.PlainText; text: "›"; color: Theme.muted; font.pixelSize: 22 }
                             Switch {
                                 id: sw
                                 checked: row.on
@@ -177,8 +189,7 @@ Item {
                                 contentItem: Item {}
                             }
                         }
-                        // the whole row except the switch opens a connected network
-                        // (a network that is off has no "›" and keeps its trash button clickable)
+                        // the whole row except the switch: a connected network opens, any other shows its details
                         MouseArea {
                             id: openArea
                             anchors.left: parent.left
@@ -186,9 +197,11 @@ Item {
                             anchors.bottom: parent.bottom
                             width: parent.width - 56
                             hoverEnabled: true
-                            enabled: row.connected
-                            cursorShape: row.connected ? Qt.PointingHandCursor : Qt.ArrowCursor
-                            onClicked: Backend.openNetwork(row.modelData.code)
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (row.connected) Backend.openNetwork(row.modelData.code)
+                                else details.openFor(row.modelData.code, row.modelData.name, row.modelData.alias, false, false)
+                            }
                         }
                         Rectangle {
                             visible: row.index < networkList.count - 1
@@ -360,4 +373,6 @@ Item {
             }
         }
     }
+
+    NetworkDialog { id: details }
 }

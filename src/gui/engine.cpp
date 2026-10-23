@@ -66,6 +66,18 @@ void Engine::leave(const std::string& text) {
     });
 }
 
+void Engine::rename(const std::string& text, const std::string& name) {
+    post([this, text, name] {
+        if (!st_->net) return;
+        const auto code = netcode::parse(text);
+        if (!code) return;
+        const std::string wanted = netcode::format(*code);
+        for (const auto& info : st_->net->networks())
+            if (info.code == wanted) st_->net->rename(info.id, name);
+        st_->dirty = true;
+    });
+}
+
 void Engine::leaveAll() {
     post([this] {
         if (st_->net) st_->net->leaveAll();
