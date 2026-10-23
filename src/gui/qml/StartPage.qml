@@ -177,13 +177,14 @@ Item {
                                 contentItem: Item {}
                             }
                         }
-                        // the name area opens a connected network (switch and trash keep their own clicks)
+                        // the whole row except the switch opens a connected network
+                        // (a network that is off has no "›" and keeps its trash button clickable)
                         MouseArea {
                             id: openArea
                             anchors.left: parent.left
                             anchors.top: parent.top
                             anchors.bottom: parent.bottom
-                            width: parent.width - 110
+                            width: parent.width - 56
                             hoverEnabled: true
                             enabled: row.connected
                             cursorShape: row.connected ? Qt.PointingHandCursor : Qt.ArrowCursor
