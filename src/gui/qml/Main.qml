@@ -45,12 +45,12 @@ ApplicationWindow {
     }
     StartPage {
         anchors.fill: parent
-        visible: !win.settingsOpen && Backend.status === "ready" && Backend.netState !== "connected"
+        visible: !win.settingsOpen && Backend.status === "ready" && !Backend.networkOpen
         onOpenSettings: win.settingsOpen = true
     }
     NetworkPage {
         anchors.fill: parent
-        visible: !win.settingsOpen && Backend.status === "ready" && Backend.netState === "connected"
+        visible: !win.settingsOpen && Backend.status === "ready" && Backend.networkOpen
         onOpenSettings: win.settingsOpen = true
     }
     SettingsPage {

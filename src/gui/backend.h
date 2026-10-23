@@ -3,12 +3,15 @@
 
 #include <QObject>
 #include <QPointer>
+#include <QSet>
+#include <QStringList>
 #include <QString>
 #include <QVariantList>
 #include <QWindow>
 #include <memory>
 
 #include "engine.h"
+#include "network.h"
 
 class QSystemTrayIcon;
 class QMenu;
@@ -28,6 +31,12 @@ class Backend : public QObject {
     Q_PROPERTY(QVariantList peers READ peers NOTIFY changed)
     Q_PROPERTY(int memberCount READ memberCount NOTIFY changed)
     Q_PROPERTY(QVariantList savedNetworks READ savedNetworks NOTIFY savedChanged)
+    // home screen: saved networks with their current state (connected first)
+    Q_PROPERTY(QVariantList networks READ networks NOTIFY changed)
+    Q_PROPERTY(int connectedCount READ connectedCount NOTIFY changed)
+    Q_PROPERTY(int maxNetworks READ maxNetworks CONSTANT)
+    // the network shown on the network screen (networkName, networkCode, peers… describe it)
+    Q_PROPERTY(bool networkOpen READ networkOpen NOTIFY changed)
     // settings
     Q_PROPERTY(bool closeToTray READ closeToTray WRITE setCloseToTray NOTIFY settingsChanged)
     Q_PROPERTY(bool notifications READ notifications WRITE setNotifications NOTIFY settingsChanged)
@@ -60,6 +69,10 @@ public:
     QString networkCode() const { return networkCode_; }
     QVariantList peers() const { return peers_; }
     int memberCount() const { return memberCount_; }
+    QVariantList networks() const { return networks_; }
+    int connectedCount() const { return int(live_.size()); }
+    int maxNetworks() const { return int(steam::Network::kMaxNetworks); }
+    bool networkOpen() const { return networkOpen_; }
     QVariantList savedNetworks() const { return saved_; }
 
     bool closeToTray() const { return closeToTray_; }
@@ -88,7 +101,10 @@ public:
     Q_INVOKABLE void createNetwork(const QString& name);
     Q_INVOKABLE bool isCodeValid(const QString& code) const;
     Q_INVOKABLE void joinNetwork(const QString& code);
-    Q_INVOKABLE void leaveNetwork();
+    Q_INVOKABLE void leaveNetwork(); // the open network
+    Q_INVOKABLE void openNetwork(const QString& code);
+    Q_INVOKABLE void closeNetwork();
+    Q_INVOKABLE void setNetworkEnabled(const QString& code, bool on);
     Q_INVOKABLE void connectSaved(const QString& code);
     Q_INVOKABLE void forgetNetwork(const QString& code);
     Q_INVOKABLE void copyText(const QString& text, const QString& message);
@@ -136,8 +152,26 @@ private:
     int memberCount_ = 0;
 
     QVariantList saved_;
-    QString lastSavedSignature_;
+    struct LiveNetwork {
+        QString code;
+        QString lobbyName;
+        bool connected = false;
+        QVariantList peers;
+        int members = 0;
+    };
+    std::vector<LiveNetwork> live_;  // from the engine: connecting and connected networks
+    QVariantList networks_;          // home screen model
+    QString openCode_;
+    bool networkOpen_ = false;
+    QString pendingOpen_;            // open this network once it is connected
+    QSet<QString> rememberedNow_;    // saved/updated in this session (once per connect)
     bool autoConnectDone_ = false;
+    void disconnectNetwork(const QString& code);
+    void rebuildNetworks();
+    void showOpenNetwork();
+    QStringList activeNetworks() const;
+    void setActive(const QString& code, bool active);
+    const LiveNetwork* liveFor(const QString& code) const;
 
     bool closeToTray_ = true;
     bool autoConnect_ = true;

@@ -5,11 +5,10 @@ import QtQuick.Layouts
 import KettleLAN
 import KettleLAN.Core
 
-// Start screen: create a network or join with a code.
+// Home screen: your address, your networks (switch them on and off), create or join a network.
 Item {
     id: page
     signal openSettings()
-    readonly property bool busy: Backend.netState === "connecting"
 
     ColumnLayout {
         anchors.fill: parent
@@ -34,32 +33,21 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             Layout.margins: Theme.pad
-            spacing: 18
+            spacing: 14
 
-            Rectangle {
+            InfoCard {
                 Layout.fillWidth: true
-                implicitHeight: steamRow.implicitHeight + 24
-                radius: Theme.radius
-                color: Theme.surface
-                border.color: Theme.border
-                RowLayout {
-                    id: steamRow
-                    anchors.fill: parent
-                    anchors.margins: 12
-                    anchors.leftMargin: 14
-                    spacing: 12
-                    Rectangle { width: 10; height: 10; radius: 5; color: Theme.ok }
-                    ColumnLayout {
-                        spacing: 2
-                        Text { textFormat: Text.PlainText; text: qsTr("Connected to Steam"); color: Theme.text; font.pixelSize: 14; font.weight: Font.DemiBold }
-                        Text { textFormat: Text.PlainText; text: qsTr("Signed in as %1").arg(Backend.personaName); color: Theme.muted; font.pixelSize: 13 }
-                    }
-                }
+                label: qsTr("Your address · the same in every network")
+                value: Backend.selfAddress
+                onCopyRequested: Backend.copyText(Backend.selfAddress, qsTr("Your address was copied"))
             }
 
+            // first start: what KettleLAN is for
             ColumnLayout {
                 Layout.fillWidth: true
+                Layout.topMargin: 8
                 spacing: 6
+                visible: Backend.networks.length === 0
                 Text { textFormat: Text.PlainText;
                     Layout.fillWidth: true
                     text: qsTr("Play with friends like on a LAN")
@@ -78,139 +66,175 @@ Item {
                 }
             }
 
-            AppButton {
-                Layout.fillWidth: true
-                implicitHeight: 52
-                kind: "primary"
-                iconName: "plus"
-                text: qsTr("Create network")
-                enabled: !page.busy
-                onClicked: createDialog.open()
-            }
-
-            ColumnLayout {
-                Layout.fillWidth: true
-                spacing: 8
-                Text { textFormat: Text.PlainText; text: qsTr("Network code"); color: Theme.muted; font.pixelSize: 13; font.weight: Font.DemiBold }
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-                    TextField {
-                        id: codeField
-                        Layout.fillWidth: true
-                        implicitHeight: 48
-                        placeholderText: qsTr("e.g. KTL-50AA-1SZ3-XRK3")
-                        placeholderTextColor: Theme.muted
-                        color: Theme.text
-                        font.family: Theme.mono
-                        font.pixelSize: 15
-                        selectByMouse: true
-                        enabled: !page.busy
-                        leftPadding: 14
-                        Accessible.name: qsTr("Network code")
-                        background: Rectangle {
-                            radius: Theme.radius
-                            color: Theme.surface
-                            border.width: codeField.activeFocus ? 2 : 1
-                            border.color: codeField.activeFocus ? Theme.accent : Theme.border
-                        }
-                        onAccepted: if (joinButton.enabled) joinButton.clicked()
-                    }
-                    AppButton {
-                        id: joinButton
-                        kind: "secondary"
-                        text: qsTr("Join")
-                        enabled: !page.busy && Backend.isCodeValid(codeField.text)
-                        onClicked: Backend.joinNetwork(codeField.text)
-                    }
-                }
-                Text { textFormat: Text.PlainText;
-                    Layout.fillWidth: true
-                    text: qsTr("You get the code from whoever created the network. It never changes – save it once.")
-                    color: Theme.muted
-                    font.pixelSize: 12
-                    wrapMode: Text.WordWrap
-                }
-            }
-
-            // --- connecting
+            // --- your networks
             RowLayout {
                 Layout.fillWidth: true
-                visible: page.busy
-                spacing: 10
-                BusyIndicator { implicitWidth: 28; implicitHeight: 28; running: page.busy }
-                Text { textFormat: Text.PlainText; text: qsTr("Connecting to the network…"); color: Theme.text; font.pixelSize: 14; Layout.fillWidth: true }
+                Layout.topMargin: 4
+                visible: Backend.networks.length > 0
+                Text { textFormat: Text.PlainText; text: qsTr("Your networks"); color: Theme.text; font.pixelSize: 14; font.weight: Font.Bold; Layout.fillWidth: true }
+                Text { textFormat: Text.PlainText; text: qsTr("%1 of %2 connected").arg(Backend.connectedCount).arg(Backend.maxNetworks); color: Theme.muted; font.pixelSize: 12 }
             }
 
-            // --- saved networks
-            ColumnLayout {
+            Rectangle {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                spacing: 8
-                visible: Backend.savedNetworks.length > 0 && !page.busy
-                Text { textFormat: Text.PlainText; text: qsTr("Your networks"); color: Theme.muted; font.pixelSize: 13; font.weight: Font.DemiBold }
-                Rectangle {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    Layout.maximumHeight: savedList.contentHeight + 2
-                    radius: Theme.radius
-                    color: Theme.surface
-                    border.color: Theme.border
-                    clip: true
-                    ListView {
-                        id: savedList
-                        anchors.fill: parent
-                        anchors.margins: 1
-                        model: Backend.savedNetworks
-                        boundsBehavior: Flickable.StopAtBounds
-                        ScrollBar.vertical: ScrollBar {}
-                        delegate: Rectangle {
-                            id: savedRow
-                            required property var modelData
-                            required property int index
-                            width: savedList.width
-                            implicitHeight: 60
-                            color: "transparent"
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 14
-                                anchors.rightMargin: 8
-                                spacing: 8
-                                ColumnLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 3
-                                    Text { textFormat: Text.PlainText; text: savedRow.modelData.name; color: Theme.text; font.pixelSize: 14; font.weight: Font.DemiBold; elide: Text.ElideRight; Layout.fillWidth: true }
-                                    Text { textFormat: Text.PlainText; text: savedRow.modelData.code; color: Theme.muted; font.family: Theme.mono; font.pixelSize: 12 }
-                                }
-                                AppButton {
-                                    kind: "secondary"
-                                    implicitHeight: 40
-                                    leftPadding: 14
-                                    rightPadding: 14
-                                    font.pixelSize: 14
-                                    text: qsTr("Connect")
-                                    onClicked: Backend.connectSaved(savedRow.modelData.code)
-                                }
-                                IconButton {
-                                    iconName: "trash"
-                                    iconSize: 18
-                                    label: qsTr("Forget network")
-                                    onClicked: Backend.forgetNetwork(savedRow.modelData.code)
-                                }
-                            }
+                // as tall as its rows; scrolls only when they do not fit
+                Layout.preferredHeight: networkList.contentHeight + 2
+                Layout.maximumHeight: networkList.contentHeight + 2
+                visible: Backend.networks.length > 0
+                radius: Theme.radius
+                color: Theme.surface
+                border.color: Theme.border
+                clip: true
+                ListView {
+                    id: networkList
+                    anchors.fill: parent
+                    anchors.margins: 1
+                    model: Backend.networks
+                    boundsBehavior: Flickable.StopAtBounds
+                    ScrollBar.vertical: ScrollBar {}
+                    delegate: Rectangle {
+                        id: row
+                        required property var modelData
+                        required property int index
+                        readonly property bool connected: modelData.state === "connected"
+                        readonly property bool connecting: modelData.state === "connecting"
+                        readonly property bool on: modelData.state !== "off"
+                        width: networkList.width
+                        implicitHeight: 62
+                        color: openArea.containsMouse && row.connected ? Theme.surface2 : "transparent"
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 14
+                            anchors.rightMargin: 8
+                            spacing: 10
                             Rectangle {
-                                visible: savedRow.index < savedList.count - 1
-                                anchors.bottom: parent.bottom
-                                width: parent.width
-                                height: 1
-                                color: Theme.border
+                                width: 10
+                                height: 10
+                                radius: 5
+                                color: row.connected ? Theme.ok : (row.connecting ? Theme.accent : Theme.border)
+                                SequentialAnimation on opacity {
+                                    running: row.connecting
+                                    loops: Animation.Infinite
+                                    NumberAnimation { to: 0.3; duration: 500 }
+                                    NumberAnimation { to: 1; duration: 500 }
+                                }
                             }
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 3
+                                Text { textFormat: Text.PlainText; text: row.modelData.name; color: Theme.text; font.pixelSize: 15; font.weight: Font.DemiBold; elide: Text.ElideRight; Layout.fillWidth: true }
+                                Text {
+                                    textFormat: Text.PlainText
+                                    Layout.fillWidth: true
+                                    elide: Text.ElideRight
+                                    color: Theme.muted
+                                    font.pixelSize: 12
+                                    font.family: row.on ? Qt.application.font.family : Theme.mono
+                                    text: row.connected ? (row.modelData.members === 1 ? qsTr("Connected · 1 member") : qsTr("Connected · %1 members").arg(row.modelData.members))
+                                        : row.connecting ? qsTr("Connecting…")
+                                        : row.modelData.code
+                                }
+                            }
+                            Text { textFormat: Text.PlainText; text: "›"; color: Theme.muted; font.pixelSize: 22; visible: row.connected }
+                            IconButton {
+                                visible: !row.on
+                                iconName: "trash"
+                                iconSize: 18
+                                label: qsTr("Forget %1").arg(row.modelData.name)
+                                onClicked: Backend.forgetNetwork(row.modelData.code)
+                            }
+                            Switch {
+                                id: sw
+                                checked: row.on
+                                enabled: row.on || Backend.connectedCount < Backend.maxNetworks
+                                opacity: enabled ? 1 : 0.4
+                                Accessible.name: row.on ? qsTr("Disconnect from %1").arg(row.modelData.name) : qsTr("Connect to %1").arg(row.modelData.name)
+                                onToggled: Backend.setNetworkEnabled(row.modelData.code, checked)
+                                padding: 0
+                                implicitWidth: 44
+                                implicitHeight: 44
+                                indicator: Rectangle {
+                                    x: 0
+                                    y: (sw.height - height) / 2
+                                    implicitWidth: 42
+                                    implicitHeight: 24
+                                    radius: 12
+                                    color: sw.checked ? Theme.accent : Theme.surface2
+                                    border.color: sw.checked ? Theme.accent : (sw.visualFocus ? Theme.accent : Theme.border)
+                                    border.width: sw.visualFocus ? 2 : 1
+                                    Rectangle {
+                                        x: sw.checked ? parent.width - width - 4 : 4
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: 16
+                                        height: 16
+                                        radius: 8
+                                        color: sw.checked ? Theme.accentInk : Theme.muted
+                                        Behavior on x { NumberAnimation { duration: 120 } }
+                                    }
+                                }
+                                contentItem: Item {}
+                            }
+                        }
+                        // the name area opens a connected network (switch and trash keep their own clicks)
+                        MouseArea {
+                            id: openArea
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            anchors.bottom: parent.bottom
+                            width: parent.width - 110
+                            hoverEnabled: true
+                            enabled: row.connected
+                            cursorShape: row.connected ? Qt.PointingHandCursor : Qt.ArrowCursor
+                            onClicked: Backend.openNetwork(row.modelData.code)
+                        }
+                        Rectangle {
+                            visible: row.index < networkList.count - 1
+                            anchors.bottom: parent.bottom
+                            width: parent.width
+                            height: 1
+                            color: Theme.border
                         }
                     }
                 }
             }
 
-            Item { Layout.fillHeight: true; visible: Backend.savedNetworks.length === 0 || page.busy }
+            Text {
+                textFormat: Text.PlainText
+                Layout.fillWidth: true
+                visible: Backend.networks.length > 0
+                wrapMode: Text.WordWrap
+                color: Theme.muted
+                font.pixelSize: 12
+                text: Backend.connectedCount >= Backend.maxNetworks
+                      ? qsTr("You are connected to %1 networks – the most at the same time. Turn one off to connect to another.").arg(Backend.maxNetworks)
+                      : qsTr("You can be connected to up to %1 networks at the same time.").arg(Backend.maxNetworks)
+            }
+
+            Item { Layout.fillHeight: true; Layout.preferredHeight: 0 }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 10
+                AppButton {
+                    Layout.fillWidth: true
+                    implicitHeight: 50
+                    kind: "primary"
+                    iconName: "plus"
+                    text: qsTr("Create network")
+                    enabled: Backend.connectedCount < Backend.maxNetworks
+                    onClicked: createDialog.open()
+                }
+                AppButton {
+                    Layout.fillWidth: true
+                    implicitHeight: 50
+                    kind: "secondary"
+                    text: qsTr("Join with a code")
+                    enabled: Backend.connectedCount < Backend.maxNetworks
+                    onClicked: joinDialog.open()
+                }
+            }
         }
 
         // --- footer
@@ -278,6 +302,59 @@ Item {
                     kind: "primary"
                     text: qsTr("Create")
                     onClicked: { Backend.createNetwork(nameField.text); createDialog.close() }
+                }
+            }
+        }
+    }
+
+    // --- join with a code
+    Popup {
+        id: joinDialog
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: Math.min(page.width - 40, 380)
+        modal: true
+        focus: true
+        padding: 20
+        onOpened: { codeField.text = ""; codeField.forceActiveFocus() }
+        background: Rectangle { radius: Theme.radius + 4; color: Theme.surface; border.color: Theme.border }
+        Overlay.modal: Rectangle { color: Theme.dark ? "#99000000" : "#55000000" }
+
+        contentItem: ColumnLayout {
+            spacing: 14
+            Text { textFormat: Text.PlainText; text: qsTr("Join a network"); color: Theme.text; font.pixelSize: 18; font.weight: Font.Bold }
+            Text { textFormat: Text.PlainText; text: qsTr("You get the code from whoever created the network. It never changes – save it once."); color: Theme.muted; font.pixelSize: 13; Layout.fillWidth: true; wrapMode: Text.WordWrap }
+            TextField {
+                id: codeField
+                Layout.fillWidth: true
+                implicitHeight: 46
+                placeholderText: qsTr("e.g. KTL-50AA-1SZ3-XRK3")
+                placeholderTextColor: Theme.muted
+                color: Theme.text
+                font.family: Theme.mono
+                font.pixelSize: 15
+                selectByMouse: true
+                leftPadding: 14
+                Accessible.name: qsTr("Network code")
+                background: Rectangle {
+                    radius: Theme.radius
+                    color: Theme.bg
+                    border.width: codeField.activeFocus ? 2 : 1
+                    border.color: codeField.activeFocus ? Theme.accent : Theme.border
+                }
+                onAccepted: if (joinButton.enabled) joinButton.clicked()
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 10
+                Item { Layout.fillWidth: true }
+                AppButton { kind: "secondary"; text: qsTr("Cancel"); onClicked: joinDialog.close() }
+                AppButton {
+                    id: joinButton
+                    kind: "primary"
+                    text: qsTr("Join")
+                    enabled: Backend.isCodeValid(codeField.text)
+                    onClicked: { Backend.joinNetwork(codeField.text); joinDialog.close() }
                 }
             }
         }

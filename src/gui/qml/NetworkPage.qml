@@ -17,11 +17,12 @@ Item {
         // --- header
         RowLayout {
             Layout.fillWidth: true
-            Layout.leftMargin: Theme.pad
+            Layout.leftMargin: 6
             Layout.rightMargin: 10
             Layout.topMargin: 10
             Layout.bottomMargin: 10
-            spacing: 10
+            spacing: 6
+            IconButton { iconName: "back"; label: qsTr("Back to your networks"); onClicked: Backend.closeNetwork() }
             ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 2
@@ -173,7 +174,7 @@ Item {
                 AppButton {
                     kind: "secondary"
                     iconName: "leave"
-                    text: qsTr("Leave")
+                    text: qsTr("Disconnect")
                     onClicked: Backend.leaveNetwork()
                 }
             }

@@ -45,13 +45,6 @@ void Engine::retry() {
     });
 }
 
-void Engine::create(const std::string& name) {
-    post([this, name] {
-        if (st_->net) st_->net->create(name);
-        st_->dirty = true;
-    });
-}
-
 void Engine::join(const std::string& text, const std::string& nameHint) {
     post([this, text, nameHint] {
         if (!st_->net) return;
@@ -61,9 +54,21 @@ void Engine::join(const std::string& text, const std::string& nameHint) {
     });
 }
 
-void Engine::leave() {
+void Engine::leave(const std::string& text) {
+    post([this, text] {
+        if (!st_->net) return;
+        const auto code = netcode::parse(text);
+        if (!code) return;
+        const std::string wanted = netcode::format(*code);
+        for (const auto& info : st_->net->networks())
+            if (info.code == wanted) st_->net->leave(info.id);
+        st_->dirty = true;
+    });
+}
+
+void Engine::leaveAll() {
     post([this] {
-        if (st_->net) st_->net->leave();
+        if (st_->net) st_->net->leaveAll();
         st_->dirty = true;
     });
 }
@@ -128,13 +133,8 @@ void Engine::publish() {
     if (s.session.initialized()) snap.personaName = s.session.personaName();
     if (s.net) {
         snap.selfAddress = s.net->selfAddress().toString();
-        snap.netState = s.net->state();
         snap.blockedPackets = s.net->blockedPackets();
-        if (snap.netState == steam::State::Connected) {
-            snap.networkName = s.net->networkName();
-            snap.networkCode = s.net->codeText();
-            snap.peers = s.net->peers();
-        }
+        snap.networks = s.net->networks();
     }
     s.dirty = false;
     if (onSnapshot_) onSnapshot_(snap);
@@ -177,7 +177,7 @@ void Engine::shutdown() {
     std::atomic<bool> done{false};
     post([this, &done] {
         auto& s = *st_;
-        if (s.net) s.net->leave();
+        if (s.net) s.net->leaveAll();
         if (s.session.initialized()) s.session.runCallbacks();
         if (s.tun) {
             s.tun->stop();

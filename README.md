@@ -34,6 +34,7 @@ networking (directly or via Valve's relays), so it works behind any router and e
   It works no matter who created it: the first person to connect opens it, everyone else joins.
 - **No player limit**, no port forwarding, no account other than Steam.
 - **A stable address** (`100.x.x.x`) for every player – click a person to copy their address for the game.
+- **Up to five networks at the same time**, with one address – switch each one on and off on the home screen.
 - **Saved networks**, automatic reconnect and start with the system – like Hamachi.
 - **Private by default** – your IP address is hidden from other players and your computer's services
   (SSH, file sharing, remote desktop, databases…) are blocked for them.
@@ -73,11 +74,12 @@ a build attestation – see [Verifying a download](SECURITY.md#verifying-a-downl
 2. Start KettleLAN. The first time (and after every reboot) your system asks for the administrator
    password – this creates the virtual network adapter `kettle0`. KettleLAN itself runs as a normal user.
 3. Click **Create network**, then **Invite friends** – the code is copied to the clipboard. Send it to your friends.
-4. Your friends paste the code into **Network code** and click **Join**.
+4. Your friends click **Join with a code**, paste the code and click **Join**.
 5. Start a game server as you would on a LAN. Your friends connect to your address shown in KettleLAN
    (click a person on the list to copy their address).
 
-The network is saved under **Your networks** – next time just click **Connect**.
+The network is saved under **Your networks** – next time just switch it on. You can be in up to five networks
+at the same time.
 
 ## How it works
 

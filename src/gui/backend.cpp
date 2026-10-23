@@ -37,15 +37,6 @@ QString statusName(EngineStatus s) {
     return QStringLiteral("starting");
 }
 
-QString netStateName(steam::State s) {
-    switch (s) {
-    case steam::State::Idle: return QStringLiteral("idle");
-    case steam::State::Connecting: return QStringLiteral("connecting");
-    case steam::State::Connected: return QStringLiteral("connected");
-    }
-    return QStringLiteral("idle");
-}
-
 QString normalizeCode(const QString& code) {
     const auto c = netcode::parse(code.toStdString());
     return c ? QString::fromStdString(netcode::format(*c)) : QString();
@@ -156,38 +147,105 @@ void Backend::applySnapshot(const Snapshot& snap) {
     errorText_ = hasError ? messageText(snap.error) : QString();
     personaName_ = QString::fromStdString(snap.personaName);
     selfAddress_ = QString::fromStdString(snap.selfAddress);
-    netState_ = netStateName(snap.netState);
-    networkName_ = QString::fromStdString(snap.networkName);
-    networkCode_ = QString::fromStdString(snap.networkCode);
     blockedPackets_ = snap.blockedPackets;
 
-    peers_.clear();
-    memberCount_ = 0;
-    for (const auto& p : snap.peers) {
-        peers_.append(peerToMap(QString::fromStdString(p.name), QString::fromStdString(p.address.toString()),
-                                p.self, p.owner, p.verified, p.conflict, p.pingMs, p.relayed));
-        if (p.self || p.verified) ++memberCount_;
+    live_.clear();
+    for (const auto& info : snap.networks) {
+        LiveNetwork n;
+        n.code = QString::fromStdString(info.code);
+        n.lobbyName = QString::fromStdString(info.name);
+        n.connected = info.state == steam::State::Connected;
+        for (const auto& p : info.peers) {
+            n.peers.append(peerToMap(QString::fromStdString(p.name), QString::fromStdString(p.address.toString()),
+                                     p.self, p.owner, p.verified, p.conflict, p.pingMs, p.relayed));
+            if (p.self || p.verified) ++n.members;
+        }
+        // A new network is saved under the lobby's name; a saved one keeps the user's own name.
+        if (n.connected && !rememberedNow_.contains(n.code)) {
+            rememberedNow_.insert(n.code);
+            const QString saved = savedName(n.code);
+            rememberNetwork(n.code, saved.isEmpty() ? n.lobbyName : saved);
+        }
+        if (n.connected && n.code == pendingOpen_) {
+            pendingOpen_.clear();
+            openCode_ = n.code;
+            networkOpen_ = true;
+        }
+        live_.push_back(std::move(n));
     }
+    for (auto it = rememberedNow_.begin(); it != rememberedNow_.end();) {
+        if (!liveFor(*it)) it = rememberedNow_.erase(it); // next connect updates "last used" again
+        else ++it;
+    }
+    showOpenNetwork();
+    rebuildNetworks();
     emit changed();
 
-    if (netState_ == QLatin1String("connected") && !networkCode_.isEmpty()) {
-        const QString sig = networkCode_ + networkName_;
-        if (sig != lastSavedSignature_) {
-            lastSavedSignature_ = sig;
-            rememberNetwork(networkCode_, networkName_);
-            QSettings().setValue(QStringLiteral("lastNetwork"), networkCode_);
-        }
-    } else {
-        lastSavedSignature_.clear();
-    }
-
-    // Rejoin the last network automatically – once, right after connecting to Steam.
+    // Rejoin the networks that were connected last time – once, right after connecting to Steam.
     if (status_ == QLatin1String("ready") && !autoConnectDone_) {
         autoConnectDone_ = true;
-        const QString last = QSettings().value(QStringLiteral("lastNetwork")).toString();
-        if (autoConnect_ && !last.isEmpty() && netState_ == QLatin1String("idle")) connectSaved(last);
+        if (autoConnect_ && live_.empty()) {
+            QStringList active = activeNetworks();
+            const QString last = QSettings().value(QStringLiteral("lastNetwork")).toString(); // KettleLAN 0.2
+            if (active.isEmpty() && !last.isEmpty()) {
+                active = {last};
+                setActive(last, true);
+            }
+            QSettings().remove(QStringLiteral("lastNetwork"));
+            for (int i = 0; i < active.size() && i < maxNetworks(); ++i)
+                if (engine_) engine_->join(active[i].toStdString(), savedName(active[i]).toStdString());
+        }
     }
     rebuildTrayMenu();
+}
+
+const Backend::LiveNetwork* Backend::liveFor(const QString& code) const {
+    for (const auto& n : live_)
+        if (n.code == code) return &n;
+    return nullptr;
+}
+
+// Fills the properties of the network screen from the open network.
+void Backend::showOpenNetwork() {
+    const LiveNetwork* n = networkOpen_ ? liveFor(openCode_) : nullptr;
+    if (networkOpen_ && (!n || !n->connected)) networkOpen_ = false; // left or lost – back to the home screen
+    if (n && n->connected) {
+        netState_ = QStringLiteral("connected");
+        networkCode_ = n->code;
+        const QString saved = savedName(n->code);
+        networkName_ = saved.isEmpty() ? n->lobbyName : saved;
+        peers_ = n->peers;
+        memberCount_ = n->members;
+    } else {
+        netState_ = QStringLiteral("idle");
+        networkCode_.clear();
+        networkName_.clear();
+        peers_.clear();
+        memberCount_ = 0;
+    }
+}
+
+// Home screen: connected and connecting networks first (in joining order), then the other saved ones.
+void Backend::rebuildNetworks() {
+    networks_.clear();
+    auto entry = [](const QString& code, const QString& name, const QString& state, int members) {
+        QVariantMap m;
+        m[QStringLiteral("code")] = code;
+        m[QStringLiteral("name")] = name;
+        m[QStringLiteral("state")] = state;
+        m[QStringLiteral("members")] = members;
+        return QVariant(m);
+    };
+    for (const auto& n : live_) {
+        const QString saved = savedName(n.code);
+        networks_.append(entry(n.code, saved.isEmpty() ? (n.lobbyName.isEmpty() ? n.code : n.lobbyName) : saved,
+                               n.connected ? QStringLiteral("connected") : QStringLiteral("connecting"), n.members));
+    }
+    for (const auto& v : saved_) {
+        const auto m = v.toMap();
+        const QString code = m.value(QStringLiteral("code")).toString();
+        if (!liveFor(code)) networks_.append(entry(code, m.value(QStringLiteral("name")).toString(), QStringLiteral("off"), 0));
+    }
 }
 
 QString Backend::messageText(const Message& message) const {
@@ -221,13 +279,9 @@ QString Backend::defaultNetworkName() const {
 
 void Backend::createNetwork(const QString& name) {
     const QString n = name.trimmed().isEmpty() ? defaultNetworkName() : name.trimmed().left(60);
-    if (demo_) {
-        networkName_ = n;
-        netState_ = QStringLiteral("connected");
-        emit changed();
-        return;
-    }
-    if (engine_) engine_->create(n.toStdString());
+    const QString code = QString::fromStdString(netcode::format(netcode::generate()));
+    rememberNetwork(code, n); // on the list right away, with the name the user chose
+    joinNetwork(code);
 }
 
 bool Backend::isCodeValid(const QString& code) const { return netcode::parse(code.toStdString()).has_value(); }
@@ -238,20 +292,83 @@ void Backend::joinNetwork(const QString& code) {
         return;
     }
     const QString normalized = normalizeCode(code);
+    if (liveFor(normalized)) { // already in it – just show it
+        openNetwork(normalized);
+        return;
+    }
+    if (int(live_.size()) >= maxNetworks()) {
+        emit toast(messageText({Msg::NetworkLimit, {std::to_string(maxNetworks())}}));
+        return;
+    }
+    setActive(normalized, true);
+    pendingOpen_ = normalized;
+    if (demo_) return;
     if (engine_) engine_->join(normalized.toStdString(), savedName(normalized).toStdString());
 }
 
 void Backend::connectSaved(const QString& code) { joinNetwork(code); }
 
+void Backend::openNetwork(const QString& code) {
+    const LiveNetwork* n = liveFor(normalizeCode(code));
+    if (!n || !n->connected) return;
+    openCode_ = n->code;
+    networkOpen_ = true;
+    showOpenNetwork();
+    emit changed();
+}
+
+void Backend::closeNetwork() {
+    networkOpen_ = false;
+    showOpenNetwork();
+    emit changed();
+}
+
+void Backend::setNetworkEnabled(const QString& code, bool on) {
+    if (on) {
+        joinNetwork(code);
+        pendingOpen_.clear(); // switching on from the list keeps the list on screen
+    } else {
+        disconnectNetwork(normalizeCode(code));
+    }
+}
+
+// Leaving on purpose: do not rejoin this network automatically on the next start.
+void Backend::disconnectNetwork(const QString& code) {
+    setActive(code, false);
+    if (pendingOpen_ == code) pendingOpen_.clear();
+    if (demo_) {
+        live_.erase(std::remove_if(live_.begin(), live_.end(), [&](const LiveNetwork& n) { return n.code == code; }), live_.end());
+        showOpenNetwork();
+        rebuildNetworks();
+        emit changed();
+        return;
+    }
+    if (engine_) engine_->leave(code.toStdString());
+}
+
+QStringList Backend::activeNetworks() const {
+    return QSettings().value(QStringLiteral("activeNetworks")).toStringList();
+}
+
+void Backend::setActive(const QString& code, bool active) {
+    if (demo_) return;
+    QStringList list = activeNetworks();
+    list.removeAll(code);
+    if (active) list.append(code);
+    QSettings().setValue(QStringLiteral("activeNetworks"), list);
+}
+
 void Backend::forgetNetwork(const QString& code) {
     const QString c = normalizeCode(code);
+    if (liveFor(c)) disconnectNetwork(c);
+    setActive(c, false);
     for (int i = 0; i < saved_.size(); ++i) {
         if (saved_[i].toMap().value(QStringLiteral("code")).toString() == c) {
             const QString name = saved_[i].toMap().value(QStringLiteral("name")).toString();
             saved_.removeAt(i);
             storeSaved();
-            if (QSettings().value(QStringLiteral("lastNetwork")).toString() == c)
-                QSettings().remove(QStringLiteral("lastNetwork"));
+            rebuildNetworks();
+            emit changed();
             emit toast(tr("Removed “%1” from your networks").arg(name));
             return;
         }
@@ -259,14 +376,10 @@ void Backend::forgetNetwork(const QString& code) {
 }
 
 void Backend::leaveNetwork() {
-    // Leaving on purpose: do not rejoin this network automatically on the next start.
-    QSettings().remove(QStringLiteral("lastNetwork"));
-    if (demo_) {
-        netState_ = QStringLiteral("idle");
-        emit changed();
-        return;
-    }
-    if (engine_) engine_->leave();
+    if (!openCode_.isEmpty()) disconnectNetwork(openCode_);
+    networkOpen_ = false;
+    showOpenNetwork();
+    emit changed();
 }
 
 void Backend::copyText(const QString& text, const QString& message) {
@@ -358,6 +471,12 @@ void Backend::rememberNetwork(const QString& code, const QString& name) {
             break;
         }
     saved_.prepend(entry);
+    // at most kMaxSaved saved networks: forget the least recently used one that is not in use
+    constexpr int kMaxSaved = 20;
+    for (int i = int(saved_.size()) - 1; saved_.size() > kMaxSaved && i > 0; --i) {
+        const QString c = saved_[i].toMap().value(QStringLiteral("code")).toString();
+        if (!liveFor(c) && !activeNetworks().contains(c)) saved_.removeAt(i);
+    }
     storeSaved();
 }
 
@@ -457,56 +576,76 @@ void Backend::setupTray() {
 
 void Backend::rebuildTrayMenu() {
     if (!tray_) return;
-    const bool connected = netState_ == QLatin1String("connected");
+    bool anyConnected = false;
+    for (const auto& n : live_) anyConnected = anyConnected || n.connected;
 
-    // Rebuild the menu only when the members change (ping changes every second).
-    QString sig = netState_ + networkName_ + networkCode_ + QString::number(saved_.size());
-    for (const auto& v : peers_) {
-        const auto m = v.toMap();
-        sig += m.value(QStringLiteral("name")).toString() + m.value(QStringLiteral("address")).toString() +
-               (m.value(QStringLiteral("verified")).toBool() ? QStringLiteral("1") : QStringLiteral("0"));
+    // Rebuild the menu only when networks or members change (ping changes every second).
+    QString sig = status_ + QString::number(saved_.size());
+    for (const auto& n : live_) {
+        sig += n.code + savedName(n.code) + (n.connected ? QStringLiteral("c") : QStringLiteral("w"));
+        for (const auto& v : n.peers) {
+            const auto m = v.toMap();
+            sig += m.value(QStringLiteral("address")).toString() + (m.value(QStringLiteral("verified")).toBool() ? QStringLiteral("1") : QStringLiteral("0"));
+        }
     }
     if (sig == trayMenuSignature_) return;
     trayMenuSignature_ = sig;
 
-    tray_->setIcon(makeAppIcon(connected));
-    tray_->setToolTip(connected ? QStringLiteral("KettleLAN – %1 (%2)").arg(networkName_, selfAddress_)
-                                : QStringLiteral("KettleLAN"));
+    tray_->setIcon(makeAppIcon(anyConnected));
+    tray_->setToolTip(anyConnected ? QStringLiteral("KettleLAN – %1").arg(selfAddress_) : QStringLiteral("KettleLAN"));
 
     trayMenu_->clear();
-    if (connected) {
-        auto* title = trayMenu_->addAction(menuText(QStringLiteral("%1 · %2").arg(networkName_, selfAddress_)));
-        title->setEnabled(false);
-        trayMenu_->addSeparator();
+    for (const auto& n : live_) {
+        const QString name = savedName(n.code).isEmpty() ? n.lobbyName : savedName(n.code);
+        if (!n.connected) {
+            trayMenu_->addAction(menuText(tr("%1 – connecting…").arg(name.isEmpty() ? n.code : name)))->setEnabled(false);
+            trayMenu_->addSeparator();
+            continue;
+        }
+        trayMenu_->addAction(menuText(name))->setEnabled(false);
         bool anyone = false;
-        for (const auto& v : peers_) {
+        int shown = 0;
+        for (const auto& v : n.peers) {
             const auto m = v.toMap();
             if (m.value(QStringLiteral("self")).toBool() || !m.value(QStringLiteral("verified")).toBool()) continue;
             anyone = true;
-            const QString name = m.value(QStringLiteral("name")).toString();
+            if (++shown > 8) continue; // the rest is in the window
+            const QString person = m.value(QStringLiteral("name")).toString();
             const QString addr = m.value(QStringLiteral("address")).toString();
-            trayMenu_->addAction(menuText(tr("Copy IP: %1  (%2)").arg(name, addr)), this, [this, name, addr] {
-                copyText(addr, tr("Copied address %1 (%2)").arg(addr, name));
+            trayMenu_->addAction(menuText(tr("Copy IP: %1  (%2)").arg(person, addr)), this, [this, person, addr] {
+                copyText(addr, tr("Copied address %1 (%2)").arg(addr, person));
             });
         }
         if (!anyone) trayMenu_->addAction(tr("Nobody has joined yet"))->setEnabled(false);
-        trayMenu_->addSeparator();
-        trayMenu_->addAction(tr("Copy network code"), this, [this] {
-            copyText(networkCode_, tr("Network code copied – send it to your friends"));
+        else if (shown > 8) trayMenu_->addAction(tr("%1 more – show all in the window").arg(shown - 8), this, [this, code = n.code] {
+            showWindow();
+            openNetwork(code);
         });
-        trayMenu_->addAction(tr("Leave network"), this, [this] { leaveNetwork(); });
-    } else if (netState_ == QLatin1String("idle") && status_ == QLatin1String("ready") && !saved_.isEmpty()) {
-        trayMenu_->addAction(tr("Your networks"))->setEnabled(false);
+        const QString code = n.code;
+        trayMenu_->addAction(tr("Copy network code"), this, [this, code] {
+            copyText(code, tr("Network code copied – send it to your friends"));
+        });
+        trayMenu_->addAction(menuText(tr("Disconnect from %1").arg(name)), this, [this, code] { disconnectNetwork(code); });
+        trayMenu_->addSeparator();
+    }
+    if (status_ == QLatin1String("ready")) {
+        const bool full = int(live_.size()) >= maxNetworks();
+        bool header = false;
         for (const auto& v : saved_) {
             const auto m = v.toMap();
             const QString code = m.value(QStringLiteral("code")).toString();
-            trayMenu_->addAction(menuText(tr("Connect: %1").arg(m.value(QStringLiteral("name")).toString())), this,
-                                 [this, code] { connectSaved(code); });
+            if (liveFor(code)) continue;
+            if (!header) {
+                trayMenu_->addAction(full ? tr("Other networks · limit reached") : tr("Your other networks"))->setEnabled(false);
+                header = true;
+            }
+            auto* action = trayMenu_->addAction(menuText(tr("Connect: %1").arg(m.value(QStringLiteral("name")).toString())), this,
+                                                [this, code] { setNetworkEnabled(code, true); });
+            action->setEnabled(!full);
         }
-        trayMenu_->addSeparator();
+        if (header) trayMenu_->addSeparator();
     }
     trayMenu_->addAction(tr("Show window"), this, [this] { showWindow(); });
-    trayMenu_->addSeparator();
     trayMenu_->addAction(tr("Quit KettleLAN"), this, [this] { quitApp(); });
 }
 
@@ -529,20 +668,39 @@ void Backend::loadDemo() {
         return QVariant(m);
     };
     saved_ = {demoEntry(tr("Quake night"), QStringLiteral("KTL-50AA-1SZ3-XRK3")),
-              demoEntry(tr("Warcraft III with friends"), QStringLiteral("KTL-7F3Q-9XM2-A4KD"))};
-    if (demoPage_ == QLatin1String("network")) {
-        netState_ = QStringLiteral("connected");
-        networkName_ = qEnvironmentVariable("KETTLELAN_DEMO_NAME", tr("Quake night"));
-        networkCode_ = QStringLiteral("KTL-50AA-1SZ3-XRK3");
-        peers_ = {
+              demoEntry(tr("Warcraft III with friends"), QStringLiteral("KTL-7F3Q-9XM2-A4KD")),
+              demoEntry(tr("CS 1.6 Thursday"), QStringLiteral("KTL-9WQ2-H4T7-ZK3M")),
+              demoEntry(tr("Old LAN party"), QStringLiteral("KTL-3M8K-QA2W-7VDP"))};
+    if (demoPage_ == QLatin1String("network") || demoPage_ == QLatin1String("start")) {
+        LiveNetwork quake;
+        quake.code = QStringLiteral("KTL-50AA-1SZ3-XRK3");
+        quake.lobbyName = tr("Quake night");
+        quake.connected = true;
+        quake.peers = {
             peerToMap(QStringLiteral("maxiuZ"), QStringLiteral("100.80.46.79"), true, true, true, false, -1, false),
             peerToMap(tr("Friend %1").arg(1), QStringLiteral("100.71.4.92"), false, false, true, false, 18, false),
             peerToMap(tr("Friend %1").arg(2), QStringLiteral("100.98.230.7"), false, false, true, false, 34, false),
             peerToMap(tr("Friend %1").arg(3), QStringLiteral("100.112.61.140"), false, false, true, false, 52, true),
             peerToMap(tr("Friend %1").arg(4), QStringLiteral("100.77.9.31"), false, false, false, false, -1, false),
         };
-        memberCount_ = 4;
+        quake.members = 4;
+        LiveNetwork warcraft;
+        warcraft.code = QStringLiteral("KTL-7F3Q-9XM2-A4KD");
+        warcraft.lobbyName = tr("Warcraft III with friends");
+        warcraft.connected = true;
+        warcraft.peers = {
+            peerToMap(QStringLiteral("maxiuZ"), QStringLiteral("100.80.46.79"), true, false, true, false, -1, false),
+            peerToMap(tr("Friend %1").arg(5), QStringLiteral("100.90.18.204"), false, true, true, false, 27, true),
+        };
+        warcraft.members = 2;
+        live_ = {quake, warcraft};
+        if (demoPage_ == QLatin1String("network")) {
+            openCode_ = quake.code;
+            networkOpen_ = true;
+        }
     }
+    showOpenNetwork();
+    rebuildNetworks();
 }
 
 } // namespace kettle::gui

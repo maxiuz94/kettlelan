@@ -24,10 +24,8 @@ struct Snapshot {
     Message error;
     std::string personaName;
     std::string selfAddress;
-    steam::State netState = steam::State::Idle;
-    std::string networkName;
-    std::string networkCode;
-    std::vector<steam::PeerInfo> peers;
+    std::vector<steam::NetworkInfo> networks; // connecting and connected, in the order they were joined
+    size_t maxNetworks = steam::Network::kMaxNetworks;
     uint64_t blockedPackets = 0;
 };
 
@@ -41,9 +39,10 @@ public:
 
     void start();     // starts the thread and tries to connect to Steam
     void retry();     // retry after an error
-    void create(const std::string& name);
+    // Connects to (or, when nobody is there, opens) the network with this code.
     void join(const std::string& code, const std::string& nameHint);
-    void leave();
+    void leave(const std::string& code); // one network
+    void leaveAll();
     void setHideAddress(bool hide);
     void setProtectServices(bool protect);
     // Leaves the network, closes the adapter and disconnects Steam. Blocks until done (a few seconds at most).

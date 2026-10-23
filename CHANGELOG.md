@@ -16,6 +16,12 @@ Before tagging a release add a `## [x.y.z] – date` section (see [docs/RELEASIN
 - Network: say when someone in the same network still uses KettleLAN 0.2
 - Security: verify members separately in each network, never forward traffic between networks
 - CLI: join several networks, "leave n" / "leave all", list all networks with their members
+- GUI: new home screen – your address once at the top, all your networks with on/off switches, "x of 5 connected"
+- GUI: open a connected network to see its members, go back to the list with the arrow
+- GUI: join a network with a code in a dialog
+- GUI: rejoin all networks that were connected when KettleLAN was closed
+- GUI: keep your own names for saved networks, at most 20 saved networks
+- GUI: show a section for each connected network in the system tray menu
 
 ## [0.2.1] – 2026-10-22
 
