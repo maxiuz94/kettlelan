@@ -58,7 +58,7 @@ struct NetworkInfo {
 enum class ConnectResult { Started, AlreadyConnected, LimitReached };
 
 // All KettleLAN networks of this computer: one virtual adapter, one address, up to
-// router::Router::kMaxNetworks Steam lobbies at the same time. Steam messages (packets and
+// router::Router::kMaxNetworks networks (Steam lobbies) at the same time. Steam messages (packets and
 // HELLO) are shared by all networks, so they are handled here, in one place.
 class Network {
 public:
@@ -141,6 +141,8 @@ private:
     void handleData(uint64_t from, std::span<const uint8_t> data);
     void sendTo(uint64_t steamId, std::span<const uint8_t> data, int channel);
     std::vector<PeerInfo> peersOf(const Lobby& lobby) const;
+    // Name for messages; adds the code when two of our networks have the same name.
+    std::string displayName(const Lobby& lobby) const;
     void notify(Msg id, std::vector<std::string> args = {});
 
     const uint64_t selfId_;

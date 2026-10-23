@@ -378,11 +378,16 @@ int main() {
         EXPECT(r.recipients(packet(addr(ME), addr(ALICE))).empty(), "nothing is sent to her");
     }
 
-    SCENARIO("At most two networks at the same time");
+    SCENARIO("At most kMaxNetworks networks at the same time");
     {
         router::Router r(ME);
-        EXPECT(r.addNetwork(CODE, KEYS).has_value() && r.addNetwork(CODE_B, KEYS_B).has_value(), "two networks accepted");
-        EXPECT(!r.addNetwork(OTHER_CODE, OTHER_KEYS).has_value(), "a third one is refused");
+        bool allAccepted = true;
+        for (uint32_t i = 0; i < router::Router::kMaxNetworks; ++i) {
+            const netcode::NetworkCode c{0x10000000u + i, 0x0123456};
+            allAccepted = allAccepted && r.addNetwork(c, netkeys::derive(c, netkeys::Cost::Test)).has_value();
+        }
+        EXPECT(allAccepted, "up to the limit – accepted");
+        EXPECT(!r.addNetwork(OTHER_CODE, OTHER_KEYS).has_value(), "one more – refused");
         r.removeNetwork(r.networks().front());
         EXPECT(r.addNetwork(OTHER_CODE, OTHER_KEYS).has_value(), "after leaving one, another can be added");
     }

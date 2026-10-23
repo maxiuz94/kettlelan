@@ -114,7 +114,7 @@ private:
         const auto sync = hub_.router_.syncMembers(id_, current);
         hub_.closeSessions(sync.goneEverywhere);
         for (uint64_t id : sync.left)
-            if (verifiedBefore.count(id)) hub_.notify(Msg::PeerLeft, {nameOf(id), name()});
+            if (verifiedBefore.count(id)) hub_.notify(Msg::PeerLeft, {nameOf(id), hub_.displayName(*this)});
     }
 
     void search(bool merge) {
@@ -220,7 +220,7 @@ private:
             if (!alive_) return;
             for (uint64_t raw : found) {
                 if (std::string(SteamMatchmaking()->GetLobbyData(CSteamID(uint64{raw}), kKeyTag)) == legacy) {
-                    hub_.notify(Msg::OldVersionInNetwork, {name()});
+                    hub_.notify(Msg::OldVersionInNetwork, {hub_.displayName(*this)});
                     return;
                 }
             }
@@ -271,6 +271,10 @@ ConnectResult Network::connect(const netcode::NetworkCode& code, const std::stri
             if (handle) *handle = l->id();
             return ConnectResult::AlreadyConnected;
         }
+    }
+    if (router_.networks().size() >= router_.maxNetworks()) { // before the slow key derivation
+        notify(Msg::NetworkLimit, {std::to_string(router_.maxNetworks())});
+        return ConnectResult::LimitReached;
     }
     const auto started = Clock::now();
     netkeys::Keys keys = netkeys::derive(code); // deliberately slow (Argon2id) – once per connect
@@ -415,7 +419,7 @@ void Network::handleControl(uint64_t from, std::span<const uint8_t> data) {
     const Lobby* lobby = lobbyFor(outcome.network);
     switch (outcome.result) {
     case HelloResult::Verified:
-        notify(Msg::PeerJoined, {nameOf(from), ip::addressForSteamId(from).toString(), lobby ? lobby->name() : std::string()});
+        notify(Msg::PeerJoined, {nameOf(from), ip::addressForSteamId(from).toString(), lobby ? displayName(*lobby) : std::string()});
         break;
     case HelloResult::Conflict:
         if (reportedBad_.insert(from).second)
@@ -612,6 +616,14 @@ std::vector<NetworkInfo> Network::networks() const {
         out.push_back(std::move(info));
     }
     return out;
+}
+
+std::string Network::displayName(const Lobby& lobby) const {
+    const std::string name = lobby.name();
+    for (const auto& other : lobbies_)
+        if (other.get() != &lobby && other->state() == State::Connected && other->name() == name)
+            return name + " (" + netcode::format(lobby.code()) + ")";
+    return name;
 }
 
 State Network::state() const { return lobbies_.empty() ? State::Idle : lobbies_.front()->state(); }

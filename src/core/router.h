@@ -63,8 +63,9 @@ struct SyncResult {
 class Router {
 public:
     using Clock = std::chrono::steady_clock;
-    // Steam allows a user in at most two "invisible" lobbies at the same time.
-    static constexpr size_t kMaxNetworks = 2;
+    // Networks at the same time. Steam itself allowed at least six lobbies in tests; the limit keeps
+    // the number of lobby searches and the user interface manageable.
+    static constexpr size_t kMaxNetworks = 5;
 
     explicit Router(uint64_t selfSteamId);
 
