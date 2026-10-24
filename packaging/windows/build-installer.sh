@@ -42,6 +42,7 @@ if [ ! -x "$ISCC" ]; then
     choco install innosetup --no-progress -y > /dev/null
 fi
 mkdir -p "$ROOT/dist"
-"$ISCC" /Q "/DAppVersion=$VERSION" "/DSourceDir=$(cygpath -w "$DIST")" "/DOutputDir=$(cygpath -w "$ROOT/dist")" \
-    "$(cygpath -w "$ROOT/packaging/windows/kettlelan.iss")"
+# Git Bash would turn "/DName=…" options into paths – switch that off for this call only
+MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL="*" "$ISCC" /Q "/DAppVersion=$VERSION" "/DSourceDir=$(cygpath -w "$DIST")" \
+    "/DOutputDir=$(cygpath -w "$ROOT/dist")" "$(cygpath -w "$ROOT/packaging/windows/kettlelan.iss")"
 echo "Done: dist/$NAME-setup.exe"
