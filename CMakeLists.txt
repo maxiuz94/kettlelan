@@ -139,10 +139,19 @@ if(KETTLELAN_BUILD_APP)
         find_package(Qt6 6.4 REQUIRED COMPONENTS Quick QuickControls2 Widgets Network)
         qt_standard_project_setup()
 
+        # kettlelan-steam: everything that talks to Steam, in its own process (Steam shows "Spacewar"
+        # exactly as long as it runs; the window starts it only while a network is on).
+        add_executable(kettlelan-steam src/gui/steam_worker.cpp src/gui/engine.cpp src/gui/engine_ipc.cpp)
+        target_include_directories(kettlelan-steam PRIVATE src/gui)
+        target_compile_options(kettlelan-steam PRIVATE ${KETTLELAN_WARNINGS})
+        target_link_libraries(kettlelan-steam PRIVATE kettle_net Qt6::Core)
+        list(APPEND KETTLELAN_TARGETS kettlelan-steam)
+
         qt_add_executable(kettlelan
             src/gui/main_gui.cpp
             src/gui/backend.cpp
-            src/gui/engine.cpp
+            src/gui/engine_client.cpp
+            src/gui/engine_ipc.cpp
             src/gui/util.cpp
         )
         set(KETTLELAN_QML
@@ -222,7 +231,7 @@ if(KETTLELAN_BUILD_APP AND KETTLELAN_BUILD_GUI AND CMAKE_SYSTEM_NAME STREQUAL "L
 
     if(KETTLELAN_PACKAGE STREQUAL "deb")
         # Programs, the Steam library and the helper in /usr/lib/kettlelan (owned by root).
-        install(TARGETS kettlelan kettlelan-cli RUNTIME DESTINATION lib/kettlelan)
+        install(TARGETS kettlelan kettlelan-steam kettlelan-cli RUNTIME DESTINATION lib/kettlelan)
         install(FILES "${STEAMWORKS_REDIST}" DESTINATION lib/kettlelan)
         install(PROGRAMS scripts/kettlelan-helper DESTINATION lib/kettlelan)
         install(PROGRAMS packaging/linux/kettlelan.sh DESTINATION bin RENAME kettlelan)
@@ -257,7 +266,7 @@ through the encrypted Steam network.")
         include(CPack)
     elseif(KETTLELAN_PACKAGE STREQUAL "appimage")
         # AppImage: everything in usr/bin, linuxdeploy adds the Qt libraries.
-        install(TARGETS kettlelan kettlelan-cli RUNTIME DESTINATION bin)
+        install(TARGETS kettlelan kettlelan-steam kettlelan-cli RUNTIME DESTINATION bin)
         install(FILES "${STEAMWORKS_REDIST}" DESTINATION bin)
         install(PROGRAMS scripts/kettlelan-helper DESTINATION bin)
     else()

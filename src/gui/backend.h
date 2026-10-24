@@ -11,6 +11,7 @@
 #include <memory>
 
 #include "engine.h"
+#include "engine_client.h"
 #include "network.h"
 
 class QSystemTrayIcon;
@@ -145,7 +146,7 @@ private:
 
     bool demo_ = false;
     QString demoPage_;
-    std::unique_ptr<Engine> engine_;
+    std::unique_ptr<EngineClient> engine_; // the Steam process (kettlelan-steam)
     QPointer<QWindow> window_;
     QSystemTrayIcon* tray_ = nullptr;
     QMenu* trayMenu_ = nullptr;
@@ -182,9 +183,8 @@ private:
     QSet<QString> rememberedNow_;    // saved/updated in this session (once per connect)
     bool autoConnectDone_ = false;
     void disconnectNetwork(const QString& code);
-    void goOnline();
-    void restartApp();
-    bool steamUsed_ = false;
+    void goOnline();  // starts the Steam process
+    void goOffline(); // ends it – Steam stops showing "Spacewar"
     void rebuildNetworks();
     void showOpenNetwork();
     QStringList activeNetworks() const;

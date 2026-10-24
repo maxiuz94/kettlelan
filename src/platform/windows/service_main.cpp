@@ -61,7 +61,8 @@ std::wstring lower(std::wstring s) {
     return s;
 }
 
-// Only KettleLAN.exe or kettlelan-cli.exe from the service's own folder may use the adapter.
+// Only the Steam process of the KettleLAN window (kettlelan-steam.exe) or kettlelan-cli.exe from the
+// service's own folder may use the adapter. The window itself never connects to the service.
 bool clientAllowed(HANDLE pipe, std::string& who) {
     ULONG pid = 0;
     if (!GetNamedPipeClientProcessId(pipe, &pid)) return false;
@@ -78,7 +79,7 @@ bool clientAllowed(HANDLE pipe, std::string& who) {
     if (slash == std::wstring::npos) return false;
     const std::wstring folder = lower(full.substr(0, slash + 1));
     const std::wstring file = lower(full.substr(slash + 1));
-    return folder == lower(programFolder()) && (file == L"kettlelan.exe" || file == L"kettlelan-cli.exe");
+    return folder == lower(programFolder()) && (file == L"kettlelan-steam.exe" || file == L"kettlelan-cli.exe");
 }
 
 class Pipe {

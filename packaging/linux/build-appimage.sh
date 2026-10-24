@@ -65,6 +65,7 @@ cd "$BUILD"
 PATH="$TOOLS:$PATH" "$TOOLS/linuxdeploy-x86_64.AppImage" \
     --appdir "$APPDIR" \
     --executable "$APPDIR/usr/bin/kettlelan" \
+    --executable "$APPDIR/usr/bin/kettlelan-steam" \
     --executable "$APPDIR/usr/bin/kettlelan-cli" \
     --desktop-file "$APPDIR/usr/share/applications/kettlelan.desktop" \
     --icon-file "$APPDIR/usr/share/icons/hicolor/256x256/apps/kettlelan.png" \

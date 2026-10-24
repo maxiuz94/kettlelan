@@ -16,7 +16,6 @@ struct Engine::State {
     std::unique_ptr<steam::Network> net;
     std::unique_ptr<platform::Tun> tun;
     EngineStatus status = EngineStatus::Starting;
-    bool steamUsed = false;
     Message error;
     bool dirty = true;
     bool hideAddress = true;
@@ -33,44 +32,11 @@ void Engine::post(std::function<void()> fn) {
     queue_.push_back(std::move(fn));
 }
 
-void Engine::start(bool online) {
+void Engine::start() {
     if (running_) return;
     running_ = true;
-    if (online) {
-        post([this] { initialize(); });
-    } else {
-        post([this] {
-            st_->status = EngineStatus::Offline;
-            publish();
-        });
-    }
+    post([this] { initialize(); });
     thread_ = std::thread([this] { loop(); });
-}
-
-void Engine::goOnline() {
-    post([this] {
-        auto& s = *st_;
-        if (s.steamUsed && !s.session.initialized()) return; // needs a fresh start (the GUI restarts KettleLAN)
-        if (s.status == EngineStatus::Offline) initialize();
-    });
-}
-
-void Engine::goOffline() {
-    post([this] {
-        auto& s = *st_;
-        if (s.net) s.net->leaveAll();
-        if (s.session.initialized()) s.session.runCallbacks();
-        if (s.tun) {
-            s.tun->stop();
-            s.tun.reset();
-        }
-        // The network object registers Steam callbacks – it must not be destroyed after SteamAPI_Shutdown().
-        s.net.reset();
-        if (s.session.initialized()) s.session.shutdown();
-        s.status = EngineStatus::Offline;
-        s.error = {};
-        publish();
-    });
 }
 
 void Engine::retry() {
@@ -145,7 +111,6 @@ void Engine::initialize() {
             publish();
             return;
         }
-        s.steamUsed = true;
         s.net = std::make_unique<steam::Network>(s.session.steamId(), [this](const Message& message) {
             st_->dirty = true;
             if (onEvent_) onEvent_(message);
@@ -176,7 +141,6 @@ void Engine::publish() {
     auto& s = *st_;
     Snapshot snap;
     snap.status = s.status;
-    snap.steamUsed = s.steamUsed;
     snap.error = s.error;
     if (s.session.initialized()) snap.personaName = s.session.personaName();
     if (s.net) {

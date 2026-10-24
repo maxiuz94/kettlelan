@@ -19,7 +19,7 @@ ctest --test-dir "$BUILD" -C Release --output-on-failure
 
 rm -rf "$DIST" && mkdir -p "$DIST/licenses"
 OUT="$BUILD/Release"
-cp "$OUT/KettleLAN.exe" "$OUT/kettlelan-cli.exe" "$OUT/kettlelan-service.exe" "$OUT/steam_api64.dll" "$OUT/wintun.dll" "$DIST/"
+cp "$OUT/KettleLAN.exe" "$OUT/kettlelan-steam.exe" "$OUT/kettlelan-cli.exe" "$OUT/kettlelan-service.exe" "$OUT/steam_api64.dll" "$OUT/wintun.dll" "$DIST/"
 
 
 # Qt libraries, QML modules, plugins and the Visual C++ runtime

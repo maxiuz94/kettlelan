@@ -64,6 +64,7 @@ Filename: "{app}\KettleLAN.exe"; Description: "Launch KettleLAN"; Flags: nowait 
 
 [UninstallRun]
 Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM KettleLAN.exe"; Flags: runhidden waituntilterminated; RunOnceId: "CloseKettleLAN"
+Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM kettlelan-steam.exe"; Flags: runhidden waituntilterminated; RunOnceId: "CloseKettleLANSteam"
 Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM kettlelan-cli.exe"; Flags: runhidden waituntilterminated; RunOnceId: "CloseKettleLANCli"
 Filename: "{app}\kettlelan-service.exe"; Parameters: "uninstall"; Flags: runhidden waituntilterminated; RunOnceId: "RemoveService"
 
@@ -79,6 +80,7 @@ var
   ResultCode: Integer;
 begin
   Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM KettleLAN.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM kettlelan-steam.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM kettlelan-cli.exe', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Exec(ExpandConstant('{sys}\net.exe'), 'stop KettleLAN', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Result := '';

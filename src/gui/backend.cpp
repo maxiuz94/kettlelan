@@ -114,43 +114,30 @@ void Backend::attachWindow(QWindow* window) { window_ = window; }
 
 void Backend::startEngine() {
     if (demo_) return;
-    engine_ = std::make_unique<Engine>(
-        [this](const Snapshot& snap) {
-            QMetaObject::invokeMethod(this, [this, snap] { applySnapshot(snap); }, Qt::QueuedConnection);
-        },
-        [this](const Message& message) {
-            QMetaObject::invokeMethod(this, [this, message] { handleEvent(message); }, Qt::QueuedConnection);
-        });
-    engine_->setHideAddress(hideAddress_);
-    engine_->setProtectServices(protectServices_);
+    engine_ = std::make_unique<EngineClient>([this](const Snapshot& snap) { applySnapshot(snap); },
+                                             [this](const Message& message) { handleEvent(message); }, this);
 
-    // Connect to Steam only when a network is on (otherwise Steam would show "Spacewar" for nothing).
+    // The Steam process runs only while a network is on (otherwise Steam would show "Spacewar" for nothing).
     QSettings settings;
     const QString last = settings.value(QStringLiteral("lastNetwork")).toString(); // KettleLAN 0.2
     if (activeNetworks().isEmpty() && !last.isEmpty()) setActive(last, true);
     settings.remove(QStringLiteral("lastNetwork"));
     if (!autoConnect_) settings.remove(QStringLiteral("activeNetworks")); // start with every network off
-    engine_->start(!activeNetworks().isEmpty());
-}
-
-// Connects to Steam for the networks that are on. Steamworks cannot connect twice in one run, so
-// after a disconnect KettleLAN starts itself again (the switched-on networks are saved).
-void Backend::goOnline() {
-    if (demo_ || !engine_) return;
-    if (steamUsed_ && status_ == QLatin1String("offline")) {
-        restartApp();
-        return;
+    if (!activeNetworks().isEmpty()) {
+        goOnline();
+    } else {
+        Snapshot offline;
+        offline.status = EngineStatus::Offline;
+        applySnapshot(offline);
     }
-    engine_->goOnline();
 }
 
-void Backend::restartApp() {
-    QStringList args{QStringLiteral("--restarted")};
-    if (!window_ || !window_->isVisible()) args << QStringLiteral("--minimized");
-    // An AppImage runs from a mount that disappears when it quits – start the .AppImage file itself.
-    const QString appImage = qEnvironmentVariable("APPIMAGE");
-    const QString program = appImage.isEmpty() ? QCoreApplication::applicationFilePath() : appImage;
-    if (QProcess::startDetached(program, args)) quitApp();
+void Backend::goOnline() {
+    if (engine_ && !engine_->running()) engine_->start(hideAddress_, protectServices_);
+}
+
+void Backend::goOffline() {
+    if (engine_) engine_->stop(false);
 }
 
 void Backend::pause() {
@@ -160,7 +147,7 @@ void Backend::pause() {
     QSettings().remove(QStringLiteral("activeNetworks"));
     pendingOpen_.clear();
     networkOpen_ = false;
-    if (engine_) engine_->goOffline();
+    goOffline();
     emit changed();
 }
 
@@ -181,7 +168,6 @@ bool Backend::paused() const {
 void Backend::applySnapshot(const Snapshot& snap) {
     const QString previous = status_;
     status_ = statusName(snap.status);
-    steamUsed_ = steamUsed_ || snap.steamUsed;
     const bool hasError = snap.status == EngineStatus::SteamMissing || snap.status == EngineStatus::TunError;
     errorText_ = hasError ? messageText(snap.error) : QString();
     personaName_ = QString::fromStdString(snap.personaName);
@@ -312,7 +298,9 @@ void Backend::handleEvent(const Message& message) {
 // ---------------------------------------------------------------- actions
 
 void Backend::retry() {
-    if (engine_) engine_->retry();
+    if (!engine_) return;
+    if (engine_->running()) engine_->retry();
+    else goOnline();
 }
 
 QString Backend::defaultNetworkName() const {
@@ -392,8 +380,8 @@ void Backend::disconnectNetwork(const QString& code) {
         return;
     }
     if (engine_) engine_->leave(code.toStdString());
-    // the last network is off: disconnect from Steam, so it no longer shows "Spacewar"
-    if (activeNetworks().isEmpty() && engine_) engine_->goOffline();
+    // the last network is off: end the Steam process, so Steam no longer shows "Spacewar"
+    if (activeNetworks().isEmpty()) goOffline();
 }
 
 QStringList Backend::activeNetworks() const {
@@ -451,7 +439,7 @@ void Backend::showWindow() {
 void Backend::quitApp() {
     if (tray_) tray_->hide();
     if (window_) window_->hide();
-    if (engine_) engine_->shutdown(); // leaves the network and disconnects Steam (~3 s at most)
+    if (engine_) engine_->stop(true); // leaves the networks and ends the Steam process (~3 s at most)
     QCoreApplication::quit();
 }
 

@@ -17,14 +17,11 @@
 
 namespace kettle::gui {
 
-// Offline: not connected to Steam at all (no network is on) – Steam shows no "Spacewar".
+// Offline: the window has not started the Steam process (no network is on) – Steam shows no "Spacewar".
 enum class EngineStatus { Offline, Starting, SteamMissing, TunError, Ready };
 
 struct Snapshot {
     EngineStatus status = EngineStatus::Starting;
-    // Steam was connected in this run. Steamworks cannot be initialized again in the same process
-    // after SteamAPI_Shutdown(), so connecting again needs a fresh start of the program.
-    bool steamUsed = false;
     Message error;
     std::string personaName;
     std::string selfAddress;
@@ -40,14 +37,7 @@ public:
 
     Engine(SnapshotHandler onSnapshot, EventHandler onEvent);
     ~Engine();
-
-    // online: connect to Steam right away; otherwise stay offline until goOnline().
-
-    void start(bool online);
-
-    void goOnline();  // connect to Steam and open the adapter (only once per run, see steamUsed)
-
-    void goOffline(); // leave all networks, close the adapter, disconnect from Steam
+    void start(); // connects to Steam and opens the adapter (runs in the Steam process)
     void retry();     // retry after an error
     // Connects to (or, when nobody is there, opens) the network with this code.
     void join(const std::string& code, const std::string& nameHint);

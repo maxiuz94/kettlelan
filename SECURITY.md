@@ -38,6 +38,8 @@ Please **do not open a public issue**. Use GitHub's private reporting instead:
 - **The network name** is shared by everyone with the code. Any member who opens the network first publishes the
   name they know, and only the person who opened it (★) can rename it; it is encrypted like the rest of the
   lobby data. Your own note for a network never leaves your computer.
+- **Steam runs in its own process.** Everything that talks to Steam and to other players runs in `kettlelan-steam`,
+  started by the KettleLAN window only while a network is on. The window itself never connects to Steam.
 - **Text from other people** (Steam names, network names) is cleaned of control characters and shown as plain
   text – no HTML, so it cannot be used, for example, to load an image from someone's server.
 - The file with saved networks and the log are readable by your account only (permissions `600`).
@@ -48,7 +50,8 @@ Please **do not open a public issue**. Use GitHub's private reporting instead:
   owns the Wintun adapter and passes packets, and it never talks to Steam or to other players.
 - The program and the service talk over the local named pipe `\\.\pipe\KettleLAN`: remote connections are
   rejected, and only SYSTEM, administrators and the logged-on user can open it.
-- The service accepts only `KettleLAN.exe` or `kettlelan-cli.exe` from its own folder, and checks every packet from
+- The service accepts only `kettlelan-steam.exe` (the background process of the KettleLAN window) or
+  `kettlelan-cli.exe` from its own folder, and checks every packet from
   the program before handing it to Windows: it must be a valid IPv4 packet from another KettleLAN address to your
   address (or a broadcast). A modified program cannot send arbitrary packets through the service.
 - The program checks that the pipe belongs to a Windows service (session 0), so another program cannot pretend

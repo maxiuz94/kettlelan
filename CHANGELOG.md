@@ -18,7 +18,7 @@ Before tagging a release add a `## [x.y.z] – date` section (see [docs/RELEASIN
 - Windows: the installer replaces the zip package
 - Windows: smaller package without the unused Qt styles
 - GUI: wait for Steam (and on Windows for the KettleLAN service) and connect automatically – no "Try again" needed after login
-- Steam: connect to Steam only while a network is on – with every network off Steam no longer shows "Spacewar"
+- Steam: connect to Steam only while a network is on – in a separate background process (kettlelan-steam), so with every network off Steam no longer shows "Spacewar"
 - GUI: Pause / Resume button – every network off and no Steam connection, then the same networks on again
 - GUI: your address is shown also while KettleLAN is not connected to Steam
 - Network: new protocol version 3 – not compatible with KettleLAN 0.2, everyone in a network needs 0.3
