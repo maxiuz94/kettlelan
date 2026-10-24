@@ -11,6 +11,7 @@
 #include "ip.h"
 #include "netcode.h"
 #include "netkeys.h"
+#include "svcproto.h"
 #include "protocol.h"
 #include "text.h"
 
@@ -73,6 +74,15 @@ int main(int argc, char** argv) {
 
         // network codes typed / pasted by the user
         if (netcode::parse(str)) ++codes;
+        // the Windows service reads frames from the program – any bytes, any split
+        {
+            svc::FrameReader reader;
+            const std::span<const uint8_t> all(reinterpret_cast<const uint8_t*>(str.data()), str.size());
+            const size_t cut = all.empty() ? 0 : rng() % all.size();
+            if (reader.feed(all.subspan(0, cut)) && reader.feed(all.subspan(cut)))
+                while (auto fr = reader.next())
+                    if (fr->type == svc::Type::Packet) svc::acceptFromProgram(fr->payload, ip::Address4(100, 80, 46, 79));
+        }
         // encrypted network names from lobby data (text from strangers)
         if (netkeys::openName(fuzzKeys, str)) { std::printf("ERROR: a random string opened as a network name\n"); return 1; }
         std::string code = "KTL-";

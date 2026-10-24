@@ -10,6 +10,7 @@
 #include "ip.h"
 #include "netcode.h"
 #include "netkeys.h"
+#include "svcproto.h"
 #include "monocypher.h"
 #include "protocol.h"
 #include "siphash.h"
@@ -224,6 +225,66 @@ static void testSanitize() {
     CHECK(text::sanitize("\xff\xfeok") == "ok");                    // invalid UTF-8
 }
 
+
+// Program ↔ Windows service messages and the packet check done by the service.
+static void testServiceProtocol() {
+    const ip::Address4 me(100, 80, 46, 79), peer(100, 65, 115, 91);
+
+    // frames survive any split of the byte stream
+    std::vector<uint8_t> stream = svc::encodeHello(me);
+    const std::vector<uint8_t> pkt(40, 0x45);
+    for (auto f : {svc::encode(svc::Type::Packet, pkt), svc::encode(svc::Type::Ready, {}), svc::encodeError(svc::ErrorCode::Busy, "busy")})
+        stream.insert(stream.end(), f.begin(), f.end());
+    for (size_t chunk : {size_t(1), size_t(2), size_t(7), stream.size()}) {
+        svc::FrameReader r;
+        std::vector<svc::Frame> got;
+        for (size_t i = 0; i < stream.size(); i += chunk) {
+            CHECK(r.feed(std::span<const uint8_t>(stream).subspan(i, std::min(chunk, stream.size() - i))));
+            while (auto f = r.next()) got.push_back(std::move(*f));
+        }
+        CHECK(got.size() == 4);
+        CHECK(got.size() == 4 && got[0].type == svc::Type::Hello && got[1].payload == pkt && got[2].type == svc::Type::Ready);
+        if (got.size() == 4) {
+            const auto h = svc::decodeHello(got[0].payload);
+            CHECK(h && h->version == svc::kVersion && h->address == me);
+            const auto e = svc::decodeError(got[3].payload);
+            CHECK(e && e->code == svc::ErrorCode::Busy && e->text == "busy");
+        }
+    }
+    // a broken stream (unknown type) is rejected for good
+    svc::FrameReader bad;
+    const uint8_t junk[] = {0x99, 0x00, 0x01, 0x00};
+    CHECK(!bad.feed(junk));
+    CHECK(!bad.next());
+    const uint8_t hello[] = {1, 0, 9, 'K', 'T', 'L', 'S', 1, 100, 1, 2, 3};
+    CHECK(!bad.feed(hello));
+    // hello must be exact
+    CHECK(!svc::decodeHello(std::vector<uint8_t>{'K', 'T', 'L', 'X', 1, 100, 1, 2, 3}));
+    CHECK(!svc::decodeHello(std::vector<uint8_t>{'K', 'T', 'L', 'S', 1, 100, 1, 2}));
+    CHECK(!svc::decodeError({}));
+
+    // packets the service may hand to Windows
+    auto ipv4 = [](ip::Address4 src, ip::Address4 dst) {
+        std::vector<uint8_t> p(28, 0);
+        p[0] = 0x45; p[3] = 28; p[8] = 64; p[9] = 17;
+        const auto s = src.bytes(), d = dst.bytes();
+        for (int i = 0; i < 4; ++i) { p[12 + i] = s[i]; p[16 + i] = d[i]; }
+        return p;
+    };
+    CHECK(svc::acceptFromProgram(ipv4(peer, me), me));                                  // peer → us
+    CHECK(svc::acceptFromProgram(ipv4(peer, ip::Address4(255, 255, 255, 255)), me));    // broadcast
+    CHECK(!svc::acceptFromProgram(ipv4(peer, ip::Address4(192, 168, 1, 1)), me));       // to the home network
+    CHECK(!svc::acceptFromProgram(ipv4(peer, ip::Address4(8, 8, 8, 8)), me));           // to the internet
+    CHECK(!svc::acceptFromProgram(ipv4(ip::Address4(192, 168, 1, 5), me), me));         // source outside KettleLAN
+    CHECK(!svc::acceptFromProgram(ipv4(ip::Address4(127, 0, 0, 1), me), me));           // forged localhost
+    CHECK(!svc::acceptFromProgram(ipv4(me, me), me));                                   // forged own address
+    CHECK(!svc::acceptFromProgram(std::vector<uint8_t>(10, 0x45), me));                 // too short
+    std::vector<uint8_t> v6 = ipv4(peer, me);
+    v6[0] = 0x60;
+    CHECK(!svc::acceptFromProgram(v6, me));                                             // IPv6
+    CHECK(!svc::acceptFromProgram(std::vector<uint8_t>(70000, 0x45), me));              // too big
+}
+
 int main() {
     testSiphash();
     testNetcode();
@@ -232,6 +293,7 @@ int main() {
     testProtocol();
     testArgon2Vector();
     testNetworkKeys();
+    testServiceProtocol();
     testGenerate();
     testFilter();
     testSanitize();

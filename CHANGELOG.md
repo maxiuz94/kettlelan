@@ -8,6 +8,11 @@ Before tagging a release add a `## [x.y.z] – date` section (see [docs/RELEASIN
 
 ## [Unreleased]
 
+- Windows: KettleLAN runs as the user – the new KettleLAN Service (SYSTEM) runs the Wintun adapter
+- Windows: no UAC prompt when KettleLAN starts; start with the system through the normal "Run" registry key
+- Windows: the adapter stays ready while the service runs – KettleLAN starts without the "identifying network" delay
+- Security: the service accepts only KettleLAN from its own folder and checks every packet from the program
+- Security: the program checks that it talks to the real service (a Windows service in session 0)
 - Network: new protocol version 3 – not compatible with KettleLAN 0.2, everyone in a network needs 0.3
 - Security: derive the lobby tag, the HELLO proof key and the name key from the network code with Argon2id, so the code cannot be guessed from lobby data or received proofs
 - Security: encrypt the network name in Steam lobby data (XChaCha20-Poly1305)

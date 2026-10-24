@@ -50,6 +50,7 @@ add_library(kettle_core STATIC
     src/core/netcode.cpp
     src/core/protocol.cpp
     src/core/router.cpp
+    src/core/svcproto.cpp
     src/core/siphash.cpp
     src/core/text.cpp
 )
@@ -97,11 +98,26 @@ if(KETTLELAN_BUILD_APP)
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         target_sources(kettle_net PRIVATE src/platform/linux/tun_linux.cpp)
     elseif(WIN32)
+        # The program talks to the KettleLAN service; only the service uses Wintun.
         include(cmake/Wintun.cmake)
         target_sources(kettle_net PRIVATE src/platform/windows/tun_windows.cpp)
-        target_include_directories(kettle_net PRIVATE third_party/wintun)
         target_compile_definitions(kettle_net PUBLIC NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00)
-        target_link_libraries(kettle_net PUBLIC iphlpapi ws2_32 ole32 oleaut32 advapi32 wintrust crypt32)
+        target_link_libraries(kettle_net PUBLIC ws2_32 advapi32)
+
+        # The KettleLAN service (runs as SYSTEM): the Wintun adapter and nothing else.
+        add_executable(kettlelan-service src/platform/windows/service_main.cpp src/platform/windows/wintun_adapter.cpp)
+        target_include_directories(kettlelan-service PRIVATE src/platform src/platform/windows third_party/wintun)
+        target_compile_definitions(kettlelan-service PRIVATE NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00)
+        target_compile_options(kettlelan-service PRIVATE ${KETTLELAN_WARNINGS})
+        target_link_libraries(kettlelan-service PRIVATE kettle_core iphlpapi ws2_32 ole32 oleaut32 advapi32 wintrust crypt32)
+        if(MSVC)
+            # "install" and "uninstall" need administrator rights; the service itself starts as SYSTEM
+            target_link_options(kettlelan-service PRIVATE "/MANIFESTUAC:level='requireAdministrator'")
+        else()
+            target_link_options(kettlelan-service PRIVATE -municode)
+        endif()
+        add_custom_command(TARGET kettlelan-service POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${WINTUN_DLL}" "$<TARGET_FILE_DIR:kettlelan-service>")
     else()
         message(FATAL_ERROR "Unsupported system: ${CMAKE_SYSTEM_NAME}")
     endif()
@@ -165,17 +181,12 @@ if(KETTLELAN_BUILD_APP)
     endif()
 
     if(WIN32)
-        # Windows resources (icon, version) and administrator rights (Wintun needs them).
+        # Windows resources (icon, version). The program runs as the user – the service has the rights.
         set(_rc "${CMAKE_SOURCE_DIR}/packaging/windows/kettlelan.rc")
         set_source_files_properties("${_rc}" PROPERTIES COMPILE_DEFINITIONS
             "KETTLELAN_VERSION_MAJOR=${PROJECT_VERSION_MAJOR};KETTLELAN_VERSION_MINOR=${PROJECT_VERSION_MINOR};KETTLELAN_VERSION_PATCH=${PROJECT_VERSION_PATCH};KETTLELAN_VERSION_STRING=\"${PROJECT_VERSION}\"")
-        foreach(t ${KETTLELAN_TARGETS})
+        foreach(t ${KETTLELAN_TARGETS} kettlelan-service)
             target_sources(${t} PRIVATE "${_rc}")
-            if(MSVC)
-                target_link_options(${t} PRIVATE "/MANIFESTUAC:level='requireAdministrator'")
-            endif()
-            add_custom_command(TARGET ${t} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${WINTUN_DLL}" "$<TARGET_FILE_DIR:${t}>")
         endforeach()
         if(TARGET kettlelan)
             set_target_properties(kettlelan PROPERTIES OUTPUT_NAME KettleLAN)

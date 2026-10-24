@@ -81,17 +81,8 @@ QString executablePath() {
     return appImage.isEmpty() ? QCoreApplication::applicationFilePath() : QString::fromLocal8Bit(appImage);
 }
 #else
-// KettleLAN runs as administrator on Windows, and Windows skips elevated programs in the "Run"
-// registry key at logon. A Task Scheduler task with the highest privileges starts it instead.
-constexpr const char* kTaskName = "KettleLAN";
-
-bool runSchtasks(const QString& nativeArguments) {
-    QProcess p;
-    p.setProgram(QStringLiteral("schtasks.exe"));
-    p.setNativeArguments(nativeArguments);
-    p.start();
-    return p.waitForFinished(10000) && p.exitStatus() == QProcess::NormalExit && p.exitCode() == 0;
-}
+// Autostart: the user's "Run" registry key (KettleLAN runs as the user; the service has the rights).
+const char* kRunKey = "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 #endif
 
 } // namespace
@@ -538,7 +529,7 @@ void Backend::setNotifications(bool v) {
 
 bool Backend::autostart() const {
 #ifdef _WIN32
-    return runSchtasks(QStringLiteral("/Query /TN %1").arg(QLatin1String(kTaskName)));
+    return QSettings(QString::fromLatin1(kRunKey), QSettings::NativeFormat).contains(QStringLiteral("KettleLAN"));
 #else
     return QFile::exists(autostartFile());
 #endif
@@ -546,13 +537,12 @@ bool Backend::autostart() const {
 
 void Backend::setAutostart(bool v) {
 #ifdef _WIN32
-    if (v) {
-        const QString exe = QDir::toNativeSeparators(QCoreApplication::applicationFilePath());
-        runSchtasks(QStringLiteral("/Create /F /TN %1 /SC ONLOGON /RL HIGHEST /TR \"\\\"%2\\\" --minimized\"")
-                        .arg(QLatin1String(kTaskName), exe));
-    } else {
-        runSchtasks(QStringLiteral("/Delete /F /TN %1").arg(QLatin1String(kTaskName)));
-    }
+    QSettings run(QString::fromLatin1(kRunKey), QSettings::NativeFormat);
+    if (v)
+        run.setValue(QStringLiteral("KettleLAN"),
+                     QStringLiteral("\"%1\" --minimized").arg(QDir::toNativeSeparators(QCoreApplication::applicationFilePath())));
+    else
+        run.remove(QStringLiteral("KettleLAN"));
 #else
     const QString path = autostartFile();
     if (v) {

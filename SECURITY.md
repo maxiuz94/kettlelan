@@ -44,21 +44,24 @@ Please **do not open a public issue**. Use GitHub's private reporting instead:
 
 ## Windows
 
-- Wintun needs administrator rights to create the adapter **and** to exchange packets, so on Windows the whole
-  program runs elevated (UAC prompt on start). This is a temporary design: a separate system service for the
-  adapter, with the interface running as a normal user, is planned.
-- `wintun.dll` is loaded only from the program's own folder (protection against DLL planting), and only after
-  KettleLAN has checked its digital signature (WireGuard LLC) on a file locked against changes. The shipped file is
-  the official build, verified with SHA256 at build time.
-- Because the program runs elevated, a program already running on your account could replace the Qt libraries or
-  `steam_api64.dll` in a folder you can write to (Windows loads them before KettleLAN starts, so it cannot check them).
-  For the strongest protection keep KettleLAN in a folder only administrators can change, such as
-  `C:\Program Files\KettleLAN` (copy the folder there – a moved folder keeps its old permissions). The planned system
-  service will install itself in such a folder automatically.
+- **KettleLAN runs as the user.** Only the small **KettleLAN Service** (`kettlelan-service.exe`) runs as SYSTEM: it
+  owns the Wintun adapter and passes packets, and it never talks to Steam or to other players.
+- The program and the service talk over the local named pipe `\\.\pipe\KettleLAN`: remote connections are
+  rejected, and only SYSTEM, administrators and the logged-on user can open it.
+- The service accepts only `KettleLAN.exe` or `kettlelan-cli.exe` from its own folder, and checks every packet from
+  the program before handing it to Windows: it must be a valid IPv4 packet from another KettleLAN address to your
+  address (or a broadcast). A modified program cannot send arbitrary packets through the service.
+- The program checks that the pipe belongs to a Windows service (session 0), so another program cannot pretend
+  to be the service.
+- `wintun.dll` is loaded only from the service's folder, and only after its digital signature (WireGuard LLC) has
+  been checked on a file locked against changes. The shipped file is the official build, verified with SHA256 at
+  build time.
 - Windows Firewall rules allow incoming **UDP and ping only, only on the KettleLAN adapter and only from
   `100.64.0.0/10`**. Incoming TCP is not opened: a game server on TCP gets the usual Windows "Allow access?" prompt
   for that program. The KettleLAN network stays a "Public" network, so Windows does not share files or printers on
   it, and KettleLAN's own filter blocks computer services as on Linux.
+- Install KettleLAN in a folder only administrators can change (the installer uses `C:\Program Files\KettleLAN`):
+  the service runs as SYSTEM from there, and logs a warning when its folder can be changed by ordinary programs.
 
 ## The network code
 

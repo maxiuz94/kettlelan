@@ -17,7 +17,10 @@ ctest --test-dir "$BUILD" -C Release --output-on-failure
 
 rm -rf "$DIST" && mkdir -p "$DIST/licenses"
 OUT="$BUILD/Release"
-cp "$OUT/KettleLAN.exe" "$OUT/kettlelan-cli.exe" "$OUT/steam_api64.dll" "$OUT/wintun.dll" "$DIST/"
+cp "$OUT/KettleLAN.exe" "$OUT/kettlelan-cli.exe" "$OUT/kettlelan-service.exe" "$OUT/steam_api64.dll" "$OUT/wintun.dll" "$DIST/"
+# until the installer: install / remove the service by hand (right click → Run as administrator)
+printf '@echo off\r\n"%%~dp0kettlelan-service.exe" install\r\npause\r\n' > "$DIST/install-service.cmd"
+printf '@echo off\r\n"%%~dp0kettlelan-service.exe" uninstall\r\npause\r\n' > "$DIST/uninstall-service.cmd"
 
 # Qt libraries, QML modules, plugins and the Visual C++ runtime
 windeployqt --release --qmldir "$ROOT/src/gui/qml" --no-translations --compiler-runtime "$DIST/KettleLAN.exe"
@@ -32,11 +35,13 @@ cat > "$DIST/README.txt" << README
 KettleLAN ${VERSION} for Windows 10/11 (64-bit)
 Open-source virtual LAN over the Steam network.
 
-1. Start Steam and sign in.
-2. Run KettleLAN.exe. Windows asks for administrator rights - they are needed to create
-   the virtual network adapter (Wintun).
+1. Right click install-service.cmd and choose "Run as administrator" (once). This installs
+   "KettleLAN Service", which runs the virtual network adapter (Wintun) in the background.
+2. Start Steam and sign in, then run KettleLAN.exe – no administrator rights needed.
 3. If Windows SmartScreen shows "Windows protected your PC", click "More info" and "Run anyway"
    (the program is not code-signed yet).
+
+To remove KettleLAN: run uninstall-service.cmd as administrator, then delete this folder.
 
 Download KettleLAN only from the official page: https://github.com/maxiuz94/kettlelan/releases
 Copies from other websites may be modified. How to verify a download:

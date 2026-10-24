@@ -45,6 +45,10 @@ const char* messageTemplate(Msg id) {
     case Msg::TunWintunFailed: return QT_TRANSLATE_NOOP("Messages", "Could not create the KettleLAN network adapter (Wintun): %1");
     case Msg::TunAddressFailed: return QT_TRANSLATE_NOOP("Messages", "Could not set the address of the KettleLAN network adapter: %1");
     case Msg::TunWintunUntrusted: return QT_TRANSLATE_NOOP("Messages", "wintun.dll in the KettleLAN folder is not the official file signed by WireGuard LLC – it may have been replaced. Download KettleLAN again from the official Releases page.");
+    case Msg::TunServiceUnavailable: return QT_TRANSLATE_NOOP("Messages", "The KettleLAN service is not running. Reinstall KettleLAN, or start “KettleLAN Service” in Windows Services.");
+    case Msg::TunServiceUntrusted: return QT_TRANSLATE_NOOP("Messages", "Another program pretends to be the KettleLAN service – KettleLAN does not connect to it.");
+    case Msg::TunServiceRejected: return QT_TRANSLATE_NOOP("Messages", "The KettleLAN service refused the connection: %1");
+    case Msg::TunServiceVersion: return QT_TRANSLATE_NOOP("Messages", "The KettleLAN service has a different version – reinstall KettleLAN.");
     case Msg::UnsafeFolder: return QT_TRANSLATE_NOOP("Messages", "KettleLAN runs as administrator from a folder that other programs can change: %1");
     }
     return "";

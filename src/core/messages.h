@@ -52,6 +52,10 @@ enum class Msg {
     TunAddressFailed,  // %1 = system error
     TunWintunUntrusted,
     UnsafeFolder,      // %1 = the program's folder
+    TunServiceUnavailable,
+    TunServiceUntrusted,
+    TunServiceRejected, // %1 = reason from the service
+    TunServiceVersion,
 };
 
 struct Message {
