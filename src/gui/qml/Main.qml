@@ -41,11 +41,11 @@ ApplicationWindow {
 
     StatusPage {
         anchors.fill: parent
-        visible: !win.settingsOpen && Backend.status !== "ready"
+        visible: !win.settingsOpen && Backend.status !== "ready" && Backend.status !== "offline"
     }
     StartPage {
         anchors.fill: parent
-        visible: !win.settingsOpen && Backend.status === "ready" && !Backend.networkOpen
+        visible: !win.settingsOpen && (Backend.status === "ready" || Backend.status === "offline") && !Backend.networkOpen
         onOpenSettings: win.settingsOpen = true
     }
     NetworkPage {

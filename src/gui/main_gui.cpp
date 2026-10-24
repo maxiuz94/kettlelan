@@ -3,6 +3,7 @@
 #include <QCommandLineParser>
 #include <QFile>
 #include <QLocalServer>
+#include <QThread>
 #include <QLocalSocket>
 #include <QQmlApplicationEngine>
 #include <QQuickStyle>
@@ -77,6 +78,10 @@ int main(int argc, char** argv) {
     QCommandLineOption iconSize(QStringLiteral("icon-size"), QStringLiteral("Icon size in pixels (default 256)."),
                                 QStringLiteral("px"), QStringLiteral("256"));
     parser.addOption(iconSize);
+    // used by KettleLAN itself when it restarts to connect to Steam again (see Backend::restartApp)
+    QCommandLineOption restarted(QStringLiteral("restarted"), QStringLiteral("Internal: started by KettleLAN after quitting."));
+    restarted.setFlags(QCommandLineOption::HiddenFromHelp);
+    parser.addOption(restarted);
     parser.process(app);
 
     if (parser.isSet(writeIcon)) {
@@ -90,6 +95,16 @@ int main(int argc, char** argv) {
     // Only one instance – a second one shows the first one's window and exits.
     QLocalServer server;
     if (!demo) {
+        // After a restart, wait until the previous KettleLAN has quit (it releases the adapter last).
+        if (parser.isSet(restarted)) {
+            for (int i = 0; i < 100; ++i) {
+                QLocalSocket previous;
+                previous.connectToServer(instanceName());
+                if (!previous.waitForConnected(100)) break;
+                previous.abort();
+                QThread::msleep(100);
+            }
+        }
         QLocalSocket probe;
         probe.connectToServer(instanceName());
         if (probe.waitForConnected(300)) {
@@ -104,7 +119,8 @@ int main(int argc, char** argv) {
     }
 
     // Log: terminal + file.
-    std::ofstream logFile(kettle::gui::logFilePath().toStdString(), std::ios::trunc);
+    // a restart continues the log of the previous run
+    std::ofstream logFile(kettle::gui::logFilePath().toStdString(), parser.isSet(restarted) ? std::ios::app : std::ios::trunc);
     // the log contains members' names and addresses – owner only
     QFile::setPermissions(kettle::gui::logFilePath(), QFileDevice::ReadOwner | QFileDevice::WriteOwner);
     TeeBuf tee(std::clog.rdbuf(), logFile.is_open() ? logFile.rdbuf() : nullptr);

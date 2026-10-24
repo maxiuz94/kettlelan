@@ -25,7 +25,7 @@ const char* messageTemplate(Msg id) {
     case Msg::PeerBadVersion: return QT_TRANSLATE_NOOP("Messages", "%1 uses a different version of KettleLAN – please update.");
     case Msg::OldVersionInNetwork: return QT_TRANSLATE_NOOP("Messages", "Someone in “%1” uses an older KettleLAN (0.2) – older versions cannot see this network, ask them to update.");
     case Msg::InvalidCode: return QT_TRANSLATE_NOOP("Messages", "That does not look like a network code. Codes look like KTL-XXXX-XXXX-XXXX.");
-    case Msg::SteamNotRunning: return QT_TRANSLATE_NOOP("Messages", "Steam is not running. Start Steam, sign in and try again.");
+    case Msg::SteamNotRunning: return QT_TRANSLATE_NOOP("Messages", "Steam is not running. Start Steam and sign in.");
     case Msg::SteamOutdated: return QT_TRANSLATE_NOOP("Messages", "Your Steam client is too old – please update Steam.");
     case Msg::SteamInitFailed: return QT_TRANSLATE_NOOP("Messages", "Could not connect to Steam: %1");
     case Msg::TunTempDirFailed: return QT_TRANSLATE_NOOP("Messages", "Could not create a temporary folder: %1");

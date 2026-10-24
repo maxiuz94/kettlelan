@@ -37,6 +37,7 @@ class Backend : public QObject {
     Q_PROPERTY(int maxNetworks READ maxNetworks CONSTANT)
     // the network shown on the network screen (networkName, networkCode, peers… describe it)
     Q_PROPERTY(bool networkOpen READ networkOpen NOTIFY changed)
+    Q_PROPERTY(bool paused READ paused NOTIFY changed) // all networks paused, not connected to Steam
     Q_PROPERTY(QString networkAlias READ networkAlias NOTIFY changed) // your own note for the open network
     Q_PROPERTY(bool networkOwner READ networkOwner NOTIFY changed)    // you opened it: you can rename it
     // settings
@@ -75,6 +76,7 @@ public:
     int connectedCount() const { return int(live_.size()); }
     int maxNetworks() const { return int(steam::Network::kMaxNetworks); }
     bool networkOpen() const { return networkOpen_; }
+    bool paused() const;
     QString networkAlias() const { return networkAlias_; }
     bool networkOwner() const { return networkOwner_; }
     QVariantList savedNetworks() const { return saved_; }
@@ -109,6 +111,8 @@ public:
     Q_INVOKABLE void openNetwork(const QString& code);
     Q_INVOKABLE void closeNetwork();
     Q_INVOKABLE void setNetworkEnabled(const QString& code, bool on);
+    Q_INVOKABLE void pause();  // switch every network off and disconnect from Steam, remember which were on
+    Q_INVOKABLE void resume(); // switch the paused networks on again
     Q_INVOKABLE void setAlias(const QString& code, const QString& alias); // only on this computer
     Q_INVOKABLE void renameNetwork(const QString& code, const QString& name); // for everyone (owner only)
     Q_INVOKABLE void connectSaved(const QString& code);
@@ -178,6 +182,9 @@ private:
     QSet<QString> rememberedNow_;    // saved/updated in this session (once per connect)
     bool autoConnectDone_ = false;
     void disconnectNetwork(const QString& code);
+    void goOnline();
+    void restartApp();
+    bool steamUsed_ = false;
     void rebuildNetworks();
     void showOpenNetwork();
     QStringList activeNetworks() const;

@@ -129,6 +129,15 @@ and [verify it](SECURITY.md#verifying-a-download). If a well-known antivirus fla
 please [open an issue](https://github.com/maxiuz94/kettlelan/issues) with the scan link – we report false
 positives to the vendors.
 
+**Why do my friends see me "playing Spacewar"?** While KettleLAN is connected to Steam, Steam treats it as a running
+game (Valve's free test app "Spacewar") – Steamworks programs cannot hide this. KettleLAN connects to Steam only while
+at least one network is switched on: switch them all off, or press **Pause**, and the status disappears. If you start
+another Steam game, your friends see that game – Steam shows the one you are actually playing.
+
+**Does KettleLAN get in the way of other games?** No. Steam lets several games run at the same time, and every game has
+its own lobbies and networking, so KettleLAN's lobbies do not mix with other games' lobbies. If you prefer, press
+**Pause** before you start another game.
+
 **Why "Spacewar"?** It is Valve's free test App ID that every Steam account can use. A dedicated App ID
 would require publishing KettleLAN on Steam.
 

@@ -29,6 +29,7 @@ namespace {
 
 QString statusName(EngineStatus s) {
     switch (s) {
+    case EngineStatus::Offline: return QStringLiteral("offline");
     case EngineStatus::Starting: return QStringLiteral("starting");
     case EngineStatus::SteamMissing: return QStringLiteral("steamMissing");
     case EngineStatus::TunError: return QStringLiteral("tunError");
@@ -122,17 +123,75 @@ void Backend::startEngine() {
         });
     engine_->setHideAddress(hideAddress_);
     engine_->setProtectServices(protectServices_);
-    engine_->start();
+
+    // Connect to Steam only when a network is on (otherwise Steam would show "Spacewar" for nothing).
+    QSettings settings;
+    const QString last = settings.value(QStringLiteral("lastNetwork")).toString(); // KettleLAN 0.2
+    if (activeNetworks().isEmpty() && !last.isEmpty()) setActive(last, true);
+    settings.remove(QStringLiteral("lastNetwork"));
+    if (!autoConnect_) settings.remove(QStringLiteral("activeNetworks")); // start with every network off
+    engine_->start(!activeNetworks().isEmpty());
+}
+
+// Connects to Steam for the networks that are on. Steamworks cannot connect twice in one run, so
+// after a disconnect KettleLAN starts itself again (the switched-on networks are saved).
+void Backend::goOnline() {
+    if (demo_ || !engine_) return;
+    if (steamUsed_ && status_ == QLatin1String("offline")) {
+        restartApp();
+        return;
+    }
+    engine_->goOnline();
+}
+
+void Backend::restartApp() {
+    QStringList args{QStringLiteral("--restarted")};
+    if (!window_ || !window_->isVisible()) args << QStringLiteral("--minimized");
+    // An AppImage runs from a mount that disappears when it quits – start the .AppImage file itself.
+    const QString appImage = qEnvironmentVariable("APPIMAGE");
+    const QString program = appImage.isEmpty() ? QCoreApplication::applicationFilePath() : appImage;
+    if (QProcess::startDetached(program, args)) quitApp();
+}
+
+void Backend::pause() {
+    const QStringList active = activeNetworks();
+    if (active.isEmpty()) return;
+    QSettings().setValue(QStringLiteral("pausedNetworks"), active);
+    QSettings().remove(QStringLiteral("activeNetworks"));
+    pendingOpen_.clear();
+    networkOpen_ = false;
+    if (engine_) engine_->goOffline();
+    emit changed();
+}
+
+void Backend::resume() {
+    const QStringList paused = QSettings().value(QStringLiteral("pausedNetworks")).toStringList();
+    QSettings().remove(QStringLiteral("pausedNetworks"));
+    for (const auto& code : paused) setActive(code, true);
+    emit changed();
+    if (!paused.isEmpty()) goOnline();
+}
+
+bool Backend::paused() const {
+    return status_ == QLatin1String("offline") && !QSettings().value(QStringLiteral("pausedNetworks")).toStringList().isEmpty();
 }
 
 // ---------------------------------------------------------------- state from the engine
 
 void Backend::applySnapshot(const Snapshot& snap) {
+    const QString previous = status_;
     status_ = statusName(snap.status);
+    steamUsed_ = steamUsed_ || snap.steamUsed;
     const bool hasError = snap.status == EngineStatus::SteamMissing || snap.status == EngineStatus::TunError;
     errorText_ = hasError ? messageText(snap.error) : QString();
     personaName_ = QString::fromStdString(snap.personaName);
-    selfAddress_ = QString::fromStdString(snap.selfAddress);
+    // the address comes from the Steam account – remember it for the time KettleLAN is offline
+    if (!snap.selfAddress.empty()) {
+        selfAddress_ = QString::fromStdString(snap.selfAddress);
+        QSettings().setValue(QStringLiteral("lastAddress"), selfAddress_);
+    } else if (selfAddress_.isEmpty()) {
+        selfAddress_ = QSettings().value(QStringLiteral("lastAddress")).toString();
+    }
     blockedPackets_ = snap.blockedPackets;
 
     live_.clear();
@@ -169,20 +228,11 @@ void Backend::applySnapshot(const Snapshot& snap) {
     rebuildNetworks();
     emit changed();
 
-    // Rejoin the networks that were connected last time – once, right after connecting to Steam.
-    if (status_ == QLatin1String("ready") && !autoConnectDone_) {
-        autoConnectDone_ = true;
-        if (autoConnect_ && live_.empty()) {
-            QStringList active = activeNetworks();
-            const QString last = QSettings().value(QStringLiteral("lastNetwork")).toString(); // KettleLAN 0.2
-            if (active.isEmpty() && !last.isEmpty()) {
-                active = {last};
-                setActive(last, true);
-            }
-            QSettings().remove(QStringLiteral("lastNetwork"));
-            for (int i = 0; i < active.size() && i < maxNetworks(); ++i)
-                if (engine_) engine_->join(active[i].toStdString(), savedName(active[i]).toStdString());
-        }
+    // Connected to Steam: join the networks that are on (rejoined after a start, or just switched on).
+    if (status_ == QLatin1String("ready") && previous != QLatin1String("ready")) {
+        const QStringList active = activeNetworks();
+        for (int i = 0; i < active.size() && i < maxNetworks(); ++i)
+            if (engine_ && !liveFor(active[i])) engine_->join(active[i].toStdString(), savedName(active[i]).toStdString());
     }
     rebuildTrayMenu();
 }
@@ -295,6 +345,12 @@ void Backend::joinNetwork(const QString& code) {
     setActive(normalized, true);
     pendingOpen_ = normalized;
     if (demo_) return;
+    QSettings().remove(QStringLiteral("pausedNetworks")); // switching a network on ends a pause
+    if (status_ != QLatin1String("ready")) {
+        goOnline(); // the network is joined once Steam is connected
+        emit changed();
+        return;
+    }
     if (engine_) engine_->join(normalized.toStdString(), savedName(normalized).toStdString());
 }
 
@@ -336,6 +392,8 @@ void Backend::disconnectNetwork(const QString& code) {
         return;
     }
     if (engine_) engine_->leave(code.toStdString());
+    // the last network is off: disconnect from Steam, so it no longer shows "Spacewar"
+    if (activeNetworks().isEmpty() && engine_) engine_->goOffline();
 }
 
 QStringList Backend::activeNetworks() const {
@@ -619,12 +677,13 @@ void Backend::rebuildTrayMenu() {
     int connected = 0;
     for (const auto& n : live_)
         if (n.connected) ++connected;
-    const QString sig = QString::number(connected) + selfAddress_;
+    const QString sig = QString::number(connected) + selfAddress_ + status_;
     if (sig == trayMenuSignature_) return;
     trayMenuSignature_ = sig;
 
     tray_->setIcon(makeAppIcon(connected > 0));
-    tray_->setToolTip(connected == 0 ? QStringLiteral("KettleLAN")
+    tray_->setToolTip(status_ == QLatin1String("offline") ? tr("KettleLAN – not connected to Steam")
+                      : connected == 0 ? QStringLiteral("KettleLAN")
                       : connected == 1 ? tr("KettleLAN – %1 · 1 network").arg(selfAddress_)
                                        : tr("KettleLAN – %1 · %2 networks").arg(selfAddress_).arg(connected));
     if (!trayMenu_->isEmpty()) return; // the two actions never change

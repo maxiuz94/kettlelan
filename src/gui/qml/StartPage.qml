@@ -24,6 +24,13 @@ Item {
             spacing: 10
             SvgIcon { name: "kettle"; size: 28; color: Theme.accent }
             Text { textFormat: Text.PlainText; text: "KettleLAN"; color: Theme.text; font.pixelSize: 18; font.weight: Font.Bold; Layout.fillWidth: true }
+            // Pause: every network off and no Steam connection (no "Spacewar" on Steam); Resume: the same networks on again
+            IconButton {
+                visible: Backend.connectedCount > 0 || Backend.paused
+                iconName: Backend.paused ? "play" : "pause"
+                label: Backend.paused ? qsTr("Resume – switch the paused networks on again") : qsTr("Pause – switch every network off and disconnect from Steam")
+                onClicked: Backend.paused ? Backend.resume() : Backend.pause()
+            }
             IconButton { iconName: "settings"; label: qsTr("Settings"); onClicked: page.openSettings() }
         }
         Rectangle { Layout.fillWidth: true; height: 1; color: Theme.border }
@@ -221,7 +228,9 @@ Item {
                 wrapMode: Text.WordWrap
                 color: Theme.muted
                 font.pixelSize: 12
-                text: Backend.connectedCount >= Backend.maxNetworks
+                text: Backend.paused ? qsTr("Paused – KettleLAN is not connected to Steam. Press ▶ to switch the same networks on again.")
+                      : Backend.status === "offline" ? qsTr("KettleLAN connects to Steam when you switch a network on, and disconnects when all are off.")
+                      : Backend.connectedCount >= Backend.maxNetworks
                       ? qsTr("You are connected to %1 networks – the most at the same time. Turn one off to connect to another.").arg(Backend.maxNetworks)
                       : qsTr("You can be connected to up to %1 networks at the same time.").arg(Backend.maxNetworks)
             }

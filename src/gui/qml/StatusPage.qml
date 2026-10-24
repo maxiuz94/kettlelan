@@ -28,7 +28,7 @@ Item {
             font.pixelSize: 20
             font.weight: Font.Bold
             text: page.busy ? qsTr("Connecting to Steam…")
-                 : Backend.status === "steamMissing" ? qsTr("Not connected to Steam")
+                 : Backend.status === "steamMissing" ? qsTr("Waiting for Steam…")
                  : qsTr("Could not set up the network adapter")
         }
         Text { textFormat: Text.PlainText;
@@ -39,12 +39,13 @@ Item {
             font.pixelSize: 14
             lineHeight: 1.3
             text: page.busy ? qsTr("On the first start the system asks for your password – this creates the virtual network adapter.")
-                            : Backend.errorText
+                 : Backend.status === "steamMissing" ? Backend.errorText + " " + qsTr("KettleLAN connects as soon as Steam is ready.")
+                 : Backend.errorText
         }
         BusyIndicator {
             Layout.alignment: Qt.AlignHCenter
-            running: page.busy
-            visible: page.busy
+            running: page.busy || Backend.status === "steamMissing"
+            visible: running
         }
         AppButton {
             Layout.alignment: Qt.AlignHCenter

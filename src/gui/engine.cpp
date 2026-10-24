@@ -16,6 +16,7 @@ struct Engine::State {
     std::unique_ptr<steam::Network> net;
     std::unique_ptr<platform::Tun> tun;
     EngineStatus status = EngineStatus::Starting;
+    bool steamUsed = false;
     Message error;
     bool dirty = true;
     bool hideAddress = true;
@@ -32,11 +33,44 @@ void Engine::post(std::function<void()> fn) {
     queue_.push_back(std::move(fn));
 }
 
-void Engine::start() {
+void Engine::start(bool online) {
     if (running_) return;
     running_ = true;
-    post([this] { initialize(); });
+    if (online) {
+        post([this] { initialize(); });
+    } else {
+        post([this] {
+            st_->status = EngineStatus::Offline;
+            publish();
+        });
+    }
     thread_ = std::thread([this] { loop(); });
+}
+
+void Engine::goOnline() {
+    post([this] {
+        auto& s = *st_;
+        if (s.steamUsed && !s.session.initialized()) return; // needs a fresh start (the GUI restarts KettleLAN)
+        if (s.status == EngineStatus::Offline) initialize();
+    });
+}
+
+void Engine::goOffline() {
+    post([this] {
+        auto& s = *st_;
+        if (s.net) s.net->leaveAll();
+        if (s.session.initialized()) s.session.runCallbacks();
+        if (s.tun) {
+            s.tun->stop();
+            s.tun.reset();
+        }
+        // The network object registers Steam callbacks – it must not be destroyed after SteamAPI_Shutdown().
+        s.net.reset();
+        if (s.session.initialized()) s.session.shutdown();
+        s.status = EngineStatus::Offline;
+        s.error = {};
+        publish();
+    });
 }
 
 void Engine::retry() {
@@ -111,6 +145,7 @@ void Engine::initialize() {
             publish();
             return;
         }
+        s.steamUsed = true;
         s.net = std::make_unique<steam::Network>(s.session.steamId(), [this](const Message& message) {
             st_->dirty = true;
             if (onEvent_) onEvent_(message);
@@ -141,6 +176,7 @@ void Engine::publish() {
     auto& s = *st_;
     Snapshot snap;
     snap.status = s.status;
+    snap.steamUsed = s.steamUsed;
     snap.error = s.error;
     if (s.session.initialized()) snap.personaName = s.session.personaName();
     if (s.net) {
@@ -155,6 +191,7 @@ void Engine::publish() {
 void Engine::loop() {
     auto nextTick = Clock::now();
     auto nextPublish = Clock::now();
+    auto nextRetry = Clock::now() + std::chrono::seconds(5);
     while (running_) {
         std::deque<std::function<void()>> jobs;
         {
@@ -164,6 +201,14 @@ void Engine::loop() {
         for (auto& job : jobs) job();
 
         auto& s = *st_;
+        // At login KettleLAN often starts before Steam (and on Windows before the KettleLAN service):
+        // keep trying every few seconds instead of waiting for "Try again".
+        if (Clock::now() >= nextRetry) {
+            nextRetry = Clock::now() + std::chrono::seconds(5);
+            const bool waiting = s.status == EngineStatus::SteamMissing ||
+                                 (s.status == EngineStatus::TunError && s.error.id == Msg::TunServiceUnavailable);
+            if (waiting) initialize();
+        }
         if (s.session.initialized()) {
             s.session.runCallbacks();
             if (s.net) s.net->poll();
