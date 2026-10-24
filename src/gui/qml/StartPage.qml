@@ -25,10 +25,14 @@ Item {
             SvgIcon { name: "kettle"; size: 28; color: Theme.accent }
             Text { textFormat: Text.PlainText; text: "KettleLAN"; color: Theme.text; font.pixelSize: 18; font.weight: Font.Bold; Layout.fillWidth: true }
             // Pause: every network off and no Steam connection (no "Spacewar" on Steam); Resume: the same networks on again
+            // always in the same place; greyed out when every network is already off
             IconButton {
-                visible: Backend.connectedCount > 0 || Backend.paused
+                enabled: Backend.connectedCount > 0 || Backend.paused
+                opacity: enabled ? 1 : 0.35
                 iconName: Backend.paused ? "play" : "pause"
-                label: Backend.paused ? qsTr("Resume – switch the paused networks on again") : qsTr("Pause – switch every network off and disconnect from Steam")
+                label: Backend.paused ? qsTr("Resume – switch the paused networks on again")
+                     : enabled ? qsTr("Pause – switch every network off and disconnect from Steam")
+                     : qsTr("Pause – every network is already off")
                 onClicked: Backend.paused ? Backend.resume() : Backend.pause()
             }
             IconButton { iconName: "settings"; label: qsTr("Settings"); onClicked: page.openSettings() }
