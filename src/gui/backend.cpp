@@ -42,11 +42,6 @@ QString normalizeCode(const QString& code) {
     return c ? QString::fromStdString(netcode::format(*c)) : QString();
 }
 
-// Text from other people in a Qt menu: "&" marks a keyboard shortcut there, so double it.
-QString menuText(const QString& t) {
-    QString out = t;
-    return out.replace(QLatin1Char('&'), QStringLiteral("&&"));
-}
 
 // The settings file holds network codes (they work like passwords) – owner only.
 void restrictSettingsFile() {
@@ -628,79 +623,21 @@ void Backend::setupTray() {
     tray_->show();
 }
 
+// The tray menu stays short: everything else is in the window.
 void Backend::rebuildTrayMenu() {
     if (!tray_) return;
-    bool anyConnected = false;
-    for (const auto& n : live_) anyConnected = anyConnected || n.connected;
-
-    // Rebuild the menu only when networks or members change (ping changes every second).
-    QString sig = status_ + QString::number(saved_.size());
-    for (const auto& n : live_) {
-        sig += n.code + savedName(n.code) + (n.connected ? QStringLiteral("c") : QStringLiteral("w"));
-        for (const auto& v : n.peers) {
-            const auto m = v.toMap();
-            sig += m.value(QStringLiteral("address")).toString() + (m.value(QStringLiteral("verified")).toBool() ? QStringLiteral("1") : QStringLiteral("0"));
-        }
-    }
+    int connected = 0;
+    for (const auto& n : live_)
+        if (n.connected) ++connected;
+    const QString sig = QString::number(connected) + selfAddress_;
     if (sig == trayMenuSignature_) return;
     trayMenuSignature_ = sig;
 
-    tray_->setIcon(makeAppIcon(anyConnected));
-    tray_->setToolTip(anyConnected ? QStringLiteral("KettleLAN – %1").arg(selfAddress_) : QStringLiteral("KettleLAN"));
-
-    trayMenu_->clear();
-    for (const auto& n : live_) {
-        const QString shared = n.lobbyName.isEmpty() ? savedName(n.code) : n.lobbyName;
-        const QString name = shared.isEmpty() ? n.code : shared;
-        if (!n.connected) {
-            trayMenu_->addAction(menuText(tr("%1 – connecting…").arg(name.isEmpty() ? n.code : name)))->setEnabled(false);
-            trayMenu_->addSeparator();
-            continue;
-        }
-        trayMenu_->addAction(menuText(name))->setEnabled(false);
-        bool anyone = false;
-        int shown = 0;
-        for (const auto& v : n.peers) {
-            const auto m = v.toMap();
-            if (m.value(QStringLiteral("self")).toBool() || !m.value(QStringLiteral("verified")).toBool()) continue;
-            anyone = true;
-            if (++shown > 8) continue; // the rest is in the window
-            const QString person = m.value(QStringLiteral("name")).toString();
-            const QString addr = m.value(QStringLiteral("address")).toString();
-            trayMenu_->addAction(menuText(tr("Copy IP: %1  (%2)").arg(person, addr)), this, [this, person, addr] {
-                copyText(addr, tr("Copied address %1 (%2)").arg(addr, person));
-            });
-        }
-        if (!anyone) trayMenu_->addAction(tr("Nobody has joined yet"))->setEnabled(false);
-        else if (shown > 8) trayMenu_->addAction(tr("%1 more – show all in the window").arg(shown - 8), this, [this, code = n.code] {
-            showWindow();
-            openNetwork(code);
-        });
-        const QString code = n.code;
-        trayMenu_->addAction(tr("Copy network code"), this, [this, code] {
-            copyText(code, tr("Network code copied – send it to your friends"));
-        });
-        trayMenu_->addAction(menuText(tr("Disconnect from %1").arg(name)), this, [this, code] { disconnectNetwork(code); });
-        trayMenu_->addSeparator();
-    }
-    if (status_ == QLatin1String("ready")) {
-        const bool full = int(live_.size()) >= maxNetworks();
-        bool header = false;
-        for (const auto& v : saved_) {
-            const auto m = v.toMap();
-            const QString code = m.value(QStringLiteral("code")).toString();
-            if (liveFor(code)) continue;
-            if (!header) {
-                trayMenu_->addAction(full ? tr("Other networks · limit reached") : tr("Your other networks"))->setEnabled(false);
-                header = true;
-            }
-            const QString savedTitle = m.value(QStringLiteral("name")).toString();
-            auto* action = trayMenu_->addAction(menuText(tr("Connect: %1").arg(savedTitle.isEmpty() ? code : savedTitle)), this,
-                                                [this, code] { setNetworkEnabled(code, true); });
-            action->setEnabled(!full);
-        }
-        if (header) trayMenu_->addSeparator();
-    }
+    tray_->setIcon(makeAppIcon(connected > 0));
+    tray_->setToolTip(connected == 0 ? QStringLiteral("KettleLAN")
+                      : connected == 1 ? tr("KettleLAN – %1 · 1 network").arg(selfAddress_)
+                                       : tr("KettleLAN – %1 · %2 networks").arg(selfAddress_).arg(connected));
+    if (!trayMenu_->isEmpty()) return; // the two actions never change
     trayMenu_->addAction(tr("Show window"), this, [this] { showWindow(); });
     trayMenu_->addAction(tr("Quit KettleLAN"), this, [this] { quitApp(); });
 }

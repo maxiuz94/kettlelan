@@ -28,7 +28,7 @@ Before tagging a release add a `## [x.y.z] – date` section (see [docs/RELEASIN
 - Network: keep Steam sessions with members open (ping always shown, faster first game packet)
 - GUI: list members with you first, then by ping, then the ones still connecting
 - CLI: "join <code> [name]", "rename <n> <name>"
-- GUI: show a section for each connected network in the system tray menu
+- GUI: short system tray menu (Show window, Quit KettleLAN) – everything else is in the window
 
 ## [0.2.1] – 2026-10-22
 
