@@ -51,7 +51,7 @@ Get the latest version from the [**Releases**](https://github.com/maxiuz94/kettl
 | Any Linux distribution | `KettleLAN-…-x86_64.AppImage` | `chmod +x KettleLAN-*.AppImage`, then run it |
 | Ubuntu 24.04+, Mint 22+, Pop!_OS, Debian 13 | `kettlelan_…_ubuntu24.04_amd64.deb` | `sudo apt install ./kettlelan_…_ubuntu24.04_amd64.deb` |
 | Debian 12, MX Linux 23 | `kettlelan_…_debian12_amd64.deb` | `sudo apt install ./kettlelan_…_debian12_amd64.deb` |
-| Windows 10/11 (64-bit) – from 0.2.0 | `KettleLAN-…-windows-x64.zip` | extract and run `KettleLAN.exe` (asks for administrator rights) |
+| Windows 10/11 (64-bit) | `KettleLAN-…-windows-x64-setup.exe` | run the installer (one administrator prompt); KettleLAN itself runs without administrator rights |
 
 You need **Steam** installed and signed in (on Linux the regular version from your distribution or from
 Valve; the Flatpak and Snap versions may not work).
@@ -159,9 +159,9 @@ your Downloads folder. Releases are built from the official SDK file listed in
 
 Packages: `packaging/linux/build-appimage.sh` (AppImage) and `cpack` with `-DKETTLELAN_PACKAGE=deb` (.deb).
 
-**Windows:** Visual Studio 2022 (C++ workload), CMake and Qt 6.8 for MSVC 2022 64-bit; in Git Bash run
-`packaging/windows/build-zip.sh build-windows /path/to/steamworks_sdk_XXX.zip` – it builds, runs the tests and
-creates the zip package. Wintun is downloaded automatically from wintun.net and verified with SHA256.
+**Windows:** Visual Studio 2022 (C++ workload), CMake, Qt 6.8 for MSVC 2022 64-bit and Inno Setup 6; in Git Bash run
+`packaging/windows/build-installer.sh build-windows /path/to/steamworks_sdk_XXX.zip` – it builds, runs the tests and
+creates the installer. Wintun is downloaded automatically from wintun.net and verified with SHA256.
 Releasing a new version: [docs/RELEASING.md](docs/RELEASING.md).
 
 ## Built with AI assistance
