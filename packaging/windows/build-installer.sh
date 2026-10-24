@@ -6,6 +6,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 BUILD="${1:?build directory}"
+mkdir -p "$BUILD"
+BUILD="$(cd "$BUILD" && pwd)" # absolute: Inno Setup resolves relative paths from the script's folder
 SDK_ZIP="${2:?Steamworks SDK zip}"
 VERSION="$(sed -n 's/^project(KettleLAN VERSION \([0-9.]*\).*/\1/p' "$ROOT/CMakeLists.txt")"
 NAME="KettleLAN-${VERSION}-windows-x64"
