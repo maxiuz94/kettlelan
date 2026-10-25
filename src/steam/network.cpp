@@ -253,8 +253,8 @@ private:
         SteamMatchmaking()->SetLobbyMemberData(lobby_, "ip", hub_.selfAddress_.toString().c_str());
         adoptLobbyName();
         publishKnownName();
-        publishNick();
         state_ = State::Connected;
+        publishNick(); // needs the Connected state – also when the nickname was set before joining
         const auto now = Clock::now();
         nextMergeCheck_ = now + kFirstMergeCheck;
         oldVersionCheckAt_ = now + kOldVersionCheck;
@@ -735,6 +735,7 @@ std::vector<NetworkInfo> Network::networks() const {
 
 void Network::setNick(const std::string& nick) {
     nick_ = text::sanitize(nick, 32);
+    KLOG_INFO(nick_.empty() ? std::string("Your name in networks: your Steam name") : "Your name in networks: " + nick_);
     for (const auto& l : lobbies_) l->publishNick();
 }
 
