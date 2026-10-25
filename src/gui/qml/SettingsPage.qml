@@ -99,16 +99,9 @@ Item {
                     }
                     Toggle {
                         Layout.fillWidth: true
-                        title: qsTr("Messages in the window")
-                        hint: qsTr("Short messages at the top of the window: someone joined or left, errors")
-                        checked: Backend.windowMessages
-                        onUserToggled: (value) => Backend.windowMessages = value
-                    }
-                    Toggle {
-                        Layout.fillWidth: true
                         last: true
-                        title: qsTr("System notifications")
-                        hint: qsTr("When someone joins or leaves, or something needs your attention, while the window is hidden")
+                        title: qsTr("Notifications")
+                        hint: qsTr("System notifications when someone joins or leaves, and about warnings and errors")
                         checked: Backend.notifications
                         onUserToggled: (value) => Backend.notifications = value
                     }

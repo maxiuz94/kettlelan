@@ -92,7 +92,6 @@ Backend::Backend(bool demo, QObject* parent) : QObject(parent), demo_(demo) {
     QSettings s;
     closeToTray_ = s.value(QStringLiteral("closeToTray"), true).toBool();
     notifications_ = s.value(QStringLiteral("notifications"), true).toBool();
-    windowMessages_ = s.value(QStringLiteral("windowMessages"), true).toBool();
     theme_ = s.value(QStringLiteral("theme"), QStringLiteral("system")).toString();
     autoConnect_ = s.value(QStringLiteral("autoConnect"), true).toBool();
     hideAddress_ = s.value(QStringLiteral("hideAddress"), true).toBool();
@@ -296,17 +295,20 @@ QString Backend::messageText(const Message& message) const {
 }
 
 void Backend::handleEvent(const Message& message) {
-    const QString text = messageText(message);
-    // In the window: not the state of a network (the list shows it), and only when wanted.
-    if (windowMessages_ && !isNetworkStateEvent(message.id)) emit toast(text);
-    // System notifications: people and warnings, only when the window is hidden.
-    const bool hidden = !window_ || !window_->isVisible();
-    if (notifications_ && isNotifyEvent(message.id) && hidden && tray_)
+    if (isNetworkStateEvent(message.id)) return; // connecting, connected, left: the list shows it
+    inform(messageText(message), !isPeerEvent(message.id));
+}
+
+void Backend::inform(const QString& text, bool important) {
+    if (notifications_ && tray_ && QSystemTrayIcon::supportsMessages()) {
 #ifdef _WIN32
-        tray_->showMessage(QStringLiteral("KettleLAN"), text, makeAppIcon(true), 4000); // shown as plain text
+        tray_->showMessage(QStringLiteral("KettleLAN"), text, makeAppIcon(true), 5000); // shown as plain text
 #else
-        tray_->showMessage(QStringLiteral("KettleLAN"), text.toHtmlEscaped(), makeAppIcon(true), 4000); // may be HTML
+        tray_->showMessage(QStringLiteral("KettleLAN"), text.toHtmlEscaped(), makeAppIcon(true), 5000); // may be HTML
 #endif
+    } else if (important) {
+        emit toast(text);
+    }
 }
 
 // ---------------------------------------------------------------- actions
@@ -332,7 +334,7 @@ bool Backend::isCodeValid(const QString& code) const { return netcode::parse(cod
 
 void Backend::joinNetwork(const QString& code) {
     if (!isCodeValid(code)) {
-        emit toast(messageText({Msg::InvalidCode, {}}));
+        inform(messageText({Msg::InvalidCode, {}}), true);
         return;
     }
     const QString normalized = normalizeCode(code);
@@ -341,7 +343,7 @@ void Backend::joinNetwork(const QString& code) {
         return;
     }
     if (connectedCount() >= maxNetworks()) {
-        emit toast(messageText({Msg::NetworkLimit, {std::to_string(maxNetworks())}}));
+        inform(messageText({Msg::NetworkLimit, {std::to_string(maxNetworks())}}), true);
         return;
     }
     setActive(normalized, true);
@@ -421,7 +423,7 @@ void Backend::forgetNetwork(const QString& code) {
             storeSaved();
             rebuildNetworks();
             emit changed();
-            emit toast(tr("Removed “%1” from your networks").arg(name));
+            inform(tr("Removed “%1” from your networks").arg(name), false);
             return;
         }
     }
@@ -434,10 +436,8 @@ void Backend::leaveNetwork() {
     emit changed();
 }
 
-void Backend::copyText(const QString& text, const QString& message) {
-    QGuiApplication::clipboard()->setText(text);
-    emit toast(message);
-}
+// The confirmation is shown where the user clicked (a ✓ or "Copied"), not as a message.
+void Backend::copyText(const QString& text, const QString&) { QGuiApplication::clipboard()->setText(text); }
 
 void Backend::openUrl(const QString& url) { QDesktopServices::openUrl(QUrl(url)); }
 
@@ -555,7 +555,7 @@ void Backend::renameNetwork(const QString& code, const QString& name) {
     if (clean.isEmpty() || !n || !n->owner) return;
     if (engine_) engine_->rename(c.toStdString(), clean.toStdString());
     updateSavedName(c, clean);
-    emit toast(tr("Renamed the network to “%1” for everyone").arg(clean));
+    inform(tr("Renamed the network to “%1” for everyone").arg(clean), false);
 }
 
 void Backend::rememberNetwork(const QString& code, const QString& name) {
@@ -578,13 +578,6 @@ void Backend::rememberNetwork(const QString& code, const QString& name) {
         if (!liveFor(c) && !activeNetworks().contains(c)) saved_.removeAt(i);
     }
     storeSaved();
-}
-
-void Backend::setWindowMessages(bool v) {
-    if (v == windowMessages_) return;
-    windowMessages_ = v;
-    QSettings().setValue(QStringLiteral("windowMessages"), v);
-    emit settingsChanged();
 }
 
 void Backend::setNotifications(bool v) {

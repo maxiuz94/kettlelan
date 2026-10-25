@@ -119,8 +119,11 @@ Item {
                         readonly property color badgeFg: (modelData.self || !modelData.verified || modelData.pingMs < 0) ? Theme.muted
                             : (modelData.relayed || modelData.conflict) ? Theme.relayFg : Theme.directFg
 
-                        onClicked: if (!modelData.self && modelData.verified)
-                                       Backend.copyText(modelData.address, qsTr("Copied address %1 (%2)").arg(modelData.address).arg(modelData.name))
+                        onClicked: if (!modelData.self && modelData.verified) {
+                                       Backend.copyText(modelData.address, "")
+                                       rowCopied.restart()
+                                   }
+                        Timer { id: rowCopied; interval: 1500 }
 
                         background: Rectangle {
                             color: row.down ? Theme.border : (row.hovered && !row.modelData.self ? Theme.surface2 : "transparent")
@@ -151,7 +154,7 @@ Item {
                                     font.weight: Font.DemiBold
                                     elide: Text.ElideRight
                                 }
-                                Text { textFormat: Text.PlainText; text: row.modelData.address; color: Theme.muted; font.family: Theme.mono; font.pixelSize: 12 }
+                                Text { textFormat: Text.PlainText; text: rowCopied.running ? qsTr("Copied ✓") : row.modelData.address; color: rowCopied.running ? Theme.ok : Theme.muted; font.family: Theme.mono; font.pixelSize: 12 }
                             }
                             ColumnLayout {
                                 spacing: 4
@@ -183,8 +186,9 @@ Item {
                     Layout.fillWidth: true
                     kind: "primary"
                     iconName: "userPlus"
-                    text: qsTr("Invite friends")
-                    onClicked: Backend.copyText(Backend.networkCode, qsTr("Network code copied – send it to your friends"))
+                    text: inviteCopied.running ? qsTr("Code copied – send it to your friends") : qsTr("Invite friends")
+                    onClicked: { Backend.copyText(Backend.networkCode, ""); inviteCopied.restart() }
+                    Timer { id: inviteCopied; interval: 2500 }
                 }
                 AppButton {
                     kind: "secondary"

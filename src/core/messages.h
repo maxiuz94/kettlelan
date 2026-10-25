@@ -71,8 +71,6 @@ std::string english(const Message& message);
 
 // Whether the message is about another person joining or leaving (shown as a notification).
 bool isPeerEvent(Msg id);
-// Worth a system notification when the window is hidden: people joining and leaving, and warnings.
-bool isNotifyEvent(Msg id);
 // The state of a network, already shown on the list (no message needed in the window).
 bool isNetworkStateEvent(Msg id);
 

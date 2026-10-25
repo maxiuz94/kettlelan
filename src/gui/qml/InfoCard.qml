@@ -41,10 +41,11 @@ Rectangle {
             IconButton {
                 implicitWidth: 34
                 implicitHeight: 34
-                iconName: "copy"
+                iconName: copiedTimer.running ? "check" : "copy"
                 iconSize: 16
-                label: qsTr("Copy")
-                onClicked: card.copyRequested()
+                label: copiedTimer.running ? qsTr("Copied") : qsTr("Copy")
+                onClicked: { card.copyRequested(); copiedTimer.restart() }
+                Timer { id: copiedTimer; interval: 1500 }
             }
         }
     }

@@ -121,10 +121,11 @@ Popup {
             }
             Item { Layout.fillWidth: true }
             IconButton {
-                iconName: "copy"
+                iconName: codeCopied.running ? "check" : "copy"
                 iconSize: 18
-                label: qsTr("Copy network code")
-                onClicked: Backend.copyText(dialog.code, qsTr("Network code copied – send it to your friends"))
+                label: codeCopied.running ? qsTr("Copied") : qsTr("Copy network code")
+                onClicked: { Backend.copyText(dialog.code, ""); codeCopied.restart() }
+                Timer { id: codeCopied; interval: 1500 }
             }
         }
 

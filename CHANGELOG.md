@@ -21,8 +21,8 @@ Before tagging a release add a `## [x.y.z] – date` section (see [docs/RELEASIN
 - Steam: connect to Steam only while a network is on – in a separate background process (kettlelan-steam), so with every network off Steam no longer shows "Spacewar"
 - GUI: Pause / Resume button – every network off and no Steam connection, then the same networks on again
 - GUI: networks show "Connecting…" on the list while KettleLAN connects to Steam – no separate screen in between
-- GUI: messages at the top of the window instead of over the buttons, none about a network's state (the list shows it)
-- GUI: settings "Messages in the window" and "System notifications" (also about warnings, such as an older KettleLAN in the network)
+- GUI: messages as system notifications instead of pop-ups in the window, none about a network's state (the list shows it); errors appear in the window when notifications are off
+- GUI: "Copied" shown where you clicked (✓ on the copy button, "Copied" in the members list, on the Invite button)
 - GUI: your address is shown also while KettleLAN is not connected to Steam
 - Network: new protocol version 3 – not compatible with KettleLAN 0.2, everyone in a network needs 0.3
 - Security: derive the lobby tag, the HELLO proof key and the name key from the network code with Argon2id, so the code cannot be guessed from lobby data or received proofs
