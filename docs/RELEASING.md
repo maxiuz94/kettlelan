@@ -1,21 +1,21 @@
 # Releasing a new version
 
-1. Bump the version in `CMakeLists.txt`: `project(KettleLAN VERSION 0.2.0 …)`.
+1. Bump the version in `CMakeLists.txt`: `project(KettleLAN VERSION 0.3.0 …)`.
 2. In [`CHANGELOG.md`](../CHANGELOG.md) rename `## [Unreleased]` to `## [0.2.0] – date` (and start a new empty
    `## [Unreleased]` above it). Keep the format: a flat list, one line per change – `Area: what changed`.
-   This text becomes the description of the GitHub release – preview it with `scripts/release-notes.sh 0.2.0`.
+   This text becomes the description of the GitHub release – preview it with `scripts/release-notes.sh 0.3.0`.
    The release workflow stops if the entry is missing.
 3. Make sure the tests pass: `ctest --test-dir build --output-on-failure`.
 4. Commit and create a tag with the same version:
 
    ```sh
-   git commit -am "Release 0.2.0"
-   git tag v0.2.0
-   git push origin main v0.2.0
+   git commit -am "Release 0.3.0"
+   git tag v0.3.0
+   git push origin main v0.3.0
    ```
 
 5. GitHub Actions (the **Release** workflow) builds the .deb packages (Debian 12, Ubuntu 24.04), the
-   AppImage and the Windows zip, runs the tests, computes SHA256 checksums, adds a build attestation and publishes the release
+   AppImage and the Windows installer, runs the tests, computes SHA256 checksums, adds a build attestation and publishes the release
    on the **Releases** page with the description from `CHANGELOG.md`. Progress is visible in the **Actions** tab.
 
 ## One-time setup

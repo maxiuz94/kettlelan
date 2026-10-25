@@ -3,54 +3,40 @@
 All notable changes to KettleLAN. The entry for a version becomes the description of its GitHub release.
 
 Format: one flat list per version, one line per change – `Area: what changed`, imperative, no intro text.
-Areas: Network, Security, GUI, CLI, Linux, Windows, AppImage, Packaging, Docs, CI.
+Areas: Network, Security, Steam, GUI, CLI, Linux, Windows, AppImage, Packaging, Docs, CI.
 Before tagging a release add a `## [x.y.z] – date` section (see [docs/RELEASING.md](docs/RELEASING.md)).
 
 ## [Unreleased]
 
-- Windows: KettleLAN runs as the user – the new KettleLAN Service (SYSTEM) runs the Wintun adapter
-- Windows: no UAC prompt when KettleLAN starts; start with the system through the normal "Run" registry key
-- Windows: the adapter stays ready while the service runs – KettleLAN starts without the "identifying network" delay
-- Security: the service accepts only KettleLAN from its own folder and checks every packet from the program
-- Security: the program checks that it talks to the real service (a Windows service in session 0)
-- Windows: installer (Inno Setup) – installs to Program Files, installs the service, Start menu shortcut, optional desktop shortcut and autostart
-- Windows: updating closes KettleLAN and the service first; uninstalling removes the service and its firewall rules and keeps your saved networks
-- Windows: the installer replaces the zip package
-- Windows: smaller package without the unused Qt styles
-- GUI: wait for Steam (and on Windows for the KettleLAN service) and connect automatically – no "Try again" needed after login
-- Steam: ▶ / ⏹ button connects to and disconnects from Steam; the network switches are separate and stay as they are
-- Steam: everything that talks to Steam runs in a separate background process (kettlelan-steam) – with ⏹ Steam no longer shows "Spacewar"
-- Steam: the ▶ / ⏹ state is remembered; a first start does not connect to Steam
-- GUI: "Connected to Steam" / "Not connected to Steam" under the title
-- Network: your own name in networks instead of the Steam name (Settings → Your name, saved as you type), encrypted with each network's key
-- GUI: "Steam friend" badge for members who are your Steam friends (checked on your computer only), ⚠ when two members use the same name
-- CLI: "name [nickname]", "(Steam friend)" in "list"
-- GUI: networks show "Connecting…" on the list while KettleLAN connects to Steam – no separate screen in between
-- GUI: messages as system notifications instead of pop-ups in the window, none about a network's state (the list shows it); errors appear in the window when notifications are off
-- GUI: "Copied" shown where you clicked (✓ on the copy button, "Copied" in the members list, on the Invite button)
-- GUI: your address is shown also while KettleLAN is not connected to Steam
-- GUI: networks switched on while Steam is off show "Waiting for ▶"; Create and Join connect to Steam
-- Network: new protocol version 3 – not compatible with KettleLAN 0.2, everyone in a network needs 0.3
-- Security: derive the lobby tag, the HELLO proof key and the name key from the network code with Argon2id, so the code cannot be guessed from lobby data or received proofs
-- Security: encrypt the network name in Steam lobby data (XChaCha20-Poly1305)
-- Security: generate network codes and nonces with the system's cryptographic random generator (getrandom, BCryptGenRandom)
+## [0.3.0] – 2026-10-25
+
+- Network: new protocol version 3 – not compatible with KettleLAN 0.2; network codes stay the same, everyone in a network needs 0.3
 - Network: be in up to five networks at the same time, with one adapter and one address
+- Network: the same network name for everyone with the same code; only whoever opened the network (★) can rename it
+- Network: your own name in networks instead of the Steam name (Settings → Your name)
+- Network: keep Steam sessions with members open – ping always shown, faster first game packet
 - Network: say when someone in the same network still uses KettleLAN 0.2
+- Security: derive the lobby tag, the HELLO proof key and the name key from the network code with Argon2id – the code cannot be guessed from lobby data or received proofs
+- Security: encrypt the network name and nicknames in Steam lobby data (XChaCha20-Poly1305, Monocypher)
 - Security: verify members separately in each network, never forward traffic between networks
-- CLI: join several networks, "leave n" / "leave all", list all networks with their members
-- GUI: new home screen – your address once at the top, all your networks with on/off switches, "x of 5 connected"
-- GUI: open a connected network to see its members, go back to the list with the arrow
-- GUI: join a network with a code in a dialog
-- GUI: rejoin all networks that were connected when KettleLAN was closed
-- Network: the same network name for everyone with the same code, kept by every member and restored when an unnamed lobby is reopened
-- Network: only whoever opened the network (★) can rename it for everyone
-- GUI: add your own note to a network, shown under its name only on your computer
-- GUI: network details (name, note, code, forget) from the list or with the pencil on the network screen
-- GUI: at most 20 saved networks
-- Network: keep Steam sessions with members open (ping always shown, faster first game packet)
-- GUI: list members with you first, then by ping, then the ones still connecting
-- CLI: "join <code> [name]", "rename <n> <name>"
-- GUI: short system tray menu (Show window, Quit KettleLAN) – everything else is in the window
+- Security: generate network codes and nonces with the system's cryptographic random generator
+- Steam: ▶ / ⏹ button connects to and disconnects from Steam – with ⏹ Steam no longer shows "Spacewar"; the state is remembered
+- Steam: everything that talks to Steam runs in a separate background process (kettlelan-steam)
+- Steam: wait for Steam after login and connect automatically – no "Try again" needed
+- GUI: new home screen – your address, all your networks with on/off switches, "Connected to Steam" under the title
+- GUI: open a connected network to see its members, back to the list with the arrow; members sorted by ping
+- GUI: network details with the pencil: shared name, your own note (only on your computer), code, forget
+- GUI: "Steam friend" badge for your Steam friends (checked on your computer only), ⚠ when two members use the same name
+- GUI: join a network with a code in a dialog; reconnect the networks that were on when KettleLAN was closed
+- GUI: system notifications instead of pop-ups in the window; "Copied" shown where you clicked
+- GUI: short system tray menu (Show window, Quit KettleLAN); at most 20 saved networks
+- Windows: KettleLAN runs as the user – the new KettleLAN Service runs the Wintun adapter; no UAC prompt when KettleLAN starts
+- Windows: the service accepts only KettleLAN from its own folder and checks every packet from it; KettleLAN checks that it talks to the real service
+- Windows: installer (Inno Setup) instead of the zip – Program Files, the service, Start menu shortcut, optional desktop shortcut and autostart
+- Windows: updating closes KettleLAN and the service first; uninstalling removes the service and its firewall rules and keeps your networks
+- Windows: the adapter stays ready while the service runs – no "identifying network" delay; smaller package without unused Qt styles
+- CLI: several networks ("leave n", "leave all"), "join <code> [name]", "rename <n> <name>", "name [nickname]"
+- Docs: FAQ about "Spacewar" in Steam and other games, updated screenshots
 
 ## [0.2.1] – 2026-10-22
 

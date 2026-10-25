@@ -72,15 +72,17 @@ a build attestation – see [Verifying a download](SECURITY.md#verifying-a-downl
 ## Quick start
 
 1. Start Steam and sign in.
-2. Start KettleLAN. The first time (and after every reboot) your system asks for the administrator
-   password – this creates the virtual network adapter `kettle0`. KettleLAN itself runs as a normal user.
+2. Start KettleLAN. On Linux, the first time (and after every reboot) your system asks for the administrator
+   password – this creates the virtual network adapter `kettle0`. On Windows the installer has set up the adapter
+   (KettleLAN Service). KettleLAN itself runs as a normal user.
 3. Click **Create network**, then **Invite friends** – the code is copied to the clipboard. Send it to your friends.
 4. Your friends click **Join with a code**, paste the code and click **Join**.
 5. Start a game server as you would on a LAN. Your friends connect to your address shown in KettleLAN
    (click a person on the list to copy their address).
 
 The network is saved under **Your networks** – next time just switch it on. You can be in up to five networks
-at the same time.
+at the same time. **▶ / ⏹** in the header connects KettleLAN to Steam and disconnects it; your networks stay
+switched on for next time. Under **Settings → Your name** you can choose the name others see.
 
 ## How it works
 
@@ -122,8 +124,8 @@ once – allow it for the game.
 **Is there a player limit?** Steam lobbies allow up to 250 members.
 
 **My antivirus or Windows SmartScreen warns about KettleLAN.** The Windows version is new and not yet
-code-signed, and it does things that heuristic scanners treat as suspicious: it asks for administrator rights,
-installs a network driver (Wintun), adds a firewall rule and a scheduled task for autostart. A single generic
+code-signed, and it does things that heuristic scanners treat as suspicious: its installer asks for
+administrator rights, installs a network driver (Wintun) and a Windows service, and adds firewall rules. A single generic
 detection (for example `Trojan.Malware.300983.susgen` from MaxSecure) is a known false-positive pattern for
 new, unsigned programs. Make sure the file comes from the [Releases page](https://github.com/maxiuz94/kettlelan/releases)
 and [verify it](SECURITY.md#verifying-a-download). If a well-known antivirus flags an official release,
