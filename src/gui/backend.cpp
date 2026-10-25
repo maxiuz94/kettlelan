@@ -92,6 +92,7 @@ Backend::Backend(bool demo, QObject* parent) : QObject(parent), demo_(demo) {
     QSettings s;
     closeToTray_ = s.value(QStringLiteral("closeToTray"), true).toBool();
     notifications_ = s.value(QStringLiteral("notifications"), true).toBool();
+    windowMessages_ = s.value(QStringLiteral("windowMessages"), true).toBool();
     theme_ = s.value(QStringLiteral("theme"), QStringLiteral("system")).toString();
     autoConnect_ = s.value(QStringLiteral("autoConnect"), true).toBool();
     hideAddress_ = s.value(QStringLiteral("hideAddress"), true).toBool();
@@ -296,10 +297,11 @@ QString Backend::messageText(const Message& message) const {
 
 void Backend::handleEvent(const Message& message) {
     const QString text = messageText(message);
-    emit toast(text);
-    // System notifications only about people, and only when the window is hidden.
+    // In the window: not the state of a network (the list shows it), and only when wanted.
+    if (windowMessages_ && !isNetworkStateEvent(message.id)) emit toast(text);
+    // System notifications: people and warnings, only when the window is hidden.
     const bool hidden = !window_ || !window_->isVisible();
-    if (notifications_ && isPeerEvent(message.id) && hidden && tray_)
+    if (notifications_ && isNotifyEvent(message.id) && hidden && tray_)
 #ifdef _WIN32
         tray_->showMessage(QStringLiteral("KettleLAN"), text, makeAppIcon(true), 4000); // shown as plain text
 #else
@@ -576,6 +578,13 @@ void Backend::rememberNetwork(const QString& code, const QString& name) {
         if (!liveFor(c) && !activeNetworks().contains(c)) saved_.removeAt(i);
     }
     storeSaved();
+}
+
+void Backend::setWindowMessages(bool v) {
+    if (v == windowMessages_) return;
+    windowMessages_ = v;
+    QSettings().setValue(QStringLiteral("windowMessages"), v);
+    emit settingsChanged();
 }
 
 void Backend::setNotifications(bool v) {

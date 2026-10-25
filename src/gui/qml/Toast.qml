@@ -1,7 +1,7 @@
 import QtQuick
 import KettleLAN
 
-// Short message at the bottom of the window (copied, someone joined, error…).
+// Short message at the top of the window (copied, someone joined, error…).
 Rectangle {
     id: toast
     property alias text: label.text

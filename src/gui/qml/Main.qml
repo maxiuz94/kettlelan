@@ -62,9 +62,10 @@ ApplicationWindow {
 
     Toast {
         id: toast
+        // at the top, under the header: never over the buttons
         anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 88
+        anchors.top: parent.top
+        anchors.topMargin: 74
         z: 10
     }
     Connections {

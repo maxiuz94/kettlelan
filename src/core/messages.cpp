@@ -66,4 +66,13 @@ std::string english(const Message& message) {
 
 bool isPeerEvent(Msg id) { return id == Msg::PeerJoined || id == Msg::PeerLeft; }
 
+bool isNotifyEvent(Msg id) {
+    return isPeerEvent(id) || id == Msg::OldVersionInNetwork || id == Msg::PeerBadKey || id == Msg::PeerConflict ||
+           id == Msg::PeerBadVersion;
+}
+
+bool isNetworkStateEvent(Msg id) {
+    return id == Msg::Connecting || id == Msg::Connected || id == Msg::Left || id == Msg::Merging;
+}
+
 } // namespace kettle

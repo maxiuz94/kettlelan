@@ -44,6 +44,7 @@ class Backend : public QObject {
     // settings
     Q_PROPERTY(bool closeToTray READ closeToTray WRITE setCloseToTray NOTIFY settingsChanged)
     Q_PROPERTY(bool notifications READ notifications WRITE setNotifications NOTIFY settingsChanged)
+    Q_PROPERTY(bool windowMessages READ windowMessages WRITE setWindowMessages NOTIFY settingsChanged)
     Q_PROPERTY(bool autostart READ autostart WRITE setAutostart NOTIFY settingsChanged)
     Q_PROPERTY(bool autoConnect READ autoConnect WRITE setAutoConnect NOTIFY settingsChanged)
     Q_PROPERTY(bool hideAddress READ hideAddress WRITE setHideAddress NOTIFY settingsChanged)
@@ -85,6 +86,8 @@ public:
     bool closeToTray() const { return closeToTray_; }
     void setCloseToTray(bool v);
     bool notifications() const { return notifications_; }
+    bool windowMessages() const { return windowMessages_; }
+    void setWindowMessages(bool v);
     void setNotifications(bool v);
     bool autostart() const;
     void setAutostart(bool v);
@@ -197,6 +200,7 @@ private:
     bool protectServices_ = true;
     qulonglong blockedPackets_ = 0;
     bool notifications_ = true;
+    bool windowMessages_ = true;
     QString theme_ = QStringLiteral("system");
 
 };

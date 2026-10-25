@@ -84,8 +84,8 @@ Item {
                     }
                     Toggle {
                         Layout.fillWidth: true
-                        title: qsTr("Rejoin the last network automatically")
-                        hint: qsTr("On start, rejoins the network you did not leave with “Leave”")
+                        title: qsTr("Reconnect networks automatically")
+                        hint: qsTr("On start, switches on the networks that were on when KettleLAN was closed")
                         checked: Backend.autoConnect
                         onUserToggled: (value) => Backend.autoConnect = value
                     }
@@ -99,9 +99,16 @@ Item {
                     }
                     Toggle {
                         Layout.fillWidth: true
+                        title: qsTr("Messages in the window")
+                        hint: qsTr("Short messages at the top of the window: someone joined or left, errors")
+                        checked: Backend.windowMessages
+                        onUserToggled: (value) => Backend.windowMessages = value
+                    }
+                    Toggle {
+                        Layout.fillWidth: true
                         last: true
-                        title: qsTr("Notifications")
-                        hint: qsTr("When someone joins or leaves while the window is hidden")
+                        title: qsTr("System notifications")
+                        hint: qsTr("When someone joins or leaves, or something needs your attention, while the window is hidden")
                         checked: Backend.notifications
                         onUserToggled: (value) => Backend.notifications = value
                     }
