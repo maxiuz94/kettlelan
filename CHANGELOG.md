@@ -21,6 +21,7 @@ Before tagging a release add a `## [x.y.z] – date` section (see [docs/RELEASIN
 - Steam: ▶ / ⏹ button connects to and disconnects from Steam; the network switches are separate and stay as they are
 - Steam: everything that talks to Steam runs in a separate background process (kettlelan-steam) – with ⏹ Steam no longer shows "Spacewar"
 - Steam: the ▶ / ⏹ state is remembered; a first start does not connect to Steam
+- GUI: "Connected to Steam" / "Not connected to Steam" under the title
 - GUI: networks show "Connecting…" on the list while KettleLAN connects to Steam – no separate screen in between
 - GUI: messages as system notifications instead of pop-ups in the window, none about a network's state (the list shows it); errors appear in the window when notifications are off
 - GUI: "Copied" shown where you clicked (✓ on the copy button, "Copied" in the members list, on the Invite button)

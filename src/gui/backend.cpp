@@ -753,6 +753,7 @@ void Backend::loadDemo() {
             networkOpen_ = true;
         }
     }
+    steamEnabled_ = true; // the screenshots show a connected KettleLAN
     showOpenNetwork();
     rebuildNetworks();
 }

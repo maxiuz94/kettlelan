@@ -23,7 +23,40 @@ Item {
             Layout.bottomMargin: 10
             spacing: 10
             SvgIcon { name: "kettle"; size: 28; color: Theme.accent }
-            Text { textFormat: Text.PlainText; text: "KettleLAN"; color: Theme.text; font.pixelSize: 18; font.weight: Font.Bold; Layout.fillWidth: true }
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 1
+                Text { textFormat: Text.PlainText; text: "KettleLAN"; color: Theme.text; font.pixelSize: 18; font.weight: Font.Bold; Layout.fillWidth: true }
+                // whether KettleLAN is connected to Steam (▶ / ⏹)
+                RowLayout {
+                    id: steamState
+                    spacing: 6
+                    readonly property bool connected: Backend.steamEnabled && Backend.status === "ready"
+                    readonly property bool connecting: Backend.steamEnabled && !connected
+                    Rectangle {
+                        width: 8
+                        height: 8
+                        radius: 4
+                        color: steamState.connected ? Theme.ok : steamState.connecting ? Theme.accent : "transparent"
+                        border.width: steamState.connected || steamState.connecting ? 0 : 1
+                        border.color: Theme.muted
+                        SequentialAnimation on opacity {
+                            running: steamState.connecting
+                            loops: Animation.Infinite
+                            NumberAnimation { to: 0.3; duration: 500 }
+                            NumberAnimation { to: 1; duration: 500 }
+                        }
+                    }
+                    Text {
+                        textFormat: Text.PlainText
+                        font.pixelSize: 12
+                        color: steamState.connected ? Theme.text : Theme.muted
+                        text: steamState.connected ? qsTr("Connected to Steam")
+                            : steamState.connecting ? qsTr("Connecting to Steam…")
+                            : qsTr("Not connected to Steam")
+                    }
+                }
+            }
             // ▶ connect to Steam / ⏹ disconnect – the network switches are separate and stay as they are
             IconButton {
                 iconName: Backend.steamEnabled ? "stop" : "play"
