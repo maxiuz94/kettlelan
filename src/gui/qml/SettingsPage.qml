@@ -8,6 +8,7 @@ import KettleLAN.Core
 Item {
     id: page
     signal back()
+    onVisibleChanged: if (!visible) nickField.save() // leaving the settings saves a name still being typed
 
     component SectionTitle: Text { textFormat: Text.PlainText;
         color: Theme.muted
@@ -105,15 +106,25 @@ Item {
                                 border.width: nickField.activeFocus ? 2 : 1
                                 border.color: nickField.activeFocus ? Theme.accent : Theme.border
                             }
-                            onEditingFinished: Backend.nickname = text
+                            // saved by itself a moment after typing (no Enter needed), and when leaving the settings
+                            function save() {
+                                saveTimer.stop()
+                                if (text.trim() === Backend.nickname) return
+                                Backend.nickname = text
+                                savedTimer.restart()
+                            }
+                            onTextEdited: saveTimer.restart()
+                            onEditingFinished: save()
+                            Timer { id: saveTimer; interval: 800; onTriggered: nickField.save() }
+                            Timer { id: savedTimer; interval: 2000 }
                         }
                         Text {
                             textFormat: Text.PlainText
                             Layout.fillWidth: true
                             wrapMode: Text.WordWrap
-                            color: Theme.muted
                             font.pixelSize: 12
-                            text: qsTr("Shown instead of your Steam name to everyone in your networks. Leave it empty to use your Steam name. People in your networks can still see your Steam account in Steam.")
+                            text: savedTimer.running ? qsTr("Saved ✓") : qsTr("Shown instead of your Steam name to everyone in your networks. Leave it empty to use your Steam name. People in your networks can still see your Steam account in Steam.")
+                            color: savedTimer.running ? Theme.ok : Theme.muted
                         }
                     }
                 }
