@@ -123,7 +123,11 @@ void Backend::startEngine() {
     if (activeNetworks().isEmpty() && !last.isEmpty()) setActive(last, true);
     settings.remove(QStringLiteral("lastNetwork"));
     if (!autoConnect_) settings.remove(QStringLiteral("activeNetworks")); // start with every network off
-    if (!activeNetworks().isEmpty()) {
+    // ▶/⏹ is remembered; a first start is off (no "Spacewar" before anything is clicked), an update from a
+    // version without the button keeps Steam on when a network was on
+    steamEnabled_ = settings.value(QStringLiteral("steamEnabled"), !activeNetworks().isEmpty()).toBool();
+    settings.setValue(QStringLiteral("steamEnabled"), steamEnabled_);
+    if (steamEnabled_) {
         goOnline();
     } else {
         Snapshot offline;
@@ -140,27 +144,19 @@ void Backend::goOffline() {
     if (engine_) engine_->stop(false);
 }
 
-void Backend::pause() {
-    const QStringList active = activeNetworks();
-    if (active.isEmpty()) return;
-    QSettings().setValue(QStringLiteral("pausedNetworks"), active);
-    QSettings().remove(QStringLiteral("activeNetworks"));
-    pendingOpen_.clear();
-    networkOpen_ = false;
-    goOffline();
+void Backend::setSteamEnabled(bool on) {
+    if (demo_ || on == steamEnabled_) return;
+    steamEnabled_ = on;
+    QSettings().setValue(QStringLiteral("steamEnabled"), on);
+    // the network switches stay as they are: with Steam on again, the same networks connect
+    if (on) goOnline();
+    else {
+        networkOpen_ = false;
+        pendingOpen_.clear();
+        goOffline();
+    }
+    rebuildNetworks();
     emit changed();
-}
-
-void Backend::resume() {
-    const QStringList paused = QSettings().value(QStringLiteral("pausedNetworks")).toStringList();
-    QSettings().remove(QStringLiteral("pausedNetworks"));
-    for (const auto& code : paused) setActive(code, true);
-    emit changed();
-    if (!paused.isEmpty()) goOnline();
-}
-
-bool Backend::paused() const {
-    return status_ == QLatin1String("offline") && !QSettings().value(QStringLiteral("pausedNetworks")).toStringList().isEmpty();
 }
 
 // ---------------------------------------------------------------- state from the engine
@@ -282,9 +278,10 @@ void Backend::rebuildNetworks() {
         const auto m = v.toMap();
         const QString code = m.value(QStringLiteral("code")).toString();
         if (liveFor(code)) continue;
-        const bool waiting = status_ != QLatin1String("ready") && status_ != QLatin1String("offline") && active.contains(code);
-        networks_.append(entry(code, m.value(QStringLiteral("name")).toString(),
-                               waiting ? QStringLiteral("connecting") : QStringLiteral("off"), 0, false));
+        const QString state = !active.contains(code) ? QStringLiteral("off")
+                            : !steamEnabled_ ? QStringLiteral("waiting") // on, but Steam is off (▶)
+                                             : QStringLiteral("connecting");
+        networks_.append(entry(code, m.value(QStringLiteral("name")).toString(), state, 0, false));
     }
 }
 
@@ -349,9 +346,10 @@ void Backend::joinNetwork(const QString& code) {
     setActive(normalized, true);
     pendingOpen_ = normalized;
     if (demo_) return;
-    QSettings().remove(QStringLiteral("pausedNetworks")); // switching a network on ends a pause
     if (status_ != QLatin1String("ready")) {
-        goOnline(); // the network is joined once Steam is connected
+        // "Create" and "Join" ask for a connection: switch Steam on; the network is joined once it is ready
+        if (!steamEnabled_) setSteamEnabled(true);
+        else goOnline();
         emit changed();
         return;
     }
@@ -376,6 +374,17 @@ void Backend::closeNetwork() {
 }
 
 void Backend::setNetworkEnabled(const QString& code, bool on) {
+    if (on && !steamEnabled_ && !demo_) {
+        // Steam is off: only remember the choice – the network connects with ▶
+        if (connectedCount() >= maxNetworks()) {
+            inform(messageText({Msg::NetworkLimit, {std::to_string(maxNetworks())}}), true);
+            return;
+        }
+        setActive(normalizeCode(code), true);
+        rebuildNetworks();
+        emit changed();
+        return;
+    }
     if (on) {
         joinNetwork(code);
         pendingOpen_.clear(); // switching on from the list keeps the list on screen
@@ -396,8 +405,6 @@ void Backend::disconnectNetwork(const QString& code) {
         return;
     }
     if (engine_) engine_->leave(code.toStdString());
-    // the last network is off: end the Steam process, so Steam no longer shows "Spacewar"
-    if (activeNetworks().isEmpty()) goOffline();
 }
 
 QStringList Backend::activeNetworks() const {

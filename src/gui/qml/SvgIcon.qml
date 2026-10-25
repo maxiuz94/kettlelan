@@ -27,7 +27,7 @@ Item {
         "check": "M20 6L9 17l-5-5",
         "trash": "M3 6h18 M8 6V4h8v2 M19 6l-1 14H6L5 6 M10 11v6 M14 11v6",
         "edit": "M12 20h9 M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z",
-        "pause": "M8 5v14 M16 5v14",
+        "stop": "M6 6h12v12H6z",
         "play": "M7 5l12 7-12 7z"
     })
 

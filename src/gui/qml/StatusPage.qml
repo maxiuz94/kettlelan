@@ -54,5 +54,12 @@ Item {
             text: qsTr("Try again")
             onClicked: Backend.retry()
         }
+        AppButton {
+            Layout.alignment: Qt.AlignHCenter
+            visible: Backend.status === "steamMissing" && Backend.steamEnabled
+            kind: "secondary"
+            text: qsTr("Don't connect to Steam")
+            onClicked: Backend.steamEnabled = false
+        }
     }
 }

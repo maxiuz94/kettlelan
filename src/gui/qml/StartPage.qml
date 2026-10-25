@@ -24,16 +24,12 @@ Item {
             spacing: 10
             SvgIcon { name: "kettle"; size: 28; color: Theme.accent }
             Text { textFormat: Text.PlainText; text: "KettleLAN"; color: Theme.text; font.pixelSize: 18; font.weight: Font.Bold; Layout.fillWidth: true }
-            // Pause: every network off and no Steam connection (no "Spacewar" on Steam); Resume: the same networks on again
-            // always in the same place; greyed out when every network is already off
+            // ▶ connect to Steam / ⏹ disconnect – the network switches are separate and stay as they are
             IconButton {
-                enabled: Backend.connectedCount > 0 || Backend.paused
-                opacity: enabled ? 1 : 0.35
-                iconName: Backend.paused ? "play" : "pause"
-                label: Backend.paused ? qsTr("Resume – switch the paused networks on again")
-                     : enabled ? qsTr("Pause – switch every network off and disconnect from Steam")
-                     : qsTr("Pause – every network is already off")
-                onClicked: Backend.paused ? Backend.resume() : Backend.pause()
+                iconName: Backend.steamEnabled ? "stop" : "play"
+                label: Backend.steamEnabled ? qsTr("Disconnect from Steam – your networks stay switched on for next time")
+                                            : qsTr("Connect to Steam – the networks that are switched on connect")
+                onClicked: Backend.steamEnabled = !Backend.steamEnabled
             }
             IconButton { iconName: "settings"; label: qsTr("Settings"); onClicked: page.openSettings() }
         }
@@ -83,7 +79,7 @@ Item {
                 Layout.topMargin: 4
                 visible: Backend.networks.length > 0
                 Text { textFormat: Text.PlainText; text: qsTr("Your networks"); color: Theme.text; font.pixelSize: 14; font.weight: Font.Bold; Layout.fillWidth: true }
-                Text { textFormat: Text.PlainText; text: qsTr("%1 of %2 connected").arg(Backend.connectedCount).arg(Backend.maxNetworks); color: Theme.muted; font.pixelSize: 12 }
+                Text { textFormat: Text.PlainText; text: qsTr("%1 of %2 on").arg(Backend.connectedCount).arg(Backend.maxNetworks); color: Theme.muted; font.pixelSize: 12 }
             }
 
             Rectangle {
@@ -116,6 +112,7 @@ Item {
                         required property int index
                         readonly property bool connected: modelData.state === "connected"
                         readonly property bool connecting: modelData.state === "connecting"
+                        readonly property bool waiting: modelData.state === "waiting" // on, Steam is off
                         readonly property bool on: modelData.state !== "off"
                         width: rows.width
                         implicitHeight: Math.max(62, texts.implicitHeight + 20)
@@ -171,6 +168,7 @@ Item {
                                     font.family: row.on ? Qt.application.font.family : Theme.mono
                                     text: row.connected ? (row.modelData.members === 1 ? qsTr("Connected · 1 member") : qsTr("Connected · %1 members").arg(row.modelData.members))
                                         : row.connecting ? qsTr("Connecting…")
+                                        : row.waiting ? qsTr("Waiting for ▶ (not connected to Steam)")
                                         : row.modelData.code
                                 }
                             }
@@ -241,11 +239,11 @@ Item {
                 wrapMode: Text.WordWrap
                 color: Theme.muted
                 font.pixelSize: 12
-                text: Backend.paused ? qsTr("Paused – KettleLAN is not connected to Steam. Press ▶ to switch the same networks on again.")
-                      : Backend.status === "offline" ? qsTr("KettleLAN connects to Steam when you switch a network on, and disconnects when all are off.")
+                text: !Backend.steamEnabled ? qsTr("Not connected to Steam – press ▶ to connect. Networks you switch on connect then.")
+                      : Backend.connectedCount === 0 ? qsTr("Connected to Steam, no network on – Steam shows you in “Spacewar” until you press ⏹.")
                       : Backend.connectedCount >= Backend.maxNetworks
-                      ? qsTr("You are connected to %1 networks – the most at the same time. Turn one off to connect to another.").arg(Backend.maxNetworks)
-                      : qsTr("You can be connected to up to %1 networks at the same time.").arg(Backend.maxNetworks)
+                      ? qsTr("%1 networks are on – the most at the same time. Switch one off to switch on another.").arg(Backend.maxNetworks)
+                      : qsTr("Up to %1 networks can be on at the same time.").arg(Backend.maxNetworks)
             }
 
             Item { Layout.fillHeight: true; Layout.preferredHeight: 0 }

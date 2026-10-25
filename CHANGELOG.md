@@ -18,12 +18,14 @@ Before tagging a release add a `## [x.y.z] – date` section (see [docs/RELEASIN
 - Windows: the installer replaces the zip package
 - Windows: smaller package without the unused Qt styles
 - GUI: wait for Steam (and on Windows for the KettleLAN service) and connect automatically – no "Try again" needed after login
-- Steam: connect to Steam only while a network is on – in a separate background process (kettlelan-steam), so with every network off Steam no longer shows "Spacewar"
-- GUI: Pause / Resume button – every network off and no Steam connection, then the same networks on again
+- Steam: ▶ / ⏹ button connects to and disconnects from Steam; the network switches are separate and stay as they are
+- Steam: everything that talks to Steam runs in a separate background process (kettlelan-steam) – with ⏹ Steam no longer shows "Spacewar"
+- Steam: the ▶ / ⏹ state is remembered; a first start does not connect to Steam
 - GUI: networks show "Connecting…" on the list while KettleLAN connects to Steam – no separate screen in between
 - GUI: messages as system notifications instead of pop-ups in the window, none about a network's state (the list shows it); errors appear in the window when notifications are off
 - GUI: "Copied" shown where you clicked (✓ on the copy button, "Copied" in the members list, on the Invite button)
 - GUI: your address is shown also while KettleLAN is not connected to Steam
+- GUI: networks switched on while Steam is off show "Waiting for ▶"; Create and Join connect to Steam
 - Network: new protocol version 3 – not compatible with KettleLAN 0.2, everyone in a network needs 0.3
 - Security: derive the lobby tag, the HELLO proof key and the name key from the network code with Argon2id, so the code cannot be guessed from lobby data or received proofs
 - Security: encrypt the network name in Steam lobby data (XChaCha20-Poly1305)
