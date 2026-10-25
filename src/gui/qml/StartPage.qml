@@ -89,21 +89,27 @@ Item {
             Rectangle {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                // as tall as its rows; scrolls only when they do not fit
-                Layout.preferredHeight: networkList.contentHeight + 2
-                Layout.maximumHeight: networkList.contentHeight + 2
+                // as tall as its rows (a Column knows its height from the start); scrolls when they do not fit
+                Layout.preferredHeight: rows.implicitHeight + 2
+                Layout.maximumHeight: rows.implicitHeight + 2
                 visible: Backend.networks.length > 0
                 radius: Theme.radius
                 color: Theme.surface
                 border.color: Theme.border
                 clip: true
-                ListView {
+                Flickable {
                     id: networkList
                     anchors.fill: parent
                     anchors.margins: 1
-                    model: Backend.networks
+                    contentHeight: rows.implicitHeight
                     boundsBehavior: Flickable.StopAtBounds
                     ScrollBar.vertical: ScrollBar {}
+                    Column {
+                    id: rows
+                    width: networkList.width
+                    Repeater {
+                    id: networkRepeater
+                    model: Backend.networks
                     delegate: Rectangle {
                         id: row
                         required property var modelData
@@ -111,8 +117,9 @@ Item {
                         readonly property bool connected: modelData.state === "connected"
                         readonly property bool connecting: modelData.state === "connecting"
                         readonly property bool on: modelData.state !== "off"
-                        width: networkList.width
+                        width: rows.width
                         implicitHeight: Math.max(62, texts.implicitHeight + 20)
+                        height: implicitHeight
                         color: openArea.containsMouse ? Theme.surface2 : "transparent"
 
                         RowLayout {
@@ -215,12 +222,14 @@ Item {
                             }
                         }
                         Rectangle {
-                            visible: row.index < networkList.count - 1
+                            visible: row.index < networkRepeater.count - 1
                             anchors.bottom: parent.bottom
                             width: parent.width
                             height: 1
                             color: Theme.border
                         }
+                    }
+                    }
                     }
                 }
             }

@@ -74,7 +74,7 @@ public:
     QVariantList peers() const { return peers_; }
     int memberCount() const { return memberCount_; }
     QVariantList networks() const { return networks_; }
-    int connectedCount() const { return int(live_.size()); }
+    int connectedCount() const; // connected and connecting networks
     int maxNetworks() const { return int(steam::Network::kMaxNetworks); }
     bool networkOpen() const { return networkOpen_; }
     bool paused() const;

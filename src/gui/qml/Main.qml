@@ -41,11 +41,12 @@ ApplicationWindow {
 
     StatusPage {
         anchors.fill: parent
-        visible: !win.settingsOpen && Backend.status !== "ready" && Backend.status !== "offline"
+        // only for problems – connecting to Steam happens on the list of networks (no flashing screen)
+        visible: !win.settingsOpen && (Backend.status === "steamMissing" || Backend.status === "tunError")
     }
     StartPage {
         anchors.fill: parent
-        visible: !win.settingsOpen && (Backend.status === "ready" || Backend.status === "offline") && !Backend.networkOpen
+        visible: !win.settingsOpen && (Backend.status === "ready" || Backend.status === "offline" || Backend.status === "starting") && !Backend.networkOpen
         onOpenSettings: win.settingsOpen = true
     }
     NetworkPage {

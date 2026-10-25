@@ -223,6 +223,13 @@ void Backend::applySnapshot(const Snapshot& snap) {
     rebuildTrayMenu();
 }
 
+int Backend::connectedCount() const {
+    int n = 0;
+    for (const auto& v : networks_)
+        if (v.toMap().value(QStringLiteral("state")).toString() != QLatin1String("off")) ++n;
+    return std::max(n, int(live_.size()));
+}
+
 const Backend::LiveNetwork* Backend::liveFor(const QString& code) const {
     for (const auto& n : live_)
         if (n.code == code) return &n;
@@ -269,10 +276,15 @@ void Backend::rebuildNetworks() {
     for (const auto& n : live_)
         networks_.append(entry(n.code, n.lobbyName.isEmpty() ? savedName(n.code) : n.lobbyName,
                                n.connected ? QStringLiteral("connected") : QStringLiteral("connecting"), n.members, n.owner));
+    // switched on, but the Steam process is still connecting: show them as connecting right away
+    const QStringList active = activeNetworks();
     for (const auto& v : saved_) {
         const auto m = v.toMap();
         const QString code = m.value(QStringLiteral("code")).toString();
-        if (!liveFor(code)) networks_.append(entry(code, m.value(QStringLiteral("name")).toString(), QStringLiteral("off"), 0, false));
+        if (liveFor(code)) continue;
+        const bool waiting = status_ != QLatin1String("ready") && status_ != QLatin1String("offline") && active.contains(code);
+        networks_.append(entry(code, m.value(QStringLiteral("name")).toString(),
+                               waiting ? QStringLiteral("connecting") : QStringLiteral("off"), 0, false));
     }
 }
 
@@ -326,7 +338,7 @@ void Backend::joinNetwork(const QString& code) {
         openNetwork(normalized);
         return;
     }
-    if (int(live_.size()) >= maxNetworks()) {
+    if (connectedCount() >= maxNetworks()) {
         emit toast(messageText({Msg::NetworkLimit, {std::to_string(maxNetworks())}}));
         return;
     }
