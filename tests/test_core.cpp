@@ -155,6 +155,21 @@ static void testNetworkKeys() {
     CHECK(!netkeys::openName(keys, std::string(1000, 'a')));
     CHECK(!netkeys::openName(keys, "Quake night"));                       // plain text from an old version
 
+    // nicknames: own context – a sealed network name is not a nickname and the other way round
+    const auto nick = netkeys::sealNick(keys, "Bob");
+    CHECK(netkeys::openNick(keys, nick) == std::optional<std::string>("Bob"));
+    CHECK(!netkeys::openNick(otherKeys, nick));
+    CHECK(!netkeys::openName(keys, nick));
+    CHECK(!netkeys::openNick(keys, sealed));
+    std::string nickChanged = nick;
+    nickChanged[nickChanged.size() - 1] = nickChanged.back() == '0' ? '1' : '0';
+    CHECK(!netkeys::openNick(keys, nickChanged));
+    const auto longNick = netkeys::openNick(keys, netkeys::sealNick(keys, std::string(40, 'x')));
+    CHECK(longNick && longNick->size() == 32);
+    const auto polish = netkeys::openNick(keys, netkeys::sealNick(keys, "Zażółć gęślą jaźń – bardzo długi nick"));
+    CHECK(polish && polish->rfind("Zażółć", 0) == 0);
+    CHECK(!netkeys::openNick(keys, std::string(1000, 'a')));
+
     // long names are cut to 60 bytes without breaking a UTF-8 character
     const std::string longName(30, 'x');
     const auto opened = netkeys::openName(keys, netkeys::sealName(keys, longName + std::string(20, '\xC5') + "ąąąąąąąąąą"));

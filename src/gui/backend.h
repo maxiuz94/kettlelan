@@ -45,6 +45,8 @@ class Backend : public QObject {
     // settings
     Q_PROPERTY(bool closeToTray READ closeToTray WRITE setCloseToTray NOTIFY settingsChanged)
     Q_PROPERTY(bool notifications READ notifications WRITE setNotifications NOTIFY settingsChanged)
+    // your name in every network; "" = your Steam name
+    Q_PROPERTY(QString nickname READ nickname WRITE setNickname NOTIFY settingsChanged)
     Q_PROPERTY(bool autostart READ autostart WRITE setAutostart NOTIFY settingsChanged)
     Q_PROPERTY(bool autoConnect READ autoConnect WRITE setAutoConnect NOTIFY settingsChanged)
     Q_PROPERTY(bool hideAddress READ hideAddress WRITE setHideAddress NOTIFY settingsChanged)
@@ -87,6 +89,8 @@ public:
     bool closeToTray() const { return closeToTray_; }
     void setCloseToTray(bool v);
     bool notifications() const { return notifications_; }
+    QString nickname() const { return nickname_; }
+    void setNickname(const QString& v);
     // A message as a system notification (when on and supported); an important one falls back to
     // a short message in the window, so an error is never lost.
     void inform(const QString& text, bool important);
@@ -202,6 +206,7 @@ private:
     bool protectServices_ = true;
     qulonglong blockedPackets_ = 0;
     bool notifications_ = true;
+    QString nickname_;
 
     QString theme_ = QStringLiteral("system");
 

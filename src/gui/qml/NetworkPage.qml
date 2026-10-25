@@ -144,15 +144,51 @@ Item {
                                 Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: row.modelData.initial; color: Theme.text; font.pixelSize: 14; font.weight: Font.Bold }
                             }
                             ColumnLayout {
+                                id: nameColumn
                                 Layout.fillWidth: true
                                 spacing: 3
-                                Text { textFormat: Text.PlainText;
+                                RowLayout {
+                                    id: nameRow
                                     Layout.fillWidth: true
-                                    text: row.modelData.name + (row.modelData.owner ? "  ★" : "")
-                                    color: Theme.text
-                                    font.pixelSize: 14
-                                    font.weight: Font.DemiBold
-                                    elide: Text.ElideRight
+                                    spacing: 6
+                                    Text { textFormat: Text.PlainText;
+                                        // as wide as the name, but leave room for the badges
+                                        Layout.preferredWidth: Math.min(implicitWidth, nameColumn.width
+                                            - (friendBadge.visible ? friendBadge.implicitWidth + 6 : 0)
+                                            - (sameIcon.visible ? 20 : 0))
+                                        text: row.modelData.name + (row.modelData.owner ? "  ★" : "")
+                                        color: Theme.text
+                                        font.pixelSize: 14
+                                        font.weight: Font.DemiBold
+                                        elide: Text.ElideRight
+                                    }
+                                    // your friend on Steam (checked on this computer); their Steam name on hover
+                                    Rectangle {
+                                        id: friendBadge
+                                        visible: row.modelData.steamFriend === true
+                                        implicitWidth: friendText.implicitWidth + 10
+                                        implicitHeight: 18
+                                        radius: 9
+                                        color: Theme.directBg
+                                        Text { id: friendText; textFormat: Text.PlainText; anchors.centerIn: parent; text: qsTr("Steam friend"); color: Theme.directFg; font.pixelSize: 10; font.weight: Font.DemiBold }
+                                        HoverHandler { id: friendHover }
+                                        ToolTip.visible: friendHover.hovered
+                                        ToolTip.text: qsTr("On Steam: %1").arg(row.modelData.steamName)
+                                        ToolTip.delay: 300
+                                    }
+                                    // two members with the same name: check the address
+                                    SvgIcon {
+                                        id: sameIcon
+                                        visible: row.modelData.sameName === true
+                                        name: "alert"
+                                        size: 14
+                                        color: Theme.relayFg
+                                        HoverHandler { id: sameHover }
+                                        ToolTip.visible: sameHover.hovered
+                                        ToolTip.text: qsTr("Same name as another member – check the address")
+                                        ToolTip.delay: 300
+                                    }
+                                    Item { Layout.fillWidth: true }
                                 }
                                 Text { textFormat: Text.PlainText; text: rowCopied.running ? qsTr("Copied ✓") : row.modelData.address; color: rowCopied.running ? Theme.ok : Theme.muted; font.family: Theme.mono; font.pixelSize: 12 }
                             }

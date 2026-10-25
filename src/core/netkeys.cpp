@@ -75,29 +75,59 @@ Keys derive(const netcode::NetworkCode& code, Cost cost) {
     return keys;
 }
 
-std::string sealName(const Keys& keys, std::string_view name) {
-    const std::string_view text = cutUtf8(name, kMaxName);
+namespace {
+
+constexpr size_t kMaxNickChars = 32;
+constexpr size_t kMaxNickBytes = 4 * kMaxNickChars;
+
+// Cuts a UTF-8 string to at most `chars` characters.
+std::string_view cutChars(std::string_view s, size_t chars) {
+    size_t i = 0, n = 0;
+    while (i < s.size() && n < chars) {
+        ++i;
+        while (i < s.size() && (uint8_t(s[i]) & 0xC0) == 0x80) ++i;
+        ++n;
+    }
+    return s.substr(0, i);
+}
+
+// hex(nonce[24] || mac[16] || ciphertext); the additional data binds it to the lobby and its use
+std::string seal(const Keys& keys, std::string_view text, const std::string& ad) {
     std::vector<uint8_t> buf(24 + 16 + text.size());
     uint8_t* nonce = buf.data();
-    uint8_t* mac = buf.data() + 24;
-    uint8_t* cipher = buf.data() + 40;
     random::fill({nonce, 24});
-    // the tag is authenticated too: a name cannot be moved to another network's lobby
-    crypto_aead_lock(cipher, mac, keys.nameKey.data(), nonce, reinterpret_cast<const uint8_t*>(keys.tag.data()),
-                     keys.tag.size(), reinterpret_cast<const uint8_t*>(text.data()), text.size());
+    crypto_aead_lock(buf.data() + 40, buf.data() + 24, keys.nameKey.data(), nonce,
+                     reinterpret_cast<const uint8_t*>(ad.data()), ad.size(),
+                     reinterpret_cast<const uint8_t*>(text.data()), text.size());
     return toHex(buf.data(), buf.size());
 }
 
-std::optional<std::string> openName(const Keys& keys, std::string_view sealed) {
-    if (sealed.size() > 2 * (40 + kMaxName)) return std::nullopt;
+std::optional<std::string> open(const Keys& keys, std::string_view sealed, const std::string& ad, size_t maxBytes) {
+    if (sealed.size() > 2 * (40 + maxBytes)) return std::nullopt;
     const auto buf = fromHex(sealed);
     if (!buf || buf->size() < 40) return std::nullopt;
     std::string text(buf->size() - 40, '\0');
     if (crypto_aead_unlock(reinterpret_cast<uint8_t*>(text.data()), buf->data() + 24, keys.nameKey.data(), buf->data(),
-                           reinterpret_cast<const uint8_t*>(keys.tag.data()), keys.tag.size(), buf->data() + 40,
-                           text.size()) != 0)
+                           reinterpret_cast<const uint8_t*>(ad.data()), ad.size(), buf->data() + 40, text.size()) != 0)
         return std::nullopt;
     return text;
+}
+
+} // namespace
+
+// the tag is authenticated too: a name cannot be moved to another network's lobby
+std::string sealName(const Keys& keys, std::string_view name) { return seal(keys, cutUtf8(name, kMaxName), keys.tag); }
+
+std::optional<std::string> openName(const Keys& keys, std::string_view sealed) {
+    return open(keys, sealed, keys.tag, kMaxName);
+}
+
+std::string sealNick(const Keys& keys, std::string_view nick) {
+    return seal(keys, cutUtf8(cutChars(nick, kMaxNickChars), kMaxNickBytes), keys.tag + "|nick");
+}
+
+std::optional<std::string> openNick(const Keys& keys, std::string_view sealed) {
+    return open(keys, sealed, keys.tag + "|nick", kMaxNickBytes);
 }
 
 } // namespace kettle::netkeys

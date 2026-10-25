@@ -73,6 +73,7 @@ void EngineClient::start(bool hideAddress, bool protectServices) {
     starting.status = EngineStatus::Starting;
     onSnapshot_(starting);
     process_.start();
+    send({{"cmd", "nick"}, {"name", QString::fromStdString(nick_)}}); // before it connects to Steam
 }
 
 void EngineClient::stop(bool wait) {
@@ -115,6 +116,10 @@ void EngineClient::setProtectServices(bool on) {
     send({{"cmd", "protectServices"}, {"on", on}});
 }
 void EngineClient::retry() { send({{"cmd", "retry"}}); }
+void EngineClient::setNick(const std::string& nick) {
+    nick_ = nick;
+    send({{"cmd", "nick"}, {"name", QString::fromStdString(nick)}});
+}
 
 void EngineClient::readOutput() {
     outBuf_ += process_.readAllStandardOutput();

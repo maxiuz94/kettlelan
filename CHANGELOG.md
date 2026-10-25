@@ -22,6 +22,9 @@ Before tagging a release add a `## [x.y.z] – date` section (see [docs/RELEASIN
 - Steam: everything that talks to Steam runs in a separate background process (kettlelan-steam) – with ⏹ Steam no longer shows "Spacewar"
 - Steam: the ▶ / ⏹ state is remembered; a first start does not connect to Steam
 - GUI: "Connected to Steam" / "Not connected to Steam" under the title
+- Network: your own name in networks instead of the Steam name (Settings → Your name), encrypted with each network's key
+- GUI: "Steam friend" badge for members who are your Steam friends (checked on your computer only), ⚠ when two members use the same name
+- CLI: "name [nickname]", "(Steam friend)" in "list"
 - GUI: networks show "Connecting…" on the list while KettleLAN connects to Steam – no separate screen in between
 - GUI: messages as system notifications instead of pop-ups in the window, none about a network's state (the list shows it); errors appear in the window when notifications are off
 - GUI: "Copied" shown where you clicked (✓ on the copy button, "Copied" in the members list, on the Invite button)

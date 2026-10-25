@@ -73,6 +73,51 @@ Item {
                 width: parent.width - 2 * Theme.pad
                 spacing: 10
 
+                SectionTitle { text: qsTr("Your name") }
+                Rectangle {
+                    Layout.fillWidth: true
+                    implicitHeight: nameColumn.implicitHeight + 28
+                    radius: Theme.radius
+                    color: Theme.surface
+                    border.color: Theme.border
+                    ColumnLayout {
+                        id: nameColumn
+                        anchors.fill: parent
+                        anchors.margins: 14
+                        spacing: 8
+                        Text { textFormat: Text.PlainText; text: qsTr("Your name in networks"); color: Theme.text; font.pixelSize: 14; font.weight: Font.DemiBold }
+                        TextField {
+                            id: nickField
+                            Layout.fillWidth: true
+                            implicitHeight: 42
+                            text: Backend.nickname
+                            maximumLength: 32
+                            placeholderText: Backend.personaName !== "" ? qsTr("Your Steam name: %1").arg(Backend.personaName) : qsTr("Your Steam name")
+                            placeholderTextColor: Theme.muted
+                            color: Theme.text
+                            font.pixelSize: 14
+                            selectByMouse: true
+                            leftPadding: 12
+                            Accessible.name: qsTr("Your name in networks")
+                            background: Rectangle {
+                                radius: Theme.radius
+                                color: Theme.bg
+                                border.width: nickField.activeFocus ? 2 : 1
+                                border.color: nickField.activeFocus ? Theme.accent : Theme.border
+                            }
+                            onEditingFinished: Backend.nickname = text
+                        }
+                        Text {
+                            textFormat: Text.PlainText
+                            Layout.fillWidth: true
+                            wrapMode: Text.WordWrap
+                            color: Theme.muted
+                            font.pixelSize: 12
+                            text: qsTr("Shown instead of your Steam name to everyone in your networks. Leave it empty to use your Steam name. People in your networks can still see your Steam account in Steam.")
+                        }
+                    }
+                }
+
                 SectionTitle { text: qsTr("General") }
                 Group {
                     Toggle {

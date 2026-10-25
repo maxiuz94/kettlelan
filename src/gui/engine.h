@@ -44,6 +44,7 @@ public:
     void leave(const std::string& code); // one network
     void leaveAll();
     void rename(const std::string& code, const std::string& name); // shared name (lobby owner only)
+    void setNick(const std::string& nick);                          // our name in every network ("" = Steam)
     void setHideAddress(bool hide);
     void setProtectServices(bool protect);
     // Leaves the network, closes the adapter and disconnects Steam. Blocks until done (a few seconds at most).

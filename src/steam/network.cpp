@@ -32,6 +32,7 @@ constexpr const char* kMarkerValue = "3"; // lobby format of KettleLAN 0.3
 constexpr const char* kKeyTag = "tag";
 constexpr const char* kKeyName = "name";
 constexpr const char* kKeyProto = "proto";
+constexpr const char* kKeyNick = "nick"; // member data: a member's nickname, encrypted
 // KettleLAN 0.2 and early 0.3 builds wrote this when a network was opened without a name. It is
 // treated as "name not known", so a member who knows the real name can put it back.
 constexpr const char* kLegacyDefaultName = "KettleLAN network";
@@ -122,6 +123,22 @@ public:
         return fromMembers.empty() ? knownName_ : fromMembers;
     }
 
+    // Our nickname in this lobby's member data (encrypted); empty: the Steam name is used.
+    void publishNick() {
+        if (!lobby_.IsValid() || state_ != State::Connected) return;
+        SteamMatchmaking()->SetLobbyMemberData(lobby_, kKeyNick,
+                                               hub_.nick_.empty() ? "" : netkeys::sealNick(keys_, hub_.nick_).c_str());
+    }
+
+    // A member's nickname from this lobby, "" when none (text from other people – cleaned).
+    std::string nickOf(uint64_t steamId) const {
+        if (!lobby_.IsValid() || state_ != State::Connected) return {};
+        const char* sealed = SteamMatchmaking()->GetLobbyMemberData(lobby_, CSteamID(uint64(steamId)), kKeyNick);
+        if (!sealed || !*sealed) return {};
+        const auto nick = netkeys::openNick(keys_, sealed);
+        return nick ? text::sanitize(*nick, 32) : std::string();
+    }
+
     bool isOwner() const {
         return lobby_.IsValid() && SteamMatchmaking()->GetLobbyOwner(lobby_).ConvertToUint64() == hub_.selfId_;
     }
@@ -144,7 +161,7 @@ private:
         const auto sync = hub_.router_.syncMembers(id_, current);
         hub_.closeSessions(sync.goneEverywhere);
         for (uint64_t id : sync.left)
-            if (verifiedBefore.count(id)) hub_.notify(Msg::PeerLeft, {nameOf(id), hub_.displayName(*this)});
+            if (verifiedBefore.count(id)) hub_.notify(Msg::PeerLeft, {hub_.personName(id), hub_.displayName(*this)});
     }
 
     void search(bool merge) {
@@ -236,6 +253,7 @@ private:
         SteamMatchmaking()->SetLobbyMemberData(lobby_, "ip", hub_.selfAddress_.toString().c_str());
         adoptLobbyName();
         publishKnownName();
+        publishNick();
         state_ = State::Connected;
         const auto now = Clock::now();
         nextMergeCheck_ = now + kFirstMergeCheck;
@@ -498,19 +516,19 @@ void Network::handleControl(uint64_t from, std::span<const uint8_t> data) {
     const Lobby* lobby = lobbyFor(outcome.network);
     switch (outcome.result) {
     case HelloResult::Verified:
-        notify(Msg::PeerJoined, {nameOf(from), ip::addressForSteamId(from).toString(), lobby ? displayName(*lobby) : std::string()});
+        notify(Msg::PeerJoined, {personName(from), ip::addressForSteamId(from).toString(), lobby ? displayName(*lobby) : std::string()});
         break;
     case HelloResult::Conflict:
         if (reportedBad_.insert(from).second)
-            notify(Msg::PeerConflict, {nameOf(from)});
+            notify(Msg::PeerConflict, {personName(from)});
         break;
     case HelloResult::BadProof:
         if (reportedBad_.insert(from).second)
-            notify(Msg::PeerBadKey, {nameOf(from)});
+            notify(Msg::PeerBadKey, {personName(from)});
         return;
     case HelloResult::BadVersion:
         if (reportedBad_.insert(from).second)
-            notify(Msg::PeerBadVersion, {nameOf(from)});
+            notify(Msg::PeerBadVersion, {personName(from)});
         return;
     case HelloResult::BadAddress:
         if (reportedBad_.insert(from).second)
@@ -663,7 +681,7 @@ std::vector<PeerInfo> Network::peersOf(const Lobby& lobby) const {
 
     PeerInfo self;
     self.steamId = selfId_;
-    self.name = text::sanitize(SteamFriends()->GetPersonaName(), 32);
+    self.name = nick_.empty() ? text::sanitize(SteamFriends()->GetPersonaName(), 32) : nick_;
     self.address = selfAddress_;
     self.self = true;
     self.verified = true;
@@ -673,7 +691,9 @@ std::vector<PeerInfo> Network::peersOf(const Lobby& lobby) const {
     for (const auto& peer : router_.peers(lobby.id())) {
         PeerInfo p;
         p.steamId = peer.steamId;
-        p.name = nameOf(peer.steamId);
+        p.name = personName(peer.steamId);
+        p.steamFriend = SteamFriends()->HasFriend(CSteamID(uint64(peer.steamId)), k_EFriendFlagImmediate);
+        if (p.steamFriend) p.steamName = nameOf(peer.steamId);
         p.address = peer.address;
         p.owner = owner == peer.steamId;
         p.verified = peer.verified;
@@ -711,6 +731,27 @@ std::vector<NetworkInfo> Network::networks() const {
         out.push_back(std::move(info));
     }
     return out;
+}
+
+void Network::setNick(const std::string& nick) {
+    nick_ = text::sanitize(nick, 32);
+    for (const auto& l : lobbies_) l->publishNick();
+}
+
+std::string Network::personName(uint64_t steamId) const {
+    bool inLobby = false;
+    for (const auto& l : lobbies_) {
+        if (!l->isMember(steamId)) continue;
+        inLobby = true;
+        const std::string nick = l->nickOf(steamId);
+        if (!nick.empty()) {
+            nicks_[steamId] = nick;
+            return nick;
+        }
+    }
+    if (inLobby) nicks_.erase(steamId); // in a lobby without a nickname: the Steam name
+    const auto it = nicks_.find(steamId); // already left the lobby: the nickname we saw last
+    return it != nicks_.end() ? it->second : nameOf(steamId);
 }
 
 bool Network::rename(NetworkHandle network, const std::string& name) {

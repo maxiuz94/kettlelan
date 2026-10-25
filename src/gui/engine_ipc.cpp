@@ -37,7 +37,7 @@ QByteArray encodeSnapshot(const Snapshot& snap) {
             peers.append(QJsonObject{{"steamId", QString::number(p.steamId)}, {"name", str(p.name)},
                                      {"address", str(p.address.toString())}, {"self", p.self}, {"owner", p.owner},
                                      {"verified", p.verified}, {"conflict", p.conflict}, {"ping", p.pingMs},
-                                     {"relayed", p.relayed}});
+                                     {"relayed", p.relayed}, {"friend", p.steamFriend}, {"steamName", str(p.steamName)}});
         }
         networks.append(QJsonObject{{"id", int(n.id)}, {"connected", n.state == steam::State::Connected},
                                     {"code", str(n.code)}, {"name", str(n.name)}, {"owner", n.owner}, {"peers", peers}});
@@ -94,6 +94,8 @@ std::optional<Incoming> decodeIncoming(const QByteArray& data) {
             p.conflict = po.value("conflict").toBool();
             p.pingMs = po.value("ping").toInt(-1);
             p.relayed = po.value("relayed").toBool();
+            p.steamFriend = po.value("friend").toBool();
+            p.steamName = std8(po.value("steamName"));
             n.peers.push_back(std::move(p));
         }
         s.networks.push_back(std::move(n));

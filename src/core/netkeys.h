@@ -37,4 +37,10 @@ std::string sealName(const Keys& keys, std::string_view name);
 // Decrypts a sealed name; nothing if it was not made with these keys or was changed.
 std::optional<std::string> openName(const Keys& keys, std::string_view sealed);
 
+// A member's nickname in this network's lobby (member data), sealed like the network name but in its
+// own context, so a sealed network name cannot be passed off as a nickname or the other way round.
+// The nickname is cut to 32 characters (at most 128 UTF-8 bytes).
+std::string sealNick(const Keys& keys, std::string_view nick);
+std::optional<std::string> openNick(const Keys& keys, std::string_view sealed);
+
 } // namespace kettle::netkeys

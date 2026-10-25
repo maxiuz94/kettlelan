@@ -16,6 +16,7 @@ struct Engine::State {
     std::unique_ptr<steam::Network> net;
     std::unique_ptr<platform::Tun> tun;
     EngineStatus status = EngineStatus::Starting;
+    std::string nick; // applied when the network object exists
     Message error;
     bool dirty = true;
     bool hideAddress = true;
@@ -78,6 +79,14 @@ void Engine::rename(const std::string& text, const std::string& name) {
     });
 }
 
+void Engine::setNick(const std::string& nick) {
+    post([this, nick] {
+        st_->nick = nick;
+        if (st_->net) st_->net->setNick(nick);
+        st_->dirty = true;
+    });
+}
+
 void Engine::leaveAll() {
     post([this] {
         if (st_->net) st_->net->leaveAll();
@@ -117,6 +126,7 @@ void Engine::initialize() {
         });
         s.net->setHideAddress(s.hideAddress);
         s.net->setProtectServices(s.protectServices);
+        s.net->setNick(s.nick);
     }
     if (!s.tun) {
         s.status = EngineStatus::Starting;

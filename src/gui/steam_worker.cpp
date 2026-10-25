@@ -48,6 +48,7 @@ int main(int argc, char** argv) {
         else if (name == "leave") engine.leave(code);
         else if (name == "leaveAll") engine.leaveAll();
         else if (name == "rename") engine.rename(code, text);
+        else if (name == "nick") engine.setNick(text);
         else if (name == "hideAddress") engine.setHideAddress(cmd->value("on").toBool());
         else if (name == "protectServices") engine.setProtectServices(cmd->value("on").toBool());
         else if (name == "retry") engine.retry();

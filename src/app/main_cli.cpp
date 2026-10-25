@@ -60,6 +60,7 @@ void printHelp() {
                  "  join <code> [name]  connect to a network, e.g. join KTL-7F3Q-9XM2-A4KD\n"
                  "                  (the name is used only if you open the network and nobody knows it yet)\n"
                  "  rename <n> <name>  rename network n for everyone (only if you opened it, marked *)\n"
+                 "  name [nickname]    your name in every network (without a nickname: your Steam name)\n"
                  "  list            your networks, their members, addresses and ping\n"
                  "  code            show the codes of your networks\n"
                  "  leave [n|all]   leave network n from \"list\" (or the only one), or all of them\n"
@@ -96,7 +97,7 @@ void printNetworks(const steam::Network& net) {
             else if (p.pingMs >= 0) status = std::to_string(p.pingMs) + " ms, " + (p.relayed ? "Steam relay" : "direct");
             else status = "connected";
             std::cout << "  " << std::left << std::setw(16) << p.address.toString() << std::setw(24)
-                      << (p.name + (p.owner ? " *" : "")) << status << "\n";
+                      << (p.name + (p.owner ? " *" : "")) << status << (p.steamFriend ? "  (Steam friend)" : "") << "\n";
         }
     }
     std::cout << "\n";
@@ -148,6 +149,10 @@ void handleCommand(const std::string& rawLine, steam::Network& net) {
         int n = 1;
         for (const auto& info : networks)
             std::cout << n++ << ". " << info.code << (info.name.empty() ? "" : "  \"" + info.name + "\"") << "\n";
+    } else if (cmd == "name") {
+        net.setNick(rest);
+        std::cout << (rest.empty() ? std::string("Your Steam name is shown in your networks.\n")
+                                   : "Your name in your networks: " + rest + "\n");
     } else if (cmd == "rename") {
         std::istringstream args(rest);
         int n = 0;

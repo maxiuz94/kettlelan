@@ -11,6 +11,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QGuiApplication>
+#include <QHash>
 #include <QMenu>
 #include <QPalette>
 #include <QProcess>
@@ -92,6 +93,7 @@ Backend::Backend(bool demo, QObject* parent) : QObject(parent), demo_(demo) {
     QSettings s;
     closeToTray_ = s.value(QStringLiteral("closeToTray"), true).toBool();
     notifications_ = s.value(QStringLiteral("notifications"), true).toBool();
+    nickname_ = s.value(QStringLiteral("nick")).toString();
     theme_ = s.value(QStringLiteral("theme"), QStringLiteral("system")).toString();
     autoConnect_ = s.value(QStringLiteral("autoConnect"), true).toBool();
     hideAddress_ = s.value(QStringLiteral("hideAddress"), true).toBool();
@@ -116,6 +118,7 @@ void Backend::startEngine() {
     if (demo_) return;
     engine_ = std::make_unique<EngineClient>([this](const Snapshot& snap) { applySnapshot(snap); },
                                              [this](const Message& message) { handleEvent(message); }, this);
+    engine_->setNick(nickname_.toStdString());
 
     // The Steam process runs only while a network is on (otherwise Steam would show "Spacewar" for nothing).
     QSettings settings;
@@ -183,9 +186,15 @@ void Backend::applySnapshot(const Snapshot& snap) {
         n.lobbyName = QString::fromStdString(info.name);
         n.connected = info.state == steam::State::Connected;
         n.owner = info.owner;
+        QHash<QString, int> names; // the same name twice in one network: both get a warning
+        for (const auto& p : info.peers) names[QString::fromStdString(p.name).toCaseFolded()]++;
         for (const auto& p : info.peers) {
-            n.peers.append(peerToMap(QString::fromStdString(p.name), QString::fromStdString(p.address.toString()),
-                                     p.self, p.owner, p.verified, p.conflict, p.pingMs, p.relayed));
+            QVariantMap m = peerToMap(QString::fromStdString(p.name), QString::fromStdString(p.address.toString()),
+                                      p.self, p.owner, p.verified, p.conflict, p.pingMs, p.relayed);
+            m[QStringLiteral("steamFriend")] = p.steamFriend;
+            m[QStringLiteral("steamName")] = QString::fromStdString(p.steamName);
+            m[QStringLiteral("sameName")] = names.value(QString::fromStdString(p.name).toCaseFolded()) > 1;
+            n.peers.append(m);
             if (p.self || p.verified) ++n.members;
         }
         // The shared name from the lobby wins over what we saved; the alias stays ours.
@@ -587,6 +596,18 @@ void Backend::rememberNetwork(const QString& code, const QString& name) {
     storeSaved();
 }
 
+void Backend::setNickname(const QString& v) {
+    QString clean;
+    for (const QChar c : v.trimmed())
+        if (!c.isNull() && c.category() != QChar::Other_Control && c.category() != QChar::Other_Format) clean += c;
+    clean = clean.left(32);
+    if (clean == nickname_) return;
+    nickname_ = clean;
+    QSettings().setValue(QStringLiteral("nick"), clean);
+    if (engine_) engine_->setNick(clean.toStdString());
+    emit settingsChanged();
+}
+
 void Backend::setNotifications(bool v) {
     if (v == notifications_) return;
     notifications_ = v;
@@ -738,6 +759,19 @@ void Backend::loadDemo() {
             peerToMap(tr("Friend %1").arg(4), QStringLiteral("100.77.9.31"), false, false, false, false, -1, false),
         };
         quake.members = 4;
+        { // a Steam friend, and two people who chose the same name
+            QVariantMap friend1 = quake.peers[1].toMap();
+            friend1[QStringLiteral("steamFriend")] = true;
+            friend1[QStringLiteral("steamName")] = QStringLiteral("friend_one");
+            quake.peers[1] = friend1;
+            for (int i : {3, 4}) {
+                QVariantMap bob = quake.peers[i].toMap();
+                bob[QStringLiteral("name")] = QStringLiteral("Bob");
+                bob[QStringLiteral("initial")] = QStringLiteral("B");
+                bob[QStringLiteral("sameName")] = true;
+                quake.peers[i] = bob;
+            }
+        }
         LiveNetwork warcraft;
         warcraft.code = QStringLiteral("KTL-7F3Q-9XM2-A4KD");
         warcraft.lobbyName = tr("Warcraft III with friends");

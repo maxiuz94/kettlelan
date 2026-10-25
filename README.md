@@ -36,6 +36,7 @@ networking (directly or via Valve's relays), so it works behind any router and e
 - **A stable address** (`100.x.x.x`) for every player – click a person to copy their address for the game.
 - **Up to five networks at the same time**, with one address – switch each one on and off on the home screen.
 - **Saved networks**, automatic reconnect and start with the system – like Hamachi.
+- **Your own name** in networks instead of your Steam name, and a "Steam friend" badge for your Steam friends.
 - **Private by default** – your IP address is hidden from other players and your computer's services
   (SSH, file sharing, remote desktop, databases…) are blocked for them.
 - System tray icon, notifications, dark and light theme.

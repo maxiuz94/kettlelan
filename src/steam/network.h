@@ -43,6 +43,8 @@ struct PeerInfo {
     bool conflict = false;   // address clashes with someone else (very rare)
     int pingMs = -1;
     bool relayed = false;
+    bool steamFriend = false; // your friend on Steam (checked on this computer only)
+    std::string steamName;    // their Steam name – only for your Steam friends (you know them anyway)
 };
 
 using NetworkHandle = router::NetworkId;
@@ -79,6 +81,8 @@ public:
     void leaveAll();
     // Renames a network for everyone; only the lobby owner can. False when we are not the owner.
     bool rename(NetworkHandle network, const std::string& name);
+    // Our nickname in every network ("" = the Steam name). Encrypted with each network's key.
+    void setNick(const std::string& nick);
     void poll(); // receive messages – call as often as possible
     void tick(); // periodic work – every ~0.5 s
 
@@ -144,6 +148,8 @@ private:
     void handleData(uint64_t from, std::span<const uint8_t> data);
     void sendTo(uint64_t steamId, std::span<const uint8_t> data, int channel);
     std::vector<PeerInfo> peersOf(const Lobby& lobby) const;
+    // How we show a person: their nickname in our networks, else their Steam name.
+    std::string personName(uint64_t steamId) const;
     // Name for messages; adds the code when two of our networks have the same name.
     std::string displayName(const Lobby& lobby) const;
     void notify(Msg id, std::vector<std::string> args = {});
@@ -157,6 +163,8 @@ private:
 
     router::Router router_;          // who is verified and which packets we accept
     std::set<uint64_t> reportedBad_; // whom we already reported (no log flooding)
+    std::string nick_;                               // ours ("" = the Steam name)
+    mutable std::map<uint64_t, std::string> nicks_;  // last nickname seen per person (for "X left")
     std::chrono::steady_clock::time_point nextKeepalive_{};
 #ifdef KETTLELAN_SECURITY_TESTS
     bool debugWrongKey_ = false;

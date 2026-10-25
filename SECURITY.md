@@ -40,6 +40,10 @@ Please **do not open a public issue**. Use GitHub's private reporting instead:
   lobby data. Your own note for a network never leaves your computer.
 - **Steam runs in its own process.** Everything that talks to Steam and to other players runs in `kettlelan-steam`,
   started by the KettleLAN window only while a network is on. The window itself never connects to Steam.
+- **Your name in networks** (if you set one) is encrypted with each network's key, like the network name, so only
+  people with the code can read it. It does not make you anonymous: people in a lobby can always see your Steam
+  account in Steam. The "Steam friend" badge is decided on your computer from your own friends list – nothing is sent.
+  Two members with the same name get a warning; their addresses always differ.
 - **Text from other people** (Steam names, network names) is cleaned of control characters and shown as plain
   text – no HTML, so it cannot be used, for example, to load an image from someone's server.
 - The file with saved networks and the log are readable by your account only (permissions `600`).
