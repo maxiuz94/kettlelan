@@ -19,7 +19,7 @@ Before tagging a release add a `## [x.y.z] – date` section (see [docs/RELEASIN
 - Windows: smaller package without the unused Qt styles
 - GUI: wait for Steam (and on Windows for the KettleLAN service) and connect automatically – no "Try again" needed after login
 - Steam: connect to Steam only while a network is on – in a separate background process (kettlelan-steam), so with every network off Steam no longer shows "Spacewar"
-- GUI: Pause / Resume button – every network off and no Steam connection, then the same networks on again
+- GUI: Pause / Resume button – ⏸ switches every network off (no Steam connection), ▶ switches on the networks used last
 - GUI: networks show "Connecting…" on the list while KettleLAN connects to Steam – no separate screen in between
 - GUI: messages as system notifications instead of pop-ups in the window, none about a network's state (the list shows it); errors appear in the window when notifications are off
 - GUI: "Copied" shown where you clicked (✓ on the copy button, "Copied" in the members list, on the Invite button)

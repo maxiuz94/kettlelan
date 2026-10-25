@@ -122,7 +122,8 @@ void Backend::startEngine() {
     const QString last = settings.value(QStringLiteral("lastNetwork")).toString(); // KettleLAN 0.2
     if (activeNetworks().isEmpty() && !last.isEmpty()) setActive(last, true);
     settings.remove(QStringLiteral("lastNetwork"));
-    if (!autoConnect_) settings.remove(QStringLiteral("activeNetworks")); // start with every network off
+    if (!autoConnect_) // start with every network off – ▶ switches on the ones that were on
+        for (const auto& code : activeNetworks()) setActive(code, false);
     if (!activeNetworks().isEmpty()) {
         goOnline();
     } else {
@@ -143,8 +144,7 @@ void Backend::goOffline() {
 void Backend::pause() {
     const QStringList active = activeNetworks();
     if (active.isEmpty()) return;
-    QSettings().setValue(QStringLiteral("pausedNetworks"), active);
-    QSettings().remove(QStringLiteral("activeNetworks"));
+    for (const auto& code : active) setActive(code, false); // the last one saves the networks for ▶
     pendingOpen_.clear();
     networkOpen_ = false;
     goOffline();
@@ -349,7 +349,6 @@ void Backend::joinNetwork(const QString& code) {
     setActive(normalized, true);
     pendingOpen_ = normalized;
     if (demo_) return;
-    QSettings().remove(QStringLiteral("pausedNetworks")); // switching a network on ends a pause
     if (status_ != QLatin1String("ready")) {
         goOnline(); // the network is joined once Steam is connected
         emit changed();
@@ -404,18 +403,37 @@ QStringList Backend::activeNetworks() const {
     return QSettings().value(QStringLiteral("activeNetworks")).toStringList();
 }
 
+// activeNetworks: the networks that are on. sessionNetworks: every network that was on since the
+// last time all were off. When the last one goes off, they become pausedNetworks – what ▶ switches on.
 void Backend::setActive(const QString& code, bool active) {
     if (demo_) return;
+    QSettings settings;
     QStringList list = activeNetworks();
+    const bool wasEmpty = list.isEmpty();
     list.removeAll(code);
     if (active) list.append(code);
-    QSettings().setValue(QStringLiteral("activeNetworks"), list);
+    settings.setValue(QStringLiteral("activeNetworks"), list);
+    if (active) {
+        QStringList session = wasEmpty ? QStringList() : settings.value(QStringLiteral("sessionNetworks")).toStringList();
+        if (!session.contains(code)) session.append(code);
+        settings.setValue(QStringLiteral("sessionNetworks"), session);
+    } else if (list.isEmpty()) {
+        const QStringList session = settings.value(QStringLiteral("sessionNetworks")).toStringList();
+        if (!session.isEmpty()) settings.setValue(QStringLiteral("pausedNetworks"), session);
+        settings.remove(QStringLiteral("sessionNetworks"));
+    }
 }
 
 void Backend::forgetNetwork(const QString& code) {
     const QString c = normalizeCode(code);
     if (liveFor(c)) disconnectNetwork(c);
     setActive(c, false);
+    QSettings settings;
+    for (const char* key : {"pausedNetworks", "sessionNetworks"}) {
+        QStringList list = settings.value(QLatin1String(key)).toStringList();
+        list.removeAll(c);
+        settings.setValue(QLatin1String(key), list);
+    }
     for (int i = 0; i < saved_.size(); ++i) {
         if (saved_[i].toMap().value(QStringLiteral("code")).toString() == c) {
             const QString name = saved_[i].toMap().value(QStringLiteral("name")).toString();
