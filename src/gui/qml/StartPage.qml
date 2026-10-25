@@ -25,16 +25,15 @@ Item {
             SvgIcon { name: "kettle"; size: 28; color: Theme.accent }
             Text { textFormat: Text.PlainText; text: "KettleLAN"; color: Theme.text; font.pixelSize: 18; font.weight: Font.Bold; Layout.fillWidth: true }
             // Pause: every network off and no Steam connection (no "Spacewar" on Steam); Resume: the same networks on again
-            // ⏸ while any network is on, ▶ when all are off (switches on the ones used last)
+            // always in the same place; greyed out when every network is already off
             IconButton {
-                readonly property bool on: Backend.connectedCount > 0
-                enabled: on || Backend.paused
+                enabled: Backend.connectedCount > 0 || Backend.paused
                 opacity: enabled ? 1 : 0.35
-                iconName: on ? "pause" : "play"
-                label: on ? qsTr("Pause – switch every network off and disconnect from Steam")
-                     : Backend.paused ? qsTr("Resume – switch on the networks you used last")
-                     : qsTr("Resume – no networks used yet")
-                onClicked: on ? Backend.pause() : Backend.resume()
+                iconName: Backend.paused ? "play" : "pause"
+                label: Backend.paused ? qsTr("Resume – switch the paused networks on again")
+                     : enabled ? qsTr("Pause – switch every network off and disconnect from Steam")
+                     : qsTr("Pause – every network is already off")
+                onClicked: Backend.paused ? Backend.resume() : Backend.pause()
             }
             IconButton { iconName: "settings"; label: qsTr("Settings"); onClicked: page.openSettings() }
         }
@@ -242,7 +241,7 @@ Item {
                 wrapMode: Text.WordWrap
                 color: Theme.muted
                 font.pixelSize: 12
-                text: Backend.paused ? qsTr("All networks are off – KettleLAN is not connected to Steam. Press ▶ to switch on the ones you used last.")
+                text: Backend.paused ? qsTr("Paused – KettleLAN is not connected to Steam. Press ▶ to switch the same networks on again.")
                       : Backend.status === "offline" ? qsTr("KettleLAN connects to Steam when you switch a network on, and disconnects when all are off.")
                       : Backend.connectedCount >= Backend.maxNetworks
                       ? qsTr("You are connected to %1 networks – the most at the same time. Turn one off to connect to another.").arg(Backend.maxNetworks)
