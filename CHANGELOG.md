@@ -35,7 +35,7 @@ Before tagging a release add a `## [x.y.z] – date` section (see [docs/RELEASIN
 - Windows: installer (Inno Setup) instead of the zip – Program Files, the service, Start menu shortcut, optional desktop shortcut and autostart
 - Windows: updating closes KettleLAN and the service first; uninstalling removes the service and its firewall rules and keeps your networks
 - Windows: the adapter stays ready while the service runs – no "identifying network" delay; smaller package without unused Qt styles
-- CLI: several networks ("leave n", "leave all"), "join <code> [name]", "rename <n> <name>", "name [nickname]"
+- CLI: several networks (`leave n`, `leave all`), `join <code> [name]`, `rename <n> <name>`, `name [nickname]`
 - Docs: FAQ about "Spacewar" in Steam and other games, updated screenshots
 
 ## [0.2.1] – 2026-10-22
