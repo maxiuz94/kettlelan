@@ -13,6 +13,13 @@ Before tagging a release add a `## [x.y.z] – date` section (see [docs/RELEASIN
 - Windows: disconnect when KettleLAN or the service takes no data for 5 seconds, so neither can freeze the other
 - Windows: set autostart only in KettleLAN's settings, so it always applies to the account that uses KettleLAN
 - Windows: do not log a missing adapter at the first start as an error
+- Security: show a member's nickname only after they proved the network's key, so a copied nickname does not work
+- Security: remove invisible characters from names, so a name cannot look exactly like someone else's
+- Security: let through only the ICMP messages games need (ping, unreachable, time exceeded)
+- Security: protect development servers, web panels and Syncthing (ports 3000, 8000, 8081, 8888, 22000)
+- GUI: explain that the host (★) can rename a network and that Steam passes it on when the host leaves
+- Docs: all networks share one address – members of each see your game servers
+- CI: build the installer with a pinned Inno Setup version
 
 ## [0.3.0] – 2026-10-25
 

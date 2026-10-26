@@ -203,6 +203,14 @@ static std::vector<uint8_t> makePacket(uint8_t proto, uint16_t dstPort, uint16_t
     return p;
 }
 
+// ICMP message of the given type (8 = ping, 5 = redirect…).
+static std::vector<uint8_t> makeIcmp(uint8_t type, uint16_t frag = 0) {
+    std::vector<uint8_t> p = makePacket(1, 0, frag, 8);
+    p[20] = type;
+    p[21] = 0;
+    return p;
+}
+
 static void testFilter() {
     using filter::Verdict;
     CHECK(filter::inspectInbound(makePacket(17, 27960)).verdict == Verdict::Allow);   // Quake 3
@@ -212,7 +220,21 @@ static void testFilter() {
     CHECK(filter::inspectInbound(makePacket(17, 137)).verdict == Verdict::BlockedService);   // NetBIOS
     CHECK(filter::inspectInbound(makePacket(6, 1716)).verdict == Verdict::BlockedService);   // KDE Connect
     CHECK(filter::inspectInbound(makePacket(17, 5353)).verdict == Verdict::BlockedService);  // mDNS
-    CHECK(filter::inspectInbound(makePacket(1, 0)).verdict == Verdict::Allow);        // ICMP (ping)
+    CHECK(filter::inspectInbound(makeIcmp(8)).verdict == Verdict::Allow);   // ping
+    CHECK(filter::inspectInbound(makeIcmp(0)).verdict == Verdict::Allow);   // ping reply
+    CHECK(filter::inspectInbound(makeIcmp(3)).verdict == Verdict::Allow);   // unreachable (closed port, MTU)
+    CHECK(filter::inspectInbound(makeIcmp(11)).verdict == Verdict::Allow);  // time exceeded (traceroute)
+    CHECK(filter::inspectInbound(makeIcmp(5)).verdict == Verdict::BlockedProtocol);  // redirect
+    CHECK(filter::inspectInbound(makeIcmp(13)).verdict == Verdict::BlockedProtocol); // timestamp
+    CHECK(filter::inspectInbound(makeIcmp(9)).verdict == Verdict::BlockedProtocol);  // router advertisement
+    CHECK(filter::inspectInbound(makeIcmp(5, 0x00B9)).verdict == Verdict::Allow);    // later fragment of a big ping
+    CHECK(filter::inspectInbound(makePacket(1, 0, 0, 0)).verdict == Verdict::Malformed); // ICMP without a header
+    CHECK(filter::inspectInbound(makePacket(6, 3000)).verdict == Verdict::BlockedService);   // development server
+    CHECK(filter::inspectInbound(makePacket(6, 8081)).verdict == Verdict::BlockedService);   // web server
+    CHECK(filter::inspectInbound(makePacket(6, 22000)).verdict == Verdict::BlockedService);  // Syncthing
+    CHECK(filter::inspectInbound(makePacket(17, 22000)).verdict == Verdict::BlockedService); // Syncthing (UDP)
+    CHECK(filter::inspectInbound(makePacket(17, 7777)).verdict == Verdict::Allow);   // Unreal / Terraria
+    CHECK(filter::inspectInbound(makePacket(17, 27015)).verdict == Verdict::Allow);  // Source games
     CHECK(filter::inspectInbound(makePacket(47, 0)).verdict == Verdict::BlockedProtocol); // GRE
     // fragmentation: offset 1 (port overwrite) and a too short first fragment
     CHECK(filter::inspectInbound(makePacket(6, 0, 0x0001, 20)).verdict == Verdict::BlockedFragment);
@@ -238,6 +260,19 @@ static void testSanitize() {
     CHECK(text::sanitize("  spacje  ") == "spacje");
     CHECK(text::sanitize(std::string(200, 'x')).size() == 64);
     CHECK(text::sanitize("\xff\xfeok") == "ok");                    // invalid UTF-8
+    // invisible characters: a name must not look exactly like someone else's
+    CHECK(text::sanitize("Ma\xe2\x80\x8b" "ks") == "Maks");            // U+200B zero-width space
+    CHECK(text::sanitize("Ma\xe2\x80\x8d" "ks") == "Maks");            // U+200D zero-width joiner
+    CHECK(text::sanitize("\xef\xbb\xbf" "Maks") == "Maks");             // U+FEFF
+    CHECK(text::sanitize("Maks\xe3\x85\xa4") == "Maks");               // U+3164 Hangul filler
+    CHECK(text::sanitize("\xe2\xa0\x80\xe2\xa0\x80").empty());         // U+2800 only – an empty name
+    CHECK(text::sanitize("Ma\xc2\xad" "ks") == "Maks");                 // U+00AD soft hyphen
+    CHECK(text::sanitize("a\xf3\xa0\x80\x81" "b") == "ab");             // U+E0001 tag
+    // malformed UTF-8
+    CHECK(text::sanitize("a\xc0\xbc" "b") == "ab");                     // overlong "<"
+    CHECK(text::sanitize("a\xed\xa0\x80" "b") == "ab");                 // surrogate
+    CHECK(text::sanitize("a\xf4\x90\x80\x80" "b") == "ab");             // beyond U+10FFFF
+    CHECK(text::sanitize("\xf0\x9f\x8e\xae Gra") == "\xf0\x9f\x8e\xae Gra"); // emoji are kept
 }
 
 

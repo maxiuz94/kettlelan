@@ -118,6 +118,14 @@ bool Router::isMember(uint64_t steamId) const {
     return peers_.count(steamId) != 0;
 }
 
+bool Router::isVerified(NetworkId network, uint64_t steamId) const {
+    std::shared_lock lk(mutex_);
+    const auto n = nets_.find(network);
+    if (n == nets_.end()) return false;
+    const auto m = n->second.members.find(steamId);
+    return m != n->second.members.end() && m->second.verified;
+}
+
 // ---------------------------------------------------------------- verification
 
 HelloOutcome Router::onHello(uint64_t from, const protocol::HelloMessage& msg) {

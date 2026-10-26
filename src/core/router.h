@@ -91,6 +91,7 @@ public:
     // --- lobby members of one network (from Steam's list)
     SyncResult syncMembers(NetworkId network, const std::vector<uint64_t>& members);
     bool isMember(uint64_t steamId) const; // member of any of our networks
+    bool isVerified(NetworkId network, uint64_t steamId) const; // proved the key of this network
 
     // --- verification. A proof verifies a person only in the network whose key made it.
     HelloOutcome onHello(uint64_t from, const protocol::HelloMessage& msg);

@@ -178,7 +178,12 @@ int main() {
         EXPECT(r.onData(ALICE, packet(a, m, 47, 0)) == InboundResult::Filtered, "other protocol (GRE) blocked");
         EXPECT(r.onData(ALICE, packet(a, m, 17, 27960)) == InboundResult::Deliver, "Quake 3 allowed");
         EXPECT(r.onData(ALICE, packet(a, m, 6, 25565)) == InboundResult::Deliver, "Minecraft allowed");
-        EXPECT(r.onData(ALICE, packet(a, m, 1, 0)) == InboundResult::Deliver, "ping allowed");
+        auto ping = packet(a, m, 1, 0);
+        ping[20] = 8; // echo request
+        EXPECT(r.onData(ALICE, ping) == InboundResult::Deliver, "ping allowed");
+        auto redirect = packet(a, m, 1, 0);
+        redirect[20] = 5; // "use another router"
+        EXPECT(r.onData(ALICE, redirect) == InboundResult::Filtered, "ICMP redirect blocked");
         r.setProtectServices(false);
         EXPECT(r.onData(ALICE, packet(a, m, 6, 22)) == InboundResult::Deliver, "SSH passes once protection is off");
     }
@@ -326,6 +331,25 @@ int main() {
         EXPECT(r.onData(ALICE, packet(addr(BOB), addr(ME))) == InboundResult::Spoofed, "ALICE pretending to be BOB – rejected");
         EXPECT(r.onData(BOB, packet(addr(BOB), addr(ME))) == InboundResult::Deliver, "BOB → us – delivered");
         EXPECT(r.onData(ALICE, packet(addr(ALICE), addr(ME))) == InboundResult::Deliver, "ALICE → us – delivered");
+        EXPECT(r.recipients(packet(addr(ALICE), addr(BOB))).empty(), "we never send on someone else's packet");
+        const auto toBob = r.recipients(packet(addr(ME), addr(BOB)));
+        EXPECT(toBob.size() == 1 && toBob[0] == BOB, "our own packet to BOB goes to BOB only");
+    }
+
+    SCENARIO("A nickname belongs to the network where its owner proved the key");
+    {
+        router::Router r(ME);
+        const auto a = *r.addNetwork(CODE, KEYS);
+        const auto b = *r.addNetwork(CODE_B, KEYS_B);
+        r.syncMembers(a, {ME, ALICE, EVE});
+        r.syncMembers(b, {ME, ALICE});
+        EXPECT(!r.isVerified(a, ALICE), "before HELLO ALICE is not verified (her nickname is not shown yet)");
+        r.onHello(ALICE, hello(KEYS, ALICE, ME, addr(ALICE)));
+        EXPECT(r.isVerified(a, ALICE), "after HELLO with the A key – verified in A");
+        EXPECT(!r.isVerified(b, ALICE), "…but not in B");
+        r.onHello(EVE, hello(OTHER_KEYS, EVE, ME, addr(EVE)));
+        EXPECT(!r.isVerified(a, EVE), "EVE without the key is never verified – a copied nickname is not shown");
+        EXPECT(!r.isVerified(9999, ALICE), "unknown network – nobody is verified");
     }
 
     SCENARIO("Broadcasts reach the verified members of both networks, each person once");

@@ -5,8 +5,8 @@ import QtQuick.Layouts
 import KettleLAN
 import KettleLAN.Core
 
-// Details of one network: the shared name (everyone sees it; only the person who opened the
-// network can change it), your own note (only on this computer), the code, and "forget".
+// Details of one network: the shared name (everyone sees it; only the host ★ can change it),
+// your own note (only on this computer), the code, and "forget".
 Popup {
     id: dialog
     property string code
@@ -78,7 +78,7 @@ Popup {
                 color: Theme.muted
                 font.pixelSize: 12
                 text: dialog.connected && dialog.owner ? qsTr("Everyone in the network sees this name.")
-                    : dialog.connected ? qsTr("Everyone sees the same name. Only the person who opened the network (★) can change it.")
+                    : dialog.connected ? qsTr("Everyone sees the same name. Only the host (★) can change it – whoever opened the network, or the next host if they left.")
                     : qsTr("Everyone in the network sees the same name.")
             }
         }

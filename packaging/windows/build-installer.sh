@@ -38,10 +38,12 @@ cp "$BUILD/_deps/wintun/wintun/LICENSE.txt" "$DIST/licenses/Wintun-LICENSE.txt"
 (cd "$DIST" && find . -type f \( -name '*.dll' -o -name '*.exe' \) | sed 's|^\./||' | sort) > "$DIST/licenses/bundled-files.txt"
 
 
-# Inno Setup: preinstalled on older GitHub runner images, installed here when missing
+# Inno Setup: preinstalled on older GitHub runner images, installed here when missing – always the same
+# known version (a new release is taken on purpose, by changing this number)
+INNO_SETUP_VERSION=6.7.1
 ISCC="${ISCC:-/c/Program Files (x86)/Inno Setup 6/ISCC.exe}"
 if [ ! -x "$ISCC" ]; then
-    choco install innosetup --no-progress -y > /dev/null
+    choco install innosetup --version "$INNO_SETUP_VERSION" --no-progress -y > /dev/null
 fi
 mkdir -p "$ROOT/dist"
 # Git Bash would turn "/DName=…" options into paths – switch that off for this call only

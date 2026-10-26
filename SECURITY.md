@@ -23,8 +23,8 @@ Please **do not open a public issue**. Use GitHub's private reporting instead:
   by the system's polkit prompt; in a terminal without a desktop (e.g. over SSH) KettleLAN uses `sudo`.
 - **"Protect this computer's services"** (on by default): packets from members to SSH, file sharing
   (SMB, NFS, AFP), remote desktop (RDP, VNC), databases, admin panels, KDE Connect, Steam Remote Play and
-  similar services are dropped before they reach the system. Protocols other than TCP/UDP/ICMP and suspicious
-  IP fragments (RFC 1858) are dropped too. Full list: [`src/core/filter.cpp`](src/core/filter.cpp).
+  similar services are dropped before they reach the system. Protocols other than TCP/UDP/ICMP, ICMP messages
+  other than ping, "unreachable" and "time exceeded", and suspicious IP fragments (RFC 1858) are dropped too. Full list: [`src/core/filter.cpp`](src/core/filter.cpp).
 - With protection on, your system **does not announce** its services in the KettleLAN network (mDNS/Avahi,
   NetBIOS, SSDP, KDE Connect, Spotify…), which would reveal the computer's name and shared resources.
 - **No access to your home network.** Only packets addressed to your `100.x.x.x` address (or broadcasts) are
@@ -36,15 +36,17 @@ Please **do not open a public issue**. Use GitHub's private reporting instead:
   key. A member of one network cannot reach members of the other through you (nothing is forwarded), and does not
   learn who is in your other network.
 - **The network name** is shared by everyone with the code. Any member who opens the network first publishes the
-  name they know, and only the person who opened it (★) can rename it; it is encrypted like the rest of the
-  lobby data. Your own note for a network never leaves your computer.
+  name they know, and only the host (★) can rename it – the person who opened it, or whoever Steam makes the
+  host after they leave; it is encrypted like the rest of the lobby data. Your own note for a network never leaves your computer.
 - **Steam runs in its own process.** Everything that talks to Steam and to other players runs in `kettlelan-steam`,
   started by the KettleLAN window only while a network is on. The window itself never connects to Steam.
 - **Your name in networks** (if you set one) is encrypted with each network's key, like the network name, so only
   people with the code can read it. It does not make you anonymous: people in a lobby can always see your Steam
-  account in Steam. The "Steam friend" badge is decided on your computer from your own friends list – nothing is sent.
+  account in Steam. A nickname is shown only once its owner has proved the key, so a copied encrypted nickname
+  does not work. The "Steam friend" badge is decided on your computer from your own friends list – nothing is sent.
   Two members with the same name get a warning; their addresses always differ.
-- **Text from other people** (Steam names, network names) is cleaned of control characters and shown as plain
+- **Text from other people** (Steam names, network names) is cleaned of control and invisible characters
+  (so a name cannot look exactly like someone else's) and shown as plain
   text – no HTML, so it cannot be used, for example, to load an image from someone's server.
 - The file with saved networks and the log are readable by your account only (permissions `600`).
 
@@ -91,6 +93,8 @@ Please **do not open a public issue**. Use GitHub's private reporting instead:
 
 - Members of a network are like computers on one LAN: they see the game traffic sent to them and can
   connect to game ports on your computer. Only let people you trust into your network.
+- All your networks share one address: members of every network you are in see your broadcasts and can join a
+  game server you started, even one meant for another network. Switch off the networks you are not playing in.
 - Service protection is based on a list of ports. A service on an unusual port (e.g. your own server on 8123)
   is reachable by members – stop it or block it in your firewall for the `kettle0` adapter.
 - `scripts/install-local.sh` puts the helper into your home folder. Malware running under your account could

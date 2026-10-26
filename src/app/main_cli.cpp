@@ -59,7 +59,7 @@ void printHelp() {
                  "  create [name]   create a new network and show its code\n"
                  "  join <code> [name]  connect to a network, e.g. join KTL-7F3Q-9XM2-A4KD\n"
                  "                  (the name is used only if you open the network and nobody knows it yet)\n"
-                 "  rename <n> <name>  rename network n for everyone (only if you opened it, marked *)\n"
+                 "  rename <n> <name>  rename network n for everyone (only the host, marked *)\n"
                  "  name [nickname]    your name in every network (without a nickname: your Steam name)\n"
                  "  list            your networks, their members, addresses and ping\n"
                  "  code            show the codes of your networks\n"
@@ -163,7 +163,7 @@ void handleCommand(const std::string& rawLine, steam::Network& net) {
         const auto networks = net.networks();
         if (n < 1 || n > int(networks.size()) || name.empty()) std::cout << "Usage: rename <n> <name> – see \"list\".\n";
         else if (net.rename(networks[size_t(n - 1)].id, name)) std::cout << "Renamed for everyone.\n";
-        else std::cout << "Only the person who opened the network (marked *) can rename it.\n";
+        else std::cout << "Only the host (marked *) can rename the network – whoever opened it, or the next host if they left.\n";
     } else if (cmd == "leave") {
         const auto networks = net.networks();
         if (networks.empty()) std::cout << "You are not in a network.\n";

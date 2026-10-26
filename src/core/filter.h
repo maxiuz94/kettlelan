@@ -14,7 +14,7 @@ namespace kettle::filter {
 enum class Verdict {
     Allow,
     BlockedService,   // port of a protected service
-    BlockedProtocol,  // protocol other than TCP/UDP/ICMP
+    BlockedProtocol,  // protocol other than TCP/UDP/ICMP, or an ICMP message other than ping/unreachable/time exceeded
     BlockedFragment,  // suspicious IP fragment (e.g. an attempt to hide the port number)
     Malformed,
 };

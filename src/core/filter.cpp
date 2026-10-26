@@ -31,6 +31,7 @@ constexpr Range kProtected[] = {
     {1714, 1764, "KDE Connect"},
     {1900, 1900, "UPnP / SSDP"},
     {2049, 2049, "file sharing (NFS)"},
+    {3000, 3000, "web app (development server)"},
     {3306, 3306, "database (MySQL/MariaDB)"},
     {3389, 3389, "remote desktop (RDP)"},
     {5000, 5001, "NAS panel / UPnP"},
@@ -40,14 +41,17 @@ constexpr Range kProtected[] = {
     {5900, 5910, "remote desktop (VNC)"},
     {6000, 6007, "X11 server"},
     {6379, 6379, "database (Redis)"},
-    {8080, 8080, "web server"},
+    {8000, 8000, "web server"},
+    {8080, 8081, "web server"},
     {8096, 8096, "Jellyfin"},
     {8443, 8443, "web server (HTTPS)"},
+    {8888, 8888, "web panel (Jupyter and others)"},
     {9000, 9000, "admin panel"},
     {9090, 9091, "admin panel (Cockpit/Transmission)"},
     {9443, 9443, "admin panel"},
     {10000, 10000, "Webmin"},
     {11211, 11211, "Memcached"},
+    {22000, 22000, "file sync (Syncthing)"},
     {27017, 27017, "database (MongoDB)"},
     {27036, 27037, "Steam Remote Play"},
     {32400, 32400, "Plex"},
@@ -101,7 +105,15 @@ Result inspectInbound(std::span<const uint8_t> p) {
     const uint16_t fragField = uint16_t((p[6] << 8) | p[7]);
     const uint16_t fragOffset = fragField & 0x1FFF; // in 8-byte units
 
-    if (res.protocol == kIcmp) return res; // ping and ICMP messages – allowed
+    if (res.protocol == kIcmp) {
+        // Ping (8/0), "unreachable" (3: closed port, packet size) and "time exceeded" (11: traceroute).
+        // Others – redirects, timestamps, router messages – are not needed and are dropped.
+        if (fragOffset != 0) return res; // a later fragment: the first one carried the type
+        if (total < ihl + 1) return {Verdict::Malformed, kIcmp, 0};
+        const uint8_t type = p[ihl];
+        if (type != 0 && type != 3 && type != 8 && type != 11) res.verdict = Verdict::BlockedProtocol;
+        return res;
+    }
 
     if (res.protocol != kTcp && res.protocol != kUdp) {
         res.verdict = Verdict::BlockedProtocol;

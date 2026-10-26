@@ -143,7 +143,8 @@ public:
         return lobby_.IsValid() && SteamMatchmaking()->GetLobbyOwner(lobby_).ConvertToUint64() == hub_.selfId_;
     }
 
-    // Renames the network for everyone – only whoever opened the lobby (its owner) can.
+    // Renames the network for everyone – only the lobby's owner (the host, ★) can. Steam makes someone
+    // else the owner when the host leaves.
     bool rename(const std::string& newName) {
         const std::string clean = text::sanitize(newName, 60);
         if (state_ != State::Connected || !isOwner() || clean.empty()) return false;
@@ -744,13 +745,16 @@ std::string Network::personName(uint64_t steamId) const {
     for (const auto& l : lobbies_) {
         if (!l->isMember(steamId)) continue;
         inLobby = true;
+        // Anybody in the lobby can copy someone else's encrypted nickname into their own lobby data,
+        // so a nickname is shown only for people who proved the network's key (HELLO).
+        if (!router_.isVerified(l->id(), steamId)) continue;
         const std::string nick = l->nickOf(steamId);
         if (!nick.empty()) {
             nicks_[steamId] = nick;
             return nick;
         }
     }
-    if (inLobby) nicks_.erase(steamId); // in a lobby without a nickname: the Steam name
+    if (inLobby) nicks_.erase(steamId); // in a lobby, without a (verified) nickname: the Steam name
     const auto it = nicks_.find(steamId); // already left the lobby: the nickname we saw last
     return it != nicks_.end() ? it->second : nameOf(steamId);
 }
