@@ -55,7 +55,8 @@ Please **do not open a public issue**. Use GitHub's private reporting instead:
 - The program and the service talk over the local named pipe `\\.\pipe\KettleLAN`: remote connections are
   rejected, and only SYSTEM, administrators and the logged-on user can open it.
 - The service accepts only `kettlelan-steam.exe` (the background process of the KettleLAN window) or
-  `kettlelan-cli.exe` from its own folder, and checks every packet from
+  `kettlelan-cli.exe` from the program's folder (saved by the installer where only administrators can change it).
+  The real protection is the packet check: the service checks every packet from
   the program before handing it to Windows: it must be a valid IPv4 packet from another KettleLAN address to your
   address (or a broadcast). A modified program cannot send arbitrary packets through the service.
 - The program checks that the pipe belongs to a Windows service (session 0), so another program cannot pretend
@@ -67,8 +68,9 @@ Please **do not open a public issue**. Use GitHub's private reporting instead:
   `100.64.0.0/10`**. Incoming TCP is not opened: a game server on TCP gets the usual Windows "Allow access?" prompt
   for that program. The KettleLAN network stays a "Public" network, so Windows does not share files or printers on
   it, and KettleLAN's own filter blocks computer services as on Linux.
-- Install KettleLAN in a folder only administrators can change (the installer uses `C:\Program Files\KettleLAN`):
-  the service runs as SYSTEM from there, and logs a warning when its folder can be changed by ordinary programs.
+- The service is always installed in `C:\Program Files\KettleLAN Service`, whichever folder or drive you choose
+  for KettleLAN, and it does not start from a folder ordinary programs can change. The program itself can be
+  anywhere – it runs as the user.
 
 ## The network code
 

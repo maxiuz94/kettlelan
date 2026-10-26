@@ -1,7 +1,7 @@
 // KettleLAN – the Windows service. Runs as SYSTEM, owns the Wintun adapter and passes packets to and
 // from the KettleLAN program (which runs as the user) over a local named pipe.
 //
-//   kettlelan-service install     install and start the service (administrator)
+//   kettlelan-service install [path\to\KettleLAN.exe]   install and start the service (administrator)
 //   kettlelan-service uninstall   stop and remove the service and its firewall rules (administrator)
 //   kettlelan-service debug       run in this console instead of as a service (administrator)
 //
@@ -28,6 +28,9 @@ using namespace kettle::platform::win;
 namespace {
 
 constexpr wchar_t kServiceName[] = L"KettleLAN";
+// Where the program is installed – written by "install". HKLM: only administrators can change it.
+constexpr wchar_t kRegKey[] = L"SOFTWARE\\KettleLAN";
+constexpr wchar_t kRegProgramFolder[] = L"ProgramFolder";
 constexpr wchar_t kDisplayName[] = L"KettleLAN Service";
 constexpr wchar_t kDescription[] =
     L"Virtual network adapter for KettleLAN (LAN games over the Steam network). Started automatically.";
@@ -37,6 +40,7 @@ constexpr DWORD kHelloTimeoutMs = 5000;
 SERVICE_STATUS_HANDLE g_statusHandle = nullptr;
 SERVICE_STATUS g_status{};
 HANDLE g_stopEvent = nullptr;
+bool g_console = false; // "debug": started by hand in a console
 
 void reportStatus(DWORD state, DWORD exitCode = NO_ERROR, DWORD waitHint = 0) {
     g_status.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
@@ -61,8 +65,22 @@ std::wstring lower(std::wstring s) {
     return s;
 }
 
+// The program's folder, with a trailing backslash. The service lives in Program Files\KettleLAN Service,
+// the program wherever the user installed it. Without the registry entry (a build run by hand) both
+// share one folder.
+std::wstring clientFolder() {
+    wchar_t buf[MAX_PATH];
+    DWORD size = sizeof(buf);
+    if (RegGetValueW(HKEY_LOCAL_MACHINE, kRegKey, kRegProgramFolder, RRF_RT_REG_SZ, nullptr, buf, &size) != ERROR_SUCCESS)
+        return programFolder();
+    std::wstring dir(buf);
+    if (dir.empty()) return programFolder();
+    if (dir.back() != L'\\') dir += L'\\';
+    return dir;
+}
+
 // Only the Steam process of the KettleLAN window (kettlelan-steam.exe) or kettlelan-cli.exe from the
-// service's own folder may use the adapter. The window itself never connects to the service.
+// program's folder may use the adapter. The window itself never connects to the service.
 bool clientAllowed(HANDLE pipe, std::string& who) {
     ULONG pid = 0;
     if (!GetNamedPipeClientProcessId(pipe, &pid)) return false;
@@ -79,7 +97,7 @@ bool clientAllowed(HANDLE pipe, std::string& who) {
     if (slash == std::wstring::npos) return false;
     const std::wstring folder = lower(full.substr(0, slash + 1));
     const std::wstring file = lower(full.substr(slash + 1));
-    return folder == lower(programFolder()) && (file == L"kettlelan-steam.exe" || file == L"kettlelan-cli.exe");
+    return folder == lower(clientFolder()) && (file == L"kettlelan-steam.exe" || file == L"kettlelan-cli.exe");
 }
 
 class Pipe {
@@ -205,14 +223,20 @@ void serveClient(HANDLE handle, WintunAdapter& adapter) {
 }
 
 void runServer() {
+    // The service runs as SYSTEM: from a folder ordinary programs can change, anybody could replace it.
+    if (folderChangeableByNonAdmins(programFolder())) {
+        if (!g_console) {
+            KLOG_ERROR("The service's folder can be changed by ordinary programs – not starting. Reinstall KettleLAN.");
+            return;
+        }
+        KLOG_WARN("The service's folder can be changed by ordinary programs (allowed in debug mode only).");
+    }
     std::string error;
     auto adapter = WintunAdapter::open(error);
     if (!adapter) {
         KLOG_ERROR(error);
         return;
     }
-    if (folderChangeableByNonAdmins(programFolder()))
-        KLOG_WARN("The service's folder can be changed by ordinary programs – install KettleLAN in Program Files.");
 
     // SYSTEM and administrators: full access; the logged-on (interactive) user: read/write.
     SECURITY_ATTRIBUTES sa{sizeof(sa), nullptr, FALSE};
@@ -281,7 +305,7 @@ void runQuiet(const std::wstring& commandLine) {
     }
 }
 
-int install() {
+int install(const wchar_t* programExe) {
     SC_HANDLE scm = OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CREATE_SERVICE);
     if (!scm) {
         std::cerr << "Run this as administrator: " << systemError(GetLastError()) << "\n";
@@ -290,6 +314,27 @@ int install() {
     wchar_t exe[MAX_PATH];
     GetModuleFileNameW(nullptr, exe, MAX_PATH);
     const std::wstring command = L"\"" + std::wstring(exe) + L"\"";
+    // Where the program is: the service accepts kettlelan-steam.exe / kettlelan-cli.exe only from there.
+    if (programExe && *programExe) {
+        wchar_t full[MAX_PATH];
+        const DWORD n = GetFullPathNameW(programExe, MAX_PATH, full, nullptr);
+        std::wstring dir = (n > 0 && n < MAX_PATH) ? std::wstring(full, n) : std::wstring();
+        const size_t slash = dir.find_last_of(L"\\/");
+        dir = slash == std::wstring::npos ? std::wstring() : dir.substr(0, slash + 1);
+        HKEY key = nullptr;
+        LSTATUS st = dir.empty() ? ERROR_INVALID_PARAMETER
+                                 : RegCreateKeyExW(HKEY_LOCAL_MACHINE, kRegKey, 0, nullptr, 0, KEY_SET_VALUE, nullptr, &key, nullptr);
+        if (st == ERROR_SUCCESS) {
+            st = RegSetValueExW(key, kRegProgramFolder, 0, REG_SZ, reinterpret_cast<const BYTE*>(dir.c_str()),
+                                DWORD((dir.size() + 1) * sizeof(wchar_t)));
+            RegCloseKey(key);
+        }
+        if (st != ERROR_SUCCESS) {
+            std::cerr << "Could not save the program's folder: " << systemError(DWORD(st)) << "\n";
+            CloseServiceHandle(scm);
+            return 1;
+        }
+    }
     SC_HANDLE svc = CreateServiceW(scm, kServiceName, kDisplayName, SERVICE_ALL_ACCESS, SERVICE_WIN32_OWN_PROCESS,
                                    SERVICE_AUTO_START, SERVICE_ERROR_NORMAL, command.c_str(), nullptr, nullptr, nullptr,
                                    nullptr, nullptr);
@@ -335,6 +380,7 @@ int uninstall() {
     }
     CloseServiceHandle(scm);
     removeFirewallRules();
+    RegDeleteKeyW(HKEY_LOCAL_MACHINE, kRegKey);
     std::cout << "KettleLAN Service removed.\n";
     return 0;
 }
@@ -343,10 +389,11 @@ int uninstall() {
 
 int wmain(int argc, wchar_t** argv) {
     const std::wstring command = argc > 1 ? lower(argv[1]) : L"";
-    if (command == L"install") return install();
+    if (command == L"install") return install(argc > 2 ? argv[2] : nullptr);
     if (command == L"uninstall") return uninstall();
     g_stopEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
     if (command == L"debug") {
+        g_console = true;
         std::cout << "KettleLAN service in this console – Ctrl+C to stop.\n";
         SetConsoleCtrlHandler([](DWORD) -> BOOL { SetEvent(g_stopEvent); return TRUE; }, TRUE);
         runServer();

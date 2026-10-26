@@ -60,6 +60,16 @@ target_compile_options(kettle_core PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${KETTLELA
 if(WIN32)
     target_link_libraries(kettle_core PUBLIC bcrypt) # BCryptGenRandom
 endif()
+if(MSVC)
+    # The service is installed apart from the program (Program Files\KettleLAN Service), so it carries
+    # its own C++ runtime (/MT) instead of the DLLs in the program's folder – and needs a core built the same way.
+    get_target_property(KETTLE_CORE_SOURCES kettle_core SOURCES)
+    add_library(kettle_core_mt STATIC ${KETTLE_CORE_SOURCES})
+    target_include_directories(kettle_core_mt PUBLIC src/core PRIVATE third_party/monocypher)
+    target_compile_options(kettle_core_mt PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${KETTLELAN_WARNINGS}>")
+    target_link_libraries(kettle_core_mt PUBLIC bcrypt)
+    set_property(TARGET kettle_core_mt PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
 
 if(KETTLELAN_BUILD_TESTS)
     enable_testing()
@@ -109,12 +119,15 @@ if(KETTLELAN_BUILD_APP)
         target_include_directories(kettlelan-service PRIVATE src/platform src/platform/windows third_party/wintun)
         target_compile_definitions(kettlelan-service PRIVATE NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00)
         target_compile_options(kettlelan-service PRIVATE ${KETTLELAN_WARNINGS})
-        target_link_libraries(kettlelan-service PRIVATE kettle_core iphlpapi ws2_32 ole32 oleaut32 advapi32 wintrust crypt32)
+        target_link_libraries(kettlelan-service PRIVATE iphlpapi ws2_32 ole32 oleaut32 advapi32 wintrust crypt32)
         if(MSVC)
             # "install" and "uninstall" need administrator rights; the service itself starts as SYSTEM
             target_link_options(kettlelan-service PRIVATE "/MANIFESTUAC:level='requireAdministrator'")
+            target_link_libraries(kettlelan-service PRIVATE kettle_core_mt)
+            set_property(TARGET kettlelan-service PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
         else()
             target_link_options(kettlelan-service PRIVATE -municode)
+            target_link_libraries(kettlelan-service PRIVATE kettle_core)
         endif()
         add_custom_command(TARGET kettlelan-service POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different "${WINTUN_DLL}" "$<TARGET_FILE_DIR:kettlelan-service>")

@@ -8,6 +8,9 @@ Before tagging a release add a `## [x.y.z] – date` section (see [docs/RELEASIN
 
 ## [Unreleased]
 
+- Windows: install KettleLAN Service in its own folder in Program Files; the program can go to any folder or drive
+- Windows: do not start the service from a folder ordinary programs can change
+
 ## [0.3.0] – 2026-10-25
 
 - Network: new protocol version 3 – not compatible with KettleLAN 0.2; network codes stay the same, everyone in a network needs 0.3

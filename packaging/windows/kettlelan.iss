@@ -1,14 +1,18 @@
 ; KettleLAN – Windows installer (Inno Setup 6). Built by packaging/windows/build-installer.sh:
 ;   ISCC.exe /DAppVersion=0.3.0 /DSourceDir=<folder with the program> /DOutputDir=<folder> kettlelan.iss
 ;
-; Installs KettleLAN to Program Files, installs and starts "KettleLAN Service" (the Wintun adapter,
-; runs as SYSTEM) and adds a Start menu shortcut. The program itself runs as the user.
+; Installs KettleLAN to the folder the user picks (Program Files by default) and "KettleLAN Service"
+; (the Wintun adapter, runs as SYSTEM) always to Program Files\KettleLAN Service, and adds a Start menu
+; shortcut. The program itself runs as the user.
 ; Uninstalling removes the service, its firewall rules and the shortcuts, and keeps your saved
 ; networks and settings (in your user registry), so a reinstall loses nothing.
 
 #ifndef AppVersion
   #error AppVersion is not set
 #endif
+
+; The service runs as SYSTEM, so it always goes to a folder only administrators can change.
+#define ServiceDir "{commonpf64}\KettleLAN Service"
 
 [Setup]
 AppId={{8F3C2D6A-4B7E-4C1D-9A5E-2E6B7C0D1F34}
@@ -47,7 +51,14 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
 Name: "autostart"; Description: "Start KettleLAN with Windows"; Flags: unchecked
 
 [Files]
-Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "kettlelan-service.exe,wintun.dll"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#SourceDir}\kettlelan-service.exe"; DestDir: "{#ServiceDir}"; Flags: ignoreversion
+Source: "{#SourceDir}\wintun.dll"; DestDir: "{#ServiceDir}"; Flags: ignoreversion
+
+[InstallDelete]
+; KettleLAN 0.3.0 kept the service in the program's folder
+Type: files; Name: "{app}\kettlelan-service.exe"
+Type: files; Name: "{app}\wintun.dll"
 
 [Icons]
 Name: "{autoprograms}\KettleLAN"; Filename: "{app}\KettleLAN.exe"
@@ -58,7 +69,7 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
     ValueData: """{app}\KettleLAN.exe"" --minimized"; Tasks: autostart; Flags: uninsdeletevalue
 
 [Run]
-Filename: "{app}\kettlelan-service.exe"; Parameters: "install"; Flags: runhidden waituntilterminated; \
+Filename: "{#ServiceDir}\kettlelan-service.exe"; Parameters: "install ""{app}\KettleLAN.exe"""; Flags: runhidden waituntilterminated; \
     StatusMsg: "Installing KettleLAN Service..."
 Filename: "{app}\KettleLAN.exe"; Description: "Launch KettleLAN"; Flags: nowait postinstall skipifsilent runasoriginaluser
 
@@ -66,7 +77,7 @@ Filename: "{app}\KettleLAN.exe"; Description: "Launch KettleLAN"; Flags: nowait 
 Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM KettleLAN.exe"; Flags: runhidden waituntilterminated; RunOnceId: "CloseKettleLAN"
 Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM kettlelan-steam.exe"; Flags: runhidden waituntilterminated; RunOnceId: "CloseKettleLANSteam"
 Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM kettlelan-cli.exe"; Flags: runhidden waituntilterminated; RunOnceId: "CloseKettleLANCli"
-Filename: "{app}\kettlelan-service.exe"; Parameters: "uninstall"; Flags: runhidden waituntilterminated; RunOnceId: "RemoveService"
+Filename: "{#ServiceDir}\kettlelan-service.exe"; Parameters: "uninstall"; Flags: runhidden waituntilterminated; RunOnceId: "RemoveService"
 
 [UninstallDelete]
 ; the service log
