@@ -162,9 +162,12 @@ struct WintunApi {
 
 WintunApi g_wintun;
 
+// Set while looking for an existing adapter: not finding it is normal, although Wintun reports an error.
+std::atomic<bool> g_lookingForAdapter{false};
+
 void CALLBACK wintunLogger(WINTUN_LOGGER_LEVEL level, DWORD64 /*timestamp*/, LPCWSTR message) {
     const std::string text = toUtf8(message);
-    if (level == WINTUN_LOG_ERR) KLOG_ERROR("Wintun: " << text);
+    if (level == WINTUN_LOG_ERR && !g_lookingForAdapter) KLOG_ERROR("Wintun: " << text);
     else if (level == WINTUN_LOG_WARN) KLOG_WARN("Wintun: " << text);
     else KLOG_DEBUG("Wintun: " << text);
 }
@@ -390,8 +393,14 @@ std::unique_ptr<WintunAdapter> WintunAdapter::open(std::string& error) {
         }
     }
     g_wintun.SetLogger(wintunLogger);
+    // The adapter is missing at the first start and after the service stopped – then it is created.
+    g_lookingForAdapter = true;
     WINTUN_ADAPTER_HANDLE adapter = g_wintun.OpenAdapter(kAdapterName);
-    if (!adapter) adapter = g_wintun.CreateAdapter(kAdapterName, kTunnelType, &kAdapterGuid);
+    g_lookingForAdapter = false;
+    if (!adapter) {
+        KLOG_INFO("Creating the KettleLAN adapter");
+        adapter = g_wintun.CreateAdapter(kAdapterName, kTunnelType, &kAdapterGuid);
+    }
     if (!adapter) {
         error = "Could not create the KettleLAN adapter (Wintun): " + systemError(GetLastError());
         return nullptr;

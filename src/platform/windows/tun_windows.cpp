@@ -43,14 +43,24 @@ public:
     }
     HANDLE handle() const { return h_; }
 
+    // Waits at most 5 seconds: a service that takes no data is frozen. Then the connection is given up
+    // (the pending read ends too), so KettleLAN does not hang on it.
     bool write(const std::vector<uint8_t>& data) {
         std::lock_guard lk(writeMutex_);
+        if (broken_) return false;
         OVERLAPPED ov{};
         ov.hEvent = writeEv_;
         ResetEvent(writeEv_);
         DWORD n = 0;
         if (!WriteFile(h_, data.data(), DWORD(data.size()), nullptr, &ov) && GetLastError() != ERROR_IO_PENDING) return false;
-        return GetOverlappedResult(h_, &ov, &n, TRUE) && n == data.size();
+        if (WaitForSingleObject(writeEv_, kWriteTimeoutMs) != WAIT_OBJECT_0) {
+            broken_ = true;
+            KLOG_ERROR("The KettleLAN service is not taking any data (not responding?)");
+            CancelIoEx(h_, nullptr);
+            GetOverlappedResult(h_, &ov, &n, TRUE);
+            return false;
+        }
+        return GetOverlappedResult(h_, &ov, &n, FALSE) && n == data.size();
     }
 
     // Reads some bytes; nothing on error, timeout or when `stop` is set.
@@ -75,6 +85,8 @@ private:
     HANDLE h_;
     HANDLE readEv_, writeEv_;
     std::mutex writeMutex_;
+    static constexpr DWORD kWriteTimeoutMs = 5000;
+    std::atomic<bool> broken_{false};
     uint8_t buf_[65536 + 3];
 };
 

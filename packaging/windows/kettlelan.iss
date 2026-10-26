@@ -43,12 +43,9 @@ WizardStyle=modern
 ; KettleLAN.exe is closed by Inno Setup's Restart Manager support; the service is stopped below
 CloseApplications=yes
 RestartApplications=no
-; the autostart option writes the user's own "Run" key on purpose
-UsedUserAreasWarning=no
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
-Name: "autostart"; Description: "Start KettleLAN with Windows"; Flags: unchecked
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "kettlelan-service.exe,wintun.dll"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -63,10 +60,6 @@ Type: files; Name: "{app}\wintun.dll"
 [Icons]
 Name: "{autoprograms}\KettleLAN"; Filename: "{app}\KettleLAN.exe"
 Name: "{autodesktop}\KettleLAN"; Filename: "{app}\KettleLAN.exe"; Tasks: desktopicon
-
-[Registry]
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "KettleLAN"; \
-    ValueData: """{app}\KettleLAN.exe"" --minimized"; Tasks: autostart; Flags: uninsdeletevalue
 
 [Run]
 Filename: "{#ServiceDir}\kettlelan-service.exe"; Parameters: "install ""{app}\KettleLAN.exe"""; Flags: runhidden waituntilterminated; \

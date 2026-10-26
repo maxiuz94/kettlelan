@@ -10,6 +10,9 @@ Before tagging a release add a `## [x.y.z] – date` section (see [docs/RELEASIN
 
 - Windows: install KettleLAN Service in its own folder in Program Files; the program can go to any folder or drive
 - Windows: do not start the service from a folder ordinary programs can change
+- Windows: disconnect when KettleLAN or the service takes no data for 5 seconds, so neither can freeze the other
+- Windows: set autostart only in KettleLAN's settings, so it always applies to the account that uses KettleLAN
+- Windows: do not log a missing adapter at the first start as an error
 
 ## [0.3.0] – 2026-10-25
 

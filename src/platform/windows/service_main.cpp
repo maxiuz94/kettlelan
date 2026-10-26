@@ -36,6 +36,8 @@ constexpr wchar_t kDescription[] =
     L"Virtual network adapter for KettleLAN (LAN games over the Steam network). Started automatically.";
 constexpr wchar_t kPipeNameW[] = LR"(\\.\pipe\KettleLAN)";
 constexpr DWORD kHelloTimeoutMs = 5000;
+// A program that does not take data for this long is frozen (the pipe buffer is full): disconnect it.
+constexpr DWORD kWriteTimeoutMs = 5000;
 
 SERVICE_STATUS_HANDLE g_statusHandle = nullptr;
 SERVICE_STATUS g_status{};
@@ -127,13 +129,22 @@ public:
         if (!GetOverlappedResult(h_, &readOv_, &n, FALSE) || n == 0) return std::nullopt;
         return std::span<const uint8_t>(buf_, n);
     }
+    // Waits at most kWriteTimeoutMs (or until the service stops): a frozen program cannot block the service.
     bool write(const std::vector<uint8_t>& data) {
         OVERLAPPED ov{};
         ov.hEvent = writeEv_;
         ResetEvent(writeEv_);
         DWORD n = 0;
         if (!WriteFile(h_, data.data(), DWORD(data.size()), nullptr, &ov) && GetLastError() != ERROR_IO_PENDING) return false;
-        return GetOverlappedResult(h_, &ov, &n, TRUE) && n == data.size();
+        HANDLE waits[2] = {writeEv_, g_stopEvent};
+        const DWORD r = WaitForMultipleObjects(g_stopEvent ? 2 : 1, waits, FALSE, kWriteTimeoutMs);
+        if (r != WAIT_OBJECT_0) {
+            CancelIoEx(h_, &ov);
+            GetOverlappedResult(h_, &ov, &n, TRUE);
+            if (r == WAIT_TIMEOUT) KLOG_WARN("KettleLAN is not taking any data (not responding?) – disconnected it.");
+            return false;
+        }
+        return GetOverlappedResult(h_, &ov, &n, FALSE) && n == data.size();
     }
 
 private:
@@ -149,7 +160,7 @@ void serveClient(HANDLE handle, WintunAdapter& adapter) {
     std::string who;
     if (!clientAllowed(handle, who)) {
         KLOG_WARN("Refused a connection from " << (who.empty() ? std::string("an unknown program") : who));
-        pipe.write(svc::encodeError(svc::ErrorCode::NotAllowed, "Only KettleLAN from the service's folder may use it."));
+        pipe.write(svc::encodeError(svc::ErrorCode::NotAllowed, "Only KettleLAN from its installation folder may use it."));
         return;
     }
 
