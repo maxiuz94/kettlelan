@@ -324,6 +324,9 @@ bool folderChangeableByNonAdmins(const std::wstring& dir) {
             user = reinterpret_cast<TOKEN_USER*>(userBuf.data())->User.Sid;
         CloseHandle(token);
     }
+    // The service runs as SYSTEM – its own account is not an ordinary program. Only a person's account
+    // (the "debug" mode, started by hand) counts.
+    if (user && IsWellKnownSid(user, WinLocalSystemSid)) user = nullptr;
 
     // well-known groups every ordinary program runs with
     BYTE everyone[SECURITY_MAX_SID_SIZE], users[SECURITY_MAX_SID_SIZE], authUsers[SECURITY_MAX_SID_SIZE],
