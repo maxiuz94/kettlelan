@@ -50,10 +50,10 @@ Get the latest version from the [**Releases**](https://github.com/maxiuz94/kettl
 
 | System | File | How to install |
 |--------|------|----------------|
-| **Windows** 10/11<br>(64-bit) | [`KettleLAN-0.3.2-windows-x64-setup.exe`](https://github.com/maxiuz94/kettlelan/releases/latest/download/KettleLAN-0.3.2-windows-x64-setup.exe) | run the installer |
-| **Ubuntu** 24.04+,<br>Mint 22+, Pop!_OS,<br>Debian 13 | [`kettlelan_0.3.2_ubuntu24.04_amd64.deb`](https://github.com/maxiuz94/kettlelan/releases/latest/download/kettlelan_0.3.2_ubuntu24.04_amd64.deb) | `sudo apt install ./kettlelan_*.deb` |
-| **Debian 12**,<br>MX Linux 23 | [`kettlelan_0.3.2_debian12_amd64.deb`](https://github.com/maxiuz94/kettlelan/releases/latest/download/kettlelan_0.3.2_debian12_amd64.deb) | `sudo apt install ./kettlelan_*.deb` |
-| **Any other Linux** | [`KettleLAN-0.3.2-x86_64.AppImage`](https://github.com/maxiuz94/kettlelan/releases/latest/download/KettleLAN-0.3.2-x86_64.AppImage) | `chmod +x KettleLAN-*.AppImage`,<br>then run it |
+| **Windows** 10/11<br>(64-bit) | [`KettleLAN-0.3.3-windows-x64-setup.exe`](https://github.com/maxiuz94/kettlelan/releases/latest/download/KettleLAN-0.3.3-windows-x64-setup.exe) | run the installer |
+| **Ubuntu** 24.04+,<br>Mint 22+, Pop!_OS,<br>Debian 13 | [`kettlelan_0.3.3_ubuntu24.04_amd64.deb`](https://github.com/maxiuz94/kettlelan/releases/latest/download/kettlelan_0.3.3_ubuntu24.04_amd64.deb) | `sudo apt install ./kettlelan_*.deb` |
+| **Debian 12**,<br>MX Linux 23 | [`kettlelan_0.3.3_debian12_amd64.deb`](https://github.com/maxiuz94/kettlelan/releases/latest/download/kettlelan_0.3.3_debian12_amd64.deb) | `sudo apt install ./kettlelan_*.deb` |
+| **Any other Linux** | [`KettleLAN-0.3.3-x86_64.AppImage`](https://github.com/maxiuz94/kettlelan/releases/latest/download/KettleLAN-0.3.3-x86_64.AppImage) | `chmod +x KettleLAN-*.AppImage`,<br>then run it |
 
 Click a file name to download it. The Windows installer asks for administrator rights once, and you can choose
 any folder or drive. On Linux run the commands in the folder with the downloaded file.
