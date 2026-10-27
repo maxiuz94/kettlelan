@@ -5,6 +5,8 @@
 // Protocol (see engine_ipc.h): commands on standard input, state and events on standard output, one
 // JSON object per line; the log goes to standard error. When standard input closes (the window quit
 // or crashed) the process leaves its networks and exits.
+#include <QJsonArray>
+
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
@@ -49,6 +51,12 @@ int main(int argc, char** argv) {
         else if (name == "leaveAll") engine.leaveAll();
         else if (name == "rename") engine.rename(code, text);
         else if (name == "nick") engine.setNick(text);
+        else if (name == "blocked") {
+            std::set<uint64_t> people;
+            for (const auto& v : cmd->value("ids").toArray())
+                if (const uint64_t id = v.toString().toULongLong()) people.insert(id);
+            engine.setBlocked(people);
+        }
         else if (name == "hideAddress") engine.setHideAddress(cmd->value("on").toBool());
         else if (name == "protectServices") engine.setProtectServices(cmd->value("on").toBool());
         else if (name == "retry") engine.retry();

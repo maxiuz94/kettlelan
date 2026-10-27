@@ -2,6 +2,7 @@
 
 #include <QCoreApplication>
 #include <QDir>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QTimer>
 #include <iostream>
@@ -74,6 +75,7 @@ void EngineClient::start(bool hideAddress, bool protectServices) {
     onSnapshot_(starting);
     process_.start();
     send({{"cmd", "nick"}, {"name", QString::fromStdString(nick_)}}); // before it connects to Steam
+    setBlocked(blocked_);
 }
 
 void EngineClient::stop(bool wait) {
@@ -116,6 +118,13 @@ void EngineClient::setProtectServices(bool on) {
     send({{"cmd", "protectServices"}, {"on", on}});
 }
 void EngineClient::retry() { send({{"cmd", "retry"}}); }
+void EngineClient::setBlocked(const std::vector<uint64_t>& people) {
+    blocked_ = people;
+    QJsonArray ids;
+    for (uint64_t id : people) ids.append(QString::number(id));
+    send({{"cmd", "blocked"}, {"ids", ids}});
+}
+
 void EngineClient::setNick(const std::string& nick) {
     nick_ = nick;
     send({{"cmd", "nick"}, {"name", QString::fromStdString(nick)}});

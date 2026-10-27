@@ -94,6 +94,7 @@ Backend::Backend(bool demo, QObject* parent) : QObject(parent), demo_(demo) {
     closeToTray_ = s.value(QStringLiteral("closeToTray"), true).toBool();
     notifications_ = s.value(QStringLiteral("notifications"), true).toBool();
     nickname_ = s.value(QStringLiteral("nick")).toString();
+    blocked_ = s.value(QStringLiteral("blocked")).toMap();
     theme_ = s.value(QStringLiteral("theme"), QStringLiteral("system")).toString();
     autoConnect_ = s.value(QStringLiteral("autoConnect"), true).toBool();
     hideAddress_ = s.value(QStringLiteral("hideAddress"), true).toBool();
@@ -119,6 +120,7 @@ void Backend::startEngine() {
     engine_ = std::make_unique<EngineClient>([this](const Snapshot& snap) { applySnapshot(snap); },
                                              [this](const Message& message) { handleEvent(message); }, this);
     engine_->setNick(nickname_.toStdString());
+    sendBlocked();
 
     // The Steam process runs only while a network is on (otherwise Steam would show "Spacewar" for nothing).
     QSettings settings;
@@ -187,13 +189,21 @@ void Backend::applySnapshot(const Snapshot& snap) {
         n.connected = info.state == steam::State::Connected;
         n.owner = info.owner;
         QHash<QString, int> names; // the same name twice in one network: both get a warning
-        for (const auto& p : info.peers) names[QString::fromStdString(p.name).toCaseFolded()]++;
+        for (const auto& p : info.peers)
+            if (!p.blocked) names[QString::fromStdString(p.name).toCaseFolded()]++;
         for (const auto& p : info.peers) {
-            QVariantMap m = peerToMap(QString::fromStdString(p.name), QString::fromStdString(p.address.toString()),
-                                      p.self, p.owner, p.verified, p.conflict, p.pingMs, p.relayed);
+            const QString id = QString::number(p.steamId);
+            const bool blocked = !p.self && (p.blocked || blocked_.contains(id));
+            // a blocked person is not verified, so we show the name we saw when blocking them
+            const QString name = blocked && !blocked_.value(id).toString().isEmpty() ? blocked_.value(id).toString()
+                                                                                     : QString::fromStdString(p.name);
+            QVariantMap m = peerToMap(name, QString::fromStdString(p.address.toString()),
+                                      p.self, p.owner, p.verified && !blocked, p.conflict, p.pingMs, p.relayed);
+            m[QStringLiteral("steamId")] = id;
+            m[QStringLiteral("blocked")] = blocked;
             m[QStringLiteral("steamFriend")] = p.steamFriend;
             m[QStringLiteral("steamName")] = QString::fromStdString(p.steamName);
-            m[QStringLiteral("sameName")] = names.value(QString::fromStdString(p.name).toCaseFolded()) > 1;
+            m[QStringLiteral("sameName")] = !blocked && names.value(QString::fromStdString(p.name).toCaseFolded()) > 1;
             n.peers.append(m);
             if (p.self || p.verified) ++n.members;
         }
@@ -605,6 +615,42 @@ void Backend::setNickname(const QString& v) {
     nickname_ = clean;
     QSettings().setValue(QStringLiteral("nick"), clean);
     if (engine_) engine_->setNick(clean.toStdString());
+    emit settingsChanged();
+}
+
+QVariantList Backend::blockedPeople() const {
+    QVariantList out;
+    for (auto it = blocked_.cbegin(); it != blocked_.cend(); ++it)
+        out.append(QVariantMap{{QStringLiteral("steamId"), it.key()},
+                               {QStringLiteral("name"), it.value().toString()},
+                               {QStringLiteral("address"), QString::fromStdString(ip::addressForSteamId(it.key().toULongLong()).toString())}});
+    std::sort(out.begin(), out.end(), [](const QVariant& a, const QVariant& b) {
+        return a.toMap().value(QStringLiteral("name")).toString().compare(b.toMap().value(QStringLiteral("name")).toString(),
+                                                                         Qt::CaseInsensitive) < 0;
+    });
+    return out;
+}
+
+void Backend::sendBlocked() {
+    if (!engine_) return;
+    std::vector<uint64_t> ids;
+    for (auto it = blocked_.cbegin(); it != blocked_.cend(); ++it)
+        if (const uint64_t id = it.key().toULongLong()) ids.push_back(id);
+    engine_->setBlocked(ids);
+}
+
+void Backend::blockPerson(const QString& steamId, const QString& name) {
+    if (steamId.toULongLong() == 0 || blocked_.contains(steamId)) return;
+    blocked_.insert(steamId, name.left(64));
+    QSettings().setValue(QStringLiteral("blocked"), blocked_);
+    sendBlocked();
+    emit settingsChanged();
+}
+
+void Backend::unblockPerson(const QString& steamId) {
+    if (!blocked_.remove(steamId)) return;
+    QSettings().setValue(QStringLiteral("blocked"), blocked_);
+    sendBlocked();
     emit settingsChanged();
 }
 

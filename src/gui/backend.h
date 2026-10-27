@@ -47,6 +47,7 @@ class Backend : public QObject {
     Q_PROPERTY(bool notifications READ notifications WRITE setNotifications NOTIFY settingsChanged)
     // your name in every network; "" = your Steam name
     Q_PROPERTY(QString nickname READ nickname WRITE setNickname NOTIFY settingsChanged)
+    Q_PROPERTY(QVariantList blockedPeople READ blockedPeople NOTIFY settingsChanged) // [{steamId, name}]
     Q_PROPERTY(bool autostart READ autostart WRITE setAutostart NOTIFY settingsChanged)
     Q_PROPERTY(bool autoConnect READ autoConnect WRITE setAutoConnect NOTIFY settingsChanged)
     Q_PROPERTY(bool hideAddress READ hideAddress WRITE setHideAddress NOTIFY settingsChanged)
@@ -91,6 +92,7 @@ public:
     bool notifications() const { return notifications_; }
     QString nickname() const { return nickname_; }
     void setNickname(const QString& v);
+    QVariantList blockedPeople() const;
     // A message as a system notification (when on and supported); an important one falls back to
     // a short message in the window, so an error is never lost.
     void inform(const QString& text, bool important);
@@ -127,6 +129,9 @@ public:
     Q_INVOKABLE void connectSaved(const QString& code);
     Q_INVOKABLE void forgetNetwork(const QString& code);
     Q_INVOKABLE void copyText(const QString& text, const QString& message);
+    // Blocking (on this computer only, in every network): nothing is exchanged with that person.
+    Q_INVOKABLE void blockPerson(const QString& steamId, const QString& name);
+    Q_INVOKABLE void unblockPerson(const QString& steamId);
     Q_INVOKABLE void openUrl(const QString& url);
     Q_INVOKABLE void openLogs();
     Q_INVOKABLE void showWindow();
@@ -207,6 +212,8 @@ private:
     qulonglong blockedPackets_ = 0;
     bool notifications_ = true;
     QString nickname_;
+    QVariantMap blocked_; // SteamID (text) → the name we saw when blocking
+    void sendBlocked();
 
     QString theme_ = QStringLiteral("system");
 

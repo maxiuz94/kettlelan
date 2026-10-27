@@ -430,6 +430,77 @@ int main() {
         EXPECT(!r.makeHello(9999, ALICE, false), "no proof for an unknown network");
     }
 
+    // ------------------------------------------------------------ blocking a person
+    SCENARIO("A blocked member gets nothing from us and nothing of theirs reaches the system");
+    {
+        router::Router r(ME);
+        const auto net = setUp(r);
+        r.syncMembers(net, {ME, ALICE, EVE, BOB});
+        r.onHello(BOB, hello(KEYS, BOB, ME, addr(BOB)));
+        const auto blockedNow = r.setBlocked({ALICE});
+        EXPECT(blockedNow.size() == 1 && blockedNow[0] == ALICE, "ALICE reported as blocked just now (close her session)");
+        EXPECT(r.isBlocked(ALICE) && !r.isBlocked(BOB), "only ALICE is blocked");
+        EXPECT(r.onData(ALICE, packet(addr(ALICE), addr(ME))) == InboundResult::Blocked, "her packets are dropped");
+        EXPECT(r.recipients(packet(addr(ME), addr(ALICE))).empty(), "we send her nothing");
+        const auto everyone = r.recipients(packet(addr(ME), ip::Address4(100, 127, 255, 255)));
+        EXPECT(everyone.size() == 1 && everyone[0] == BOB, "broadcasts go to BOB only");
+        EXPECT(helloResult(r, ALICE, hello(KEYS, ALICE, ME, addr(ALICE))) == HelloResult::Blocked,
+               "her valid proof does not verify her again");
+        for (const auto& [n, id] : r.dueHellos(router::Router::Clock::now() + std::chrono::hours(1), std::chrono::seconds(2), 15))
+            EXPECT(id != ALICE, "no HELLO to her");
+        bool shownBlocked = false;
+        for (const auto& p : r.peers(net)) if (p.steamId == ALICE) shownBlocked = p.blocked && !p.verified;
+        EXPECT(shownBlocked, "the list shows her as blocked, not verified");
+        EXPECT(r.onData(BOB, packet(addr(BOB), addr(ME))) == InboundResult::Deliver, "BOB is not affected");
+    }
+
+    SCENARIO("Unblocking starts the verification again");
+    {
+        router::Router r(ME);
+        const auto net = setUp(r);
+        r.setBlocked({ALICE});
+        EXPECT(r.setBlocked({}).empty(), "nobody is blocked just now");
+        bool helloDue = false;
+        for (const auto& [n, id] : r.dueHellos(router::Router::Clock::now(), std::chrono::seconds(2), 15))
+            if (id == ALICE && n == net) helloDue = true;
+        EXPECT(helloDue, "a new HELLO to ALICE");
+        EXPECT(helloResult(r, ALICE, hello(KEYS, ALICE, ME, addr(ALICE))) == HelloResult::Verified, "she is verified again");
+        EXPECT(r.onData(ALICE, packet(addr(ALICE), addr(ME))) == InboundResult::Deliver, "her packets arrive again");
+    }
+
+    SCENARIO("Blocking works in every network and before the person joins");
+    {
+        router::Router r(ME);
+        const auto a = *r.addNetwork(CODE, KEYS);
+        const auto b = *r.addNetwork(CODE_B, KEYS_B);
+        r.syncMembers(a, {ME, ALICE});
+        r.syncMembers(b, {ME, ALICE});
+        r.onHello(ALICE, hello(KEYS, ALICE, ME, addr(ALICE)));
+        r.onHello(ALICE, hello(KEYS_B, ALICE, ME, addr(ALICE)));
+        r.setBlocked({ALICE, BOB});
+        EXPECT(!r.isVerified(a, ALICE) && !r.isVerified(b, ALICE), "ALICE is not verified in A nor in B");
+        r.syncMembers(b, {ME, ALICE, BOB});
+        EXPECT(helloResult(r, BOB, hello(KEYS_B, BOB, ME, addr(BOB))) == HelloResult::Blocked, "BOB, blocked earlier, joins B – blocked");
+        EXPECT(r.setBlocked({ME}).empty() && !r.isBlocked(ME), "blocking ourselves is ignored");
+    }
+
+    // ------------------------------------------------------------ flood protection
+    SCENARIO("A flood from one member is cut off, other members are not affected");
+    {
+        router::Router r(ME);
+        const auto t = router::Router::Clock::now();
+        int accepted = 0;
+        for (int i = 0; i < 30000; ++i) accepted += r.admit(ALICE, t) ? 1 : 0;
+        EXPECT(accepted == int(router::Router::kRateBurst), "ALICE: the burst is accepted, the rest is dropped");
+        EXPECT(r.admit(BOB, t), "BOB is not affected");
+        int later = 0;
+        for (int i = 0; i < 30000; ++i) later += r.admit(ALICE, t + std::chrono::seconds(1)) ? 1 : 0;
+        EXPECT(later == int(router::Router::kRatePerSecond), "a second later ALICE may send the per-second amount again");
+        int normal = 0; // a busy game: 1000 messages a second for 30 s
+        for (int i = 0; i < 30000; ++i) normal += r.admit(EVE, t + std::chrono::milliseconds(i)) ? 1 : 0;
+        EXPECT(normal == 30000, "normal game traffic is never cut off");
+    }
+
     std::printf("\n%d checks, %d failed\n", checks, failures);
     if (failures == 0) std::printf("All security tests passed\n");
     return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;

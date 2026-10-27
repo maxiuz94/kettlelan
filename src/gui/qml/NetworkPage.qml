@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
 import KettleLAN
@@ -110,13 +111,14 @@ Item {
                         Accessible.name: modelData.name + ", " + modelData.address
 
                         readonly property string badgeText: modelData.self ? qsTr("You")
+                            : modelData.blocked ? qsTr("Blocked")
                             : modelData.conflict ? qsTr("Address conflict")
                             : !modelData.verified ? qsTr("Connecting…")
                             : modelData.pingMs < 0 ? qsTr("Connected")
                             : modelData.relayed ? qsTr("Steam relay") : qsTr("Direct")
-                        readonly property color badgeBg: (modelData.self || !modelData.verified || modelData.pingMs < 0) ? Theme.surface2
+                        readonly property color badgeBg: (modelData.self || modelData.blocked || !modelData.verified || modelData.pingMs < 0) ? Theme.surface2
                             : (modelData.relayed || modelData.conflict) ? Theme.relayBg : Theme.directBg
-                        readonly property color badgeFg: (modelData.self || !modelData.verified || modelData.pingMs < 0) ? Theme.muted
+                        readonly property color badgeFg: (modelData.self || modelData.blocked || !modelData.verified || modelData.pingMs < 0) ? Theme.muted
                             : (modelData.relayed || modelData.conflict) ? Theme.relayFg : Theme.directFg
 
                         onClicked: if (!modelData.self && modelData.verified) {
@@ -210,6 +212,18 @@ Item {
                                     Text { textFormat: Text.PlainText; id: badge; anchors.centerIn: parent; text: row.badgeText; color: row.badgeFg; font.pixelSize: 11; font.weight: Font.DemiBold }
                                 }
                             }
+                            // block / unblock – faint until the row is hovered; never for ourselves
+                            IconButton {
+                                // for ourselves an empty space of the same width, so that all rows line up
+                                enabled: !row.modelData.self
+                                opacity: row.modelData.self ? 0 : (row.hovered || hovered || visualFocus || row.modelData.blocked ? 1 : 0.55)
+                                iconName: "block"
+                                iconSize: 18
+                                iconColor: row.modelData.blocked ? Theme.accentText : Theme.muted
+                                label: row.modelData.blocked ? qsTr("Unblock %1").arg(row.modelData.name) : qsTr("Block %1").arg(row.modelData.name)
+                                onClicked: row.modelData.blocked ? Backend.unblockPerson(row.modelData.steamId)
+                                                                 : blockDialog.openFor(row.modelData.steamId, row.modelData.name)
+                            }
                         }
                     }
                 }
@@ -237,6 +251,39 @@ Item {
     }
 
     NetworkDialog { id: details }
+
+    // Blocking someone asks once: it cuts them off in every network until you unblock them.
+    Popup {
+        id: blockDialog
+        property string steamId
+        property string name
+        function openFor(steamId, name) { blockDialog.steamId = steamId; blockDialog.name = name; open() }
+
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: Math.min(parent ? parent.width - 40 : 380, 400)
+        modal: true
+        focus: true
+        padding: 20
+        background: Rectangle { radius: Theme.radius + 4; color: Theme.surface; border.color: Theme.border }
+        Overlay.modal: Rectangle { color: Theme.dark ? "#99000000" : "#55000000" }
+
+        contentItem: ColumnLayout {
+            spacing: 14
+            Text { textFormat: Text.PlainText; Layout.fillWidth: true; wrapMode: Text.Wrap
+                text: qsTr("Block %1?").arg(blockDialog.name); color: Theme.text; font.pixelSize: 18; font.weight: Font.Bold }
+            Text { textFormat: Text.PlainText; Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.muted; font.pixelSize: 13
+                text: qsTr("Nothing from them reaches your computer, and they do not see you or your game servers – in every network, until you unblock them. They are not told. You can unblock them here or in Settings.") }
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: 4
+                spacing: 10
+                Item { Layout.fillWidth: true }
+                AppButton { kind: "secondary"; text: qsTr("Cancel"); onClicked: blockDialog.close() }
+                AppButton { kind: "primary"; text: qsTr("Block"); onClicked: { Backend.blockPerson(blockDialog.steamId, blockDialog.name); blockDialog.close() } }
+            }
+        }
+    }
     // demo mode screenshot of the dialog
     Component.onCompleted: if (Backend.demoPage === "details")
         Qt.callLater(() => details.openFor(Backend.networkCode, Backend.networkName, "my Quake friends", true, Backend.networkOwner))

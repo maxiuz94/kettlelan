@@ -478,8 +478,8 @@ void Network::onLobbyChatUpdate(LobbyChatUpdate_t* ev) {
 
 void Network::onSessionRequest(SteamNetworkingMessagesSessionRequest_t* ev) {
     const uint64_t from = ev->m_identityRemote.GetSteamID64();
-    // Accept connections only from people in one of our lobbies.
-    if (inAnyLobby(from)) {
+    // Accept connections only from people in one of our lobbies whom we did not block.
+    if (inAnyLobby(from) && !router_.isBlocked(from)) {
         SteamNetworkingMessages()->AcceptSessionWithUser(ev->m_identityRemote);
     } else {
         KLOG_DEBUG("Rejected session from " << from);
@@ -537,6 +537,7 @@ void Network::handleControl(uint64_t from, std::span<const uint8_t> data) {
         return;
     case HelloResult::Repeated:
         break;
+    case HelloResult::Blocked:
     case HelloResult::UnknownPeer:
     case HelloResult::NoNetwork:
         return;
@@ -597,8 +598,21 @@ void Network::poll() {
                 const uint64_t from = msgs[i]->m_identityPeer.GetSteamID64();
                 const std::span<const uint8_t> data(static_cast<const uint8_t*>(msgs[i]->m_pData),
                                                     size_t(msgs[i]->m_cbSize));
-                if (channel == protocol::kChannelControl) handleControl(from, data);
-                else handleData(from, data);
+                const auto now = Clock::now();
+                if (!router_.admit(from, now)) {
+                    // a flood: dropped before anything else is done with it, reported every 30 s at most
+                    ++blockedPackets_;
+                    auto& last = floodLogged_[from];
+                    if (last == Clock::time_point{} || now - last > std::chrono::seconds(30)) {
+                        last = now;
+                        KLOG_WARN("Too much traffic from " << nameOf(from) << " – dropping what is above "
+                                  << int(router::Router::kRatePerSecond) << " messages a second");
+                    }
+                } else if (channel == protocol::kChannelControl) {
+                    handleControl(from, data);
+                } else {
+                    handleData(from, data);
+                }
                 msgs[i]->Release();
             }
         }
@@ -699,6 +713,7 @@ std::vector<PeerInfo> Network::peersOf(const Lobby& lobby) const {
         p.owner = owner == peer.steamId;
         p.verified = peer.verified;
         p.conflict = peer.conflict;
+        p.blocked = peer.blocked;
         SteamNetConnectionInfo_t info{};
         SteamNetConnectionRealTimeStatus_t status{};
         const auto st = SteamNetworkingMessages()->GetSessionConnectionInfo(identityFor(peer.steamId), &info, &status);
@@ -709,7 +724,7 @@ std::vector<PeerInfo> Network::peersOf(const Lobby& lobby) const {
         out.push_back(p);
     }
     std::stable_sort(out.begin() + 1, out.end(), [](const PeerInfo& a, const PeerInfo& b) {
-        auto rank = [](const PeerInfo& p) { return p.conflict ? 3 : !p.verified ? 2 : p.pingMs < 0 ? 1 : 0; };
+        auto rank = [](const PeerInfo& p) { return p.blocked ? 4 : p.conflict ? 3 : !p.verified ? 2 : p.pingMs < 0 ? 1 : 0; };
         if (rank(a) != rank(b)) return rank(a) < rank(b);
         if (a.verified && b.verified && a.pingMs >= 0 && b.pingMs >= 0 && a.pingMs != b.pingMs) return a.pingMs < b.pingMs;
         return a.name < b.name;
@@ -738,6 +753,13 @@ void Network::setNick(const std::string& nick) {
     nick_ = text::sanitize(nick, 32);
     KLOG_INFO((nick_.empty() ? std::string("Your name in networks: your Steam name") : "Your name in networks: " + nick_));
     for (const auto& l : lobbies_) l->publishNick();
+}
+
+void Network::setBlocked(const std::set<uint64_t>& people) {
+    const auto newlyBlocked = router_.setBlocked(people);
+    for (uint64_t id : newlyBlocked) KLOG_INFO("Blocked " << nameOf(id) << " – nothing is exchanged with them now");
+    closeSessions(newlyBlocked);
+    if (floodLogged_.size() > 1000) floodLogged_.clear();
 }
 
 std::string Network::personName(uint64_t steamId) const {

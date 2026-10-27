@@ -161,8 +161,12 @@ other than ping, "unreachable" and "time exceeded", and IP fragments used to hid
   carry that member's own address.
 - **What other players do see:** your game servers and your game's LAN broadcasts – like on a real LAN. If you
   are in several networks, members of each of them see them, so switch off the networks you are not playing in.
-- **Share the code only with people you trust.** There is no "kick" button – if the code reaches the wrong
-  person, create a new network and share the new code.
+- **Share the code only with people you trust.** If someone you do not want is in your network, **block them**:
+  hover over the person in the list and click ⊘. Nothing from them reaches your computer and they do not see you
+  or your game servers – in every network, until you unblock them (*Settings → Blocked people*). They are not
+  told. To remove someone from the network for everybody, create a new network and share the new code.
+- **No flooding.** If one person sends far more than any game does, KettleLAN drops the excess, so they cannot
+  slow down your computer or your game.
 - People in a network can see your Steam account in Steam, even if you use your own name in KettleLAN.
 
 More details and how to report a vulnerability: [SECURITY.md](SECURITY.md).
@@ -247,6 +251,7 @@ desktop. Run only one KettleLAN (window or terminal) at a time.
 | `name [nickname]` | your name in networks (without a nickname: your Steam name) |
 | `rename <n> <name>` | rename network *n* for everyone (only the host, marked `*`) |
 | `leave [n\|all]` | leave one network or all of them |
+| `block <address>`, `unblock <address>`, `blocked` | block a person in every network (until you quit), unblock them, list who is blocked |
 | `quit` | exit |
 
 ## Logs and troubleshooting

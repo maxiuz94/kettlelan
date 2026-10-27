@@ -8,6 +8,10 @@ Before tagging a release add a `## [x.y.z] – date` section (see [docs/RELEASIN
 
 ## [Unreleased]
 
+- Security: block a person – nothing is exchanged with them in any network until you unblock them (⊘ in the list, Settings → Blocked people)
+- Security: drop messages above 10,000 a second from one person, so nobody can flood your computer
+- CLI: block, unblock and blocked commands
+
 ## [0.3.1] – 2026-10-27
 
 - Network: works together with KettleLAN 0.3.0 – same protocol, no need to update everyone at once

@@ -182,6 +182,38 @@ Item {
                     }
                 }
 
+                // only when someone is blocked
+                SectionTitle { visible: Backend.blockedPeople.length > 0; text: qsTr("Blocked people") }
+                Group {
+                    visible: Backend.blockedPeople.length > 0
+                    Repeater {
+                        model: Backend.blockedPeople
+                        delegate: Rectangle {
+                            id: blockedRow
+                            required property var modelData
+                            required property int index
+                            Layout.fillWidth: true
+                            implicitHeight: 58
+                            color: "transparent"
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 14
+                                anchors.rightMargin: 10
+                                spacing: 10
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 2
+                                    Text { textFormat: Text.PlainText; text: blockedRow.modelData.name; color: Theme.text; font.pixelSize: 14; elide: Text.ElideRight; Layout.fillWidth: true }
+                                    Text { textFormat: Text.PlainText; text: blockedRow.modelData.address; color: Theme.muted; font.family: Theme.mono; font.pixelSize: 12 }
+                                }
+                                AppButton { kind: "secondary"; implicitHeight: 38; text: qsTr("Unblock"); Accessible.name: qsTr("Unblock %1").arg(blockedRow.modelData.name)
+                                    onClicked: Backend.unblockPerson(blockedRow.modelData.steamId) }
+                            }
+                            Rectangle { visible: blockedRow.index < Backend.blockedPeople.length - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.border }
+                        }
+                    }
+                }
+
                 SectionTitle { text: qsTr("Appearance") }
                 Group {
                     RowLayout {

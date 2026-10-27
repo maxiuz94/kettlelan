@@ -8,7 +8,9 @@
 #include <chrono>
 #include <cstdint>
 #include <map>
+#include <mutex>
 #include <optional>
+#include <set>
 #include <shared_mutex>
 #include <span>
 #include <vector>
@@ -29,6 +31,7 @@ enum class HelloResult {
     BadProof,     // does not know the network key
     BadVersion,   // different protocol version
     BadAddress,   // the address does not match their SteamID (attempt to take over someone's address)
+    Blocked,      // we blocked this person – no verification, no traffic
     NoNetwork,    // we are not in a network
 };
 
@@ -39,6 +42,7 @@ enum class InboundResult {
     UnknownSender, // the sender is not a verified member
     Spoofed,       // the source address does not belong to the sender
     Filtered,      // blocked by service protection (details in `filter`)
+    Blocked,       // from a person we blocked
 };
 
 struct PeerState {
@@ -46,6 +50,7 @@ struct PeerState {
     ip::Address4 address;
     bool verified = false;
     bool conflict = false;
+    bool blocked = false;
 };
 
 using NetworkId = uint32_t; // handle given by the router, never 0
@@ -66,6 +71,10 @@ public:
     // Networks at the same time. Steam itself allowed at least six lobbies in tests; the limit keeps
     // the number of lobby searches and the user interface manageable.
     static constexpr size_t kMaxNetworks = 5;
+    // Messages one person may send us: on average kRatePerSecond, up to kRateBurst at once. Far above any
+    // game (a busy game server gets a few hundred per player), so only a flood is cut off.
+    static constexpr double kRatePerSecond = 10000;
+    static constexpr double kRateBurst = 20000;
 
     explicit Router(uint64_t selfSteamId);
 
@@ -100,6 +109,16 @@ public:
     // Who should get a (repeated) HELLO for which network – with a delay between attempts.
     std::vector<std::pair<NetworkId, uint64_t>> dueHellos(Clock::time_point now, std::chrono::milliseconds interval,
                                                           int maxAttempts);
+
+    // --- people we blocked (on this computer only, in every network). A blocked person is not
+    // verified, gets no HELLO and no packets from us, and nothing from them reaches the system.
+    // Returns the people who were blocked just now (close their sessions).
+    std::vector<uint64_t> setBlocked(const std::set<uint64_t>& people);
+    bool isBlocked(uint64_t steamId) const;
+
+    // --- flood protection: whether to process another message from this person now (token bucket
+    // per person). Called for every message before anything else is done with it.
+    bool admit(uint64_t from, Clock::time_point now);
 
     // --- packets (across all networks: one adapter, one address)
     InboundResult onData(uint64_t from, std::span<const uint8_t> packet, filter::Result* filterResult = nullptr) const;
@@ -139,6 +158,14 @@ private:
     std::map<NetworkId, Network> nets_;
     std::map<uint64_t, Peer> peers_;      // everyone in at least one of our networks
     std::map<uint32_t, uint64_t> routes_; // address → SteamID (verified somewhere, without conflicts)
+    std::set<uint64_t> blocked_;
+
+    struct Bucket {
+        double tokens = kRateBurst;
+        Clock::time_point last{};
+    };
+    std::mutex rateMutex_;
+    std::map<uint64_t, Bucket> buckets_;
 };
 
 } // namespace kettle::router

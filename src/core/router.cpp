@@ -118,6 +118,56 @@ bool Router::isMember(uint64_t steamId) const {
     return peers_.count(steamId) != 0;
 }
 
+std::vector<uint64_t> Router::setBlocked(const std::set<uint64_t>& people) {
+    std::unique_lock lk(mutex_);
+    std::vector<uint64_t> newlyBlocked;
+    for (uint64_t id : people)
+        if (id != selfId_ && !blocked_.count(id)) newlyBlocked.push_back(id);
+    for (uint64_t id : blocked_) {
+        if (people.count(id)) continue;
+        // unblocked: start the verification again, like for someone who has just joined
+        for (auto& [nid, n] : nets_) {
+            const auto m = n.members.find(id);
+            if (m != n.members.end()) m->second = Membership{};
+        }
+    }
+    blocked_.clear();
+    for (uint64_t id : people)
+        if (id != selfId_) blocked_.insert(id);
+    for (uint64_t id : newlyBlocked) {
+        // no longer trusted in any network: no packets from or to them
+        for (auto& [nid, n] : nets_) {
+            const auto m = n.members.find(id);
+            if (m != n.members.end()) m->second.verified = false;
+        }
+        const auto p = peers_.find(id);
+        if (p == peers_.end()) continue;
+        const auto r = routes_.find(p->second.address.value());
+        if (r != routes_.end() && r->second == id) routes_.erase(r);
+        p->second.conflict = false;
+    }
+    return newlyBlocked;
+}
+
+bool Router::isBlocked(uint64_t steamId) const {
+    std::shared_lock lk(mutex_);
+    return blocked_.count(steamId) != 0;
+}
+
+bool Router::admit(uint64_t from, Clock::time_point now) {
+    std::lock_guard lk(rateMutex_);
+    if (buckets_.size() > 4096) buckets_.clear(); // bounded: only lobby members get a Steam session anyway
+    auto [it, inserted] = buckets_.try_emplace(from);
+    Bucket& b = it->second;
+    if (inserted) b.last = now;
+    const double elapsed = std::chrono::duration<double>(now - b.last).count();
+    b.last = now;
+    if (elapsed > 0) b.tokens = std::min(kRateBurst, b.tokens + elapsed * kRatePerSecond);
+    if (b.tokens < 1) return false;
+    b.tokens -= 1;
+    return true;
+}
+
 bool Router::isVerified(NetworkId network, uint64_t steamId) const {
     std::shared_lock lk(mutex_);
     const auto n = nets_.find(network);
@@ -133,6 +183,7 @@ HelloOutcome Router::onHello(uint64_t from, const protocol::HelloMessage& msg) {
     if (nets_.empty()) return {HelloResult::NoNetwork, 0};
     const auto pit = peers_.find(from);
     if (pit == peers_.end()) return {HelloResult::UnknownPeer, 0};
+    if (blocked_.count(from)) return {HelloResult::Blocked, 0};
     Peer& peer = pit->second;
 
     // The proof must come from the key of a network in whose lobby the sender is.
@@ -181,7 +232,7 @@ std::vector<std::pair<NetworkId, uint64_t>> Router::dueHellos(Clock::time_point 
     std::vector<std::pair<NetworkId, uint64_t>> due;
     for (auto& [nid, n] : nets_) {
         for (auto& [id, m] : n.members) {
-            if (m.verified || m.hellosSent >= maxAttempts || now < m.nextHello) continue;
+            if (m.verified || m.hellosSent >= maxAttempts || now < m.nextHello || blocked_.count(id)) continue;
             m.hellosSent++;
             m.nextHello = now + interval;
             due.emplace_back(nid, id);
@@ -199,6 +250,7 @@ InboundResult Router::onData(uint64_t from, std::span<const uint8_t> packet, fil
     if (hdr->dst != selfAddress_ && !ip::isGroupDestination(hdr->dst)) return InboundResult::NotForUs;
     {
         std::shared_lock lk(mutex_);
+        if (blocked_.count(from)) return InboundResult::Blocked;
         const auto p = peers_.find(from);
         if (p == peers_.end() || p->second.conflict || !verifiedAnywhere(from)) return InboundResult::UnknownSender;
         const auto r = routes_.find(hdr->src.value());
@@ -223,8 +275,9 @@ std::vector<uint64_t> Router::recipients(std::span<const uint8_t> packet) const 
     std::shared_lock lk(mutex_);
     if (nets_.empty()) return out;
     if (group) {
-        for (const auto& [addr, id] : routes_) out.push_back(id); // one route per person: no duplicates
-    } else if (const auto it = routes_.find(hdr->dst.value()); it != routes_.end()) {
+        for (const auto& [addr, id] : routes_) // one route per person: no duplicates
+            if (!blocked_.count(id)) out.push_back(id);
+    } else if (const auto it = routes_.find(hdr->dst.value()); it != routes_.end() && !blocked_.count(it->second)) {
         out.push_back(it->second);
     }
     return out;
@@ -238,7 +291,7 @@ std::vector<PeerState> Router::peers(NetworkId network) const {
     for (const auto& [id, m] : it->second.members) {
         const auto p = peers_.find(id);
         if (p == peers_.end()) continue;
-        out.push_back({id, p->second.address, m.verified, p->second.conflict});
+        out.push_back({id, p->second.address, m.verified, p->second.conflict, blocked_.count(id) != 0});
     }
     return out;
 }

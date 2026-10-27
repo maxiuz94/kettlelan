@@ -64,6 +64,8 @@ void printHelp() {
                  "  list            your networks, their members, addresses and ping\n"
                  "  code            show the codes of your networks\n"
                  "  leave [n|all]   leave network n from \"list\" (or the only one), or all of them\n"
+                 "  block <address>    block a person in every network (until you quit), see \"list\"\n"
+                 "  unblock <address>  unblock them;  blocked  – who is blocked\n"
                  "  help            show this help\n"
                  "  quit            exit KettleLAN\n";
 #ifdef KETTLELAN_SECURITY_TESTS
@@ -92,6 +94,7 @@ void printNetworks(const steam::Network& net) {
         for (const auto& p : info.peers) {
             std::string status;
             if (p.self) status = "you";
+            else if (p.blocked) status = "blocked";
             else if (p.conflict) status = "address conflict";
             else if (!p.verified) status = "connecting…";
             else if (p.pingMs >= 0) status = std::to_string(p.pingMs) + " ms, " + (p.relayed ? "Steam relay" : "direct");
@@ -118,6 +121,25 @@ std::string stripEscapes(const std::string& line) {
         out += line[i];
     }
     return out;
+}
+
+// People blocked in this session: SteamID → the name shown when they were blocked.
+std::map<uint64_t, std::string> g_blocked;
+
+void applyBlocked(steam::Network& net) {
+    std::set<uint64_t> ids;
+    for (const auto& [id, name] : g_blocked) ids.insert(id);
+    net.setBlocked(ids);
+}
+
+// A member of one of our networks by their KettleLAN address (from "list").
+const steam::PeerInfo* findByAddress(const std::vector<steam::NetworkInfo>& networks, const std::string& text) {
+    const auto address = ip::Address4::parse(text);
+    if (!address) return nullptr;
+    for (const auto& info : networks)
+        for (const auto& p : info.peers)
+            if (!p.self && p.address == *address) return &p;
+    return nullptr;
 }
 
 void handleCommand(const std::string& rawLine, steam::Network& net) {
@@ -164,6 +186,29 @@ void handleCommand(const std::string& rawLine, steam::Network& net) {
         if (n < 1 || n > int(networks.size()) || name.empty()) std::cout << "Usage: rename <n> <name> – see \"list\".\n";
         else if (net.rename(networks[size_t(n - 1)].id, name)) std::cout << "Renamed for everyone.\n";
         else std::cout << "Only the host (marked *) can rename the network – whoever opened it, or the next host if they left.\n";
+    } else if (cmd == "block" || cmd == "unblock") {
+        const auto networks = net.networks();
+        const steam::PeerInfo* person = findByAddress(networks, rest);
+        uint64_t id = person ? person->steamId : 0;
+        if (!id && cmd == "unblock") // someone who already left: by the address they had
+            for (const auto& [blockedId, name] : g_blocked)
+                if (ip::addressForSteamId(blockedId).toString() == rest) id = blockedId;
+        if (!id) {
+            std::cout << "Nobody with the address \"" << rest << "\" – type " << cmd << " <address> from \"list\".\n";
+        } else if (cmd == "block") {
+            g_blocked[id] = person ? person->name : std::string();
+            applyBlocked(net);
+            std::cout << "Blocked " << g_blocked[id] << " in every network until you quit KettleLAN. They are not told.\n";
+        } else if (g_blocked.erase(id)) {
+            applyBlocked(net);
+            std::cout << "Unblocked.\n";
+        } else {
+            std::cout << "That person is not blocked.\n";
+        }
+    } else if (cmd == "blocked") {
+        if (g_blocked.empty()) std::cout << "Nobody is blocked.\n";
+        for (const auto& [id, name] : g_blocked)
+            std::cout << "  " << std::left << std::setw(16) << ip::addressForSteamId(id).toString() << name << "\n";
     } else if (cmd == "leave") {
         const auto networks = net.networks();
         if (networks.empty()) std::cout << "You are not in a network.\n";

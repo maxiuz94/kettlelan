@@ -29,6 +29,7 @@ public:
     void leaveAll();
     void rename(const std::string& code, const std::string& name);
     void setNick(const std::string& nick); // also sent again whenever the Steam process starts
+    void setBlocked(const std::vector<uint64_t>& people); // likewise
     void setHideAddress(bool on);
     void setProtectServices(bool on);
     void retry();
@@ -48,6 +49,7 @@ private:
     bool hideAddress_ = true;
     bool protectServices_ = true;
     std::string nick_;
+    std::vector<uint64_t> blocked_;
 };
 
 } // namespace kettle::gui

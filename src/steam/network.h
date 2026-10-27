@@ -41,6 +41,7 @@ struct PeerInfo {
     bool owner = false;
     bool verified = false;   // proved knowledge of the network key
     bool conflict = false;   // address clashes with someone else (very rare)
+    bool blocked = false;    // we blocked this person (nothing is exchanged with them)
     int pingMs = -1;
     bool relayed = false;
     bool steamFriend = false; // your friend on Steam (checked on this computer only)
@@ -83,6 +84,8 @@ public:
     bool rename(NetworkHandle network, const std::string& name);
     // Our nickname in every network ("" = the Steam name). Encrypted with each network's key.
     void setNick(const std::string& nick);
+    // People we blocked (SteamIDs, on this computer only): in every network, no traffic either way.
+    void setBlocked(const std::set<uint64_t>& people);
     void poll(); // receive messages – call as often as possible
     void tick(); // periodic work – every ~0.5 s
 
@@ -172,6 +175,7 @@ private:
     std::atomic<uint64_t> blockedPackets_{0};
     std::mutex blockedLogMutex_;
     std::set<std::pair<uint64_t, uint16_t>> blockedLogged_; // (who, port) – logged only once
+    std::map<uint64_t, std::chrono::steady_clock::time_point> floodLogged_; // Steam thread: last flood warning per person
     std::mutex handlerMutex_;
     PacketHandler packetHandler_;
 };

@@ -32,6 +32,12 @@ Please **do not open a public issue**. Use GitHub's private reporting instead:
   `100.64.0.0/10` range goes through `kettle0`.
 - **Verified members only.** Steam connections are accepted only from people in the network's lobby, and
   packets only from those who proved that they know the key from the code – and only with their own address.
+- **Blocking.** A person you block is not verified in any of your networks: their Steam connection is refused,
+  they get no HELLO and no packets from you (broadcasts included), and nothing from them reaches the system.
+  The list is kept on your computer only; the blocked person is not told.
+- **Flood protection.** Every message from a person counts against a limit of 10,000 a second (bursts up to
+  20,000) – far above any game. Messages above it are dropped before anything else is done with them, so one
+  member cannot overload your computer.
 - **Several networks at once** (up to five): members are verified separately in each network with that network's
   key. A member of one network cannot reach members of the other through you (nothing is forwarded), and does not
   learn who is in your other network.
@@ -86,8 +92,9 @@ Please **do not open a public issue**. Use GitHub's private reporting instead:
 - The network's name is encrypted in the lobby data (XChaCha20-Poly1305, bound to the lobby's tag), so only people
   who know the code can read it. Someone who joins a lobby without the code still sees the Steam names of the people
   in it and how many there are – but no addresses, no name of the network and no traffic.
-- There is no "owner" who could kick someone. If the code reaches the wrong person, create a new network
-  and share the new code only with people you trust.
+- There is no "owner" who could kick someone out of the network for everybody. Each person can **block**
+  someone on their own computer (in every network, until they unblock them); to remove someone for everybody,
+  create a new network and share the new code only with people you trust.
 
 ## What KettleLAN does not protect against
 

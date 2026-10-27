@@ -9,6 +9,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <set>
 #include <string>
 #include <thread>
 #include <vector>
@@ -45,6 +46,7 @@ public:
     void leaveAll();
     void rename(const std::string& code, const std::string& name); // shared name (lobby owner only)
     void setNick(const std::string& nick);                          // our name in every network ("" = Steam)
+    void setBlocked(const std::set<uint64_t>& people);              // people we blocked (SteamIDs)
     void setHideAddress(bool hide);
     void setProtectServices(bool protect);
     // Leaves the network, closes the adapter and disconnects Steam. Blocks until done (a few seconds at most).
