@@ -54,9 +54,9 @@ int main(int argc, char** argv) {
         else if (name == "retry") engine.retry();
         else if (name == "quit") break;
     }
-    engine.shutdown(); // leaves the networks and disconnects from Steam (~3 s at most)
+    engine.shutdown(); // leaves the networks (~3 s at most)
     std::fflush(stdout);
     std::clog.flush();
-    // Exit right away: objects tied to Steam must not be destroyed after SteamAPI_Shutdown().
+    // Exit right away, without SteamAPI_Shutdown() – see Engine::shutdown().
     std::_Exit(0);
 }

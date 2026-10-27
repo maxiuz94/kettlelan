@@ -20,6 +20,8 @@ Before tagging a release add a `## [x.y.z] – date` section (see [docs/RELEASIN
 - GUI: explain that the host (★) can rename a network and that Steam passes it on when the host leaves
 - Docs: all networks share one address – members of each see your game servers
 - CI: build the installer with a pinned Inno Setup version
+- Steam: close KettleLAN without SteamAPI_Shutdown(), which could crash inside Steam's own code on exit
+- Log: show "Your name in networks: …" instead of 0 or 1
 
 ## [0.3.0] – 2026-10-25
 

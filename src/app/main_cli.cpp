@@ -272,13 +272,18 @@ int main() {
     }).detach();
 
     net.leave();
-    session.runCallbacks();
+    // a moment for Steam to send "left the lobby" and the closed connections
+    for (int i = 0; i < 20; ++i) {
+        session.runCallbacks();
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
     tun->stop();
     tun.reset();
-    session.shutdown();
 
-    // Exit right away: objects tied to Steam must not be destroyed after SteamAPI_Shutdown(),
-    // and the keyboard thread is still waiting for the next line anyway.
+    // Exit right away, without SteamAPI_Shutdown(): Steam's own threads in this process can crash while
+    // it closes the connection to the Steam client (a race in steamclient.so). The Steam client notices
+    // that the process ended and clears its status, as after any exit. The keyboard thread is still
+    // waiting for the next line anyway.
     std::cout.flush();
     std::clog.flush();
     std::_Exit(0);

@@ -209,14 +209,19 @@ void Engine::shutdown() {
     post([this, &done] {
         auto& s = *st_;
         if (s.net) s.net->leaveAll();
-        if (s.session.initialized()) s.session.runCallbacks();
+        // a moment for Steam to send "left the lobby" and the closed connections
+        for (int i = 0; i < 20 && s.session.initialized(); ++i) {
+            s.session.runCallbacks();
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
         if (s.tun) {
             s.tun->stop();
             s.tun.reset();
         }
-        // The network object registers Steam callbacks – it must not be destroyed after SteamAPI_Shutdown().
         s.net.reset();
-        s.session.shutdown();
+        // No SteamAPI_Shutdown(): kettlelan-steam ends right after this, and Steam's own threads in this
+        // process can crash while it closes the connection to the Steam client (a race in steamclient.so).
+        // The Steam client notices that the process ended and clears its status, as after any exit.
         done = true;
     });
     const auto deadline = Clock::now() + std::chrono::seconds(3);
