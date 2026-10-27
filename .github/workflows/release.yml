@@ -18,7 +18,7 @@ jobs:
     name: CHANGELOG.md and README.md
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Check the version entry
         run: |
           VERSION="$(sed -n 's/^project(KettleLAN VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)"
@@ -53,7 +53,7 @@ jobs:
             qt6-base-dev qt6-declarative-dev qml6-module-qtquick qml6-module-qtqml \
             qml6-module-qtquick-controls qml6-module-qtquick-layouts qml6-module-qtquick-shapes \
             qml6-module-qtquick-templates qml6-module-qtquick-window qml6-module-qtqml-workerscript
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Steamworks SDK (official Valve file, verified with SHA256)
         env:
           GH_TOKEN: ${{ secrets.SDK_REPO_TOKEN }}
@@ -80,7 +80,7 @@ jobs:
     name: AppImage
     runs-on: ubuntu-22.04   # an older system, so the AppImage also runs on older distributions
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Qt 6.8 (LTS)
         uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4.4.1
         with:
@@ -110,7 +110,7 @@ jobs:
     name: Windows installer
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Qt 6.8 (LTS)
         uses: jurplel/install-qt-action@a9c63c7c123f3069cff414e7e482d95dfa9d8125 # v4.4.1
         with:
@@ -144,7 +144,7 @@ jobs:
       id-token: write       # build attestation
       attestations: write
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: dist
