@@ -13,7 +13,7 @@ Before tagging a release add a `## [x.y.z] – date` section (see [docs/RELEASIN
 - Network: works together with KettleLAN 0.3.0 and 0.3.1 – same protocol
 - Security: block a person – nothing is exchanged with them in any network until you unblock them (⊘ in the list, Settings → Blocked people)
 - Security: drop messages above 10,000 a second from one person, so nobody can flood your computer
-- CLI: block, unblock and blocked commands
+- CLI: block, unblock and blocked commands – a blocked person is shown under the name they had when you blocked them
 
 ## [0.3.1] – 2026-10-27
 

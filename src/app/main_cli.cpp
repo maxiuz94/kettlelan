@@ -77,6 +77,15 @@ void printHelp() {
     std::cout << "\n";
 }
 
+// People blocked in this session: SteamID → the name shown when they were blocked.
+std::map<uint64_t, std::string> g_blocked;
+
+// A blocked person is not verified, so Steam gives only their Steam name: show the name we saw when blocking.
+std::string shownName(const steam::PeerInfo& p) {
+    const auto it = g_blocked.find(p.steamId);
+    return p.blocked && it != g_blocked.end() && !it->second.empty() ? it->second : p.name;
+}
+
 void printNetworks(const steam::Network& net) {
     const auto networks = net.networks();
     if (networks.empty()) {
@@ -100,7 +109,7 @@ void printNetworks(const steam::Network& net) {
             else if (p.pingMs >= 0) status = std::to_string(p.pingMs) + " ms, " + (p.relayed ? "Steam relay" : "direct");
             else status = "connected";
             std::cout << "  " << std::left << std::setw(16) << p.address.toString() << std::setw(24)
-                      << (p.name + (p.owner ? " *" : "")) << status << (p.steamFriend ? "  (Steam friend)" : "") << "\n";
+                      << (shownName(p) + (p.owner ? " *" : "")) << status << (p.steamFriend ? "  (Steam friend)" : "") << "\n";
         }
     }
     std::cout << "\n";
@@ -122,9 +131,6 @@ std::string stripEscapes(const std::string& line) {
     }
     return out;
 }
-
-// People blocked in this session: SteamID → the name shown when they were blocked.
-std::map<uint64_t, std::string> g_blocked;
 
 void applyBlocked(steam::Network& net) {
     std::set<uint64_t> ids;
