@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
 import KettleLAN
@@ -174,42 +175,37 @@ Item {
                     }
                     Toggle {
                         Layout.fillWidth: true
-                        last: true
                         title: qsTr("Protect this computer's services")
                         hint: qsTr("Blocks network access to SSH, file sharing, remote desktop, databases and admin panels. Games work normally. Blocked attempts: %1").arg(Backend.blockedCount)
                         checked: Backend.protectServices
                         onUserToggled: (value) => Backend.protectServices = value
                     }
-                }
-
-                // only when someone is blocked
-                SectionTitle { visible: Backend.blockedPeople.length > 0; text: qsTr("Blocked people") }
-                Group {
-                    visible: Backend.blockedPeople.length > 0
-                    Repeater {
-                        model: Backend.blockedPeople
-                        delegate: Rectangle {
-                            id: blockedRow
-                            required property var modelData
-                            required property int index
-                            Layout.fillWidth: true
-                            implicitHeight: 58
-                            color: "transparent"
+                    // the list opens in its own window, so a long list does not stretch the settings
+                    Button {
+                        id: blockedButton
+                        Layout.fillWidth: true
+                        implicitHeight: 56
+                        padding: 0
+                        hoverEnabled: true
+                        Accessible.name: qsTr("Blocked people")
+                        onClicked: blockedDialog.open()
+                        background: Rectangle { color: blockedButton.down ? Theme.border : (blockedButton.hovered ? Theme.surface2 : "transparent") }
+                        contentItem: Item {
                             RowLayout {
                                 anchors.fill: parent
-                                anchors.leftMargin: 14
-                                anchors.rightMargin: 10
-                                spacing: 10
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 14
+                                spacing: 12
                                 ColumnLayout {
                                     Layout.fillWidth: true
                                     spacing: 2
-                                    Text { textFormat: Text.PlainText; text: blockedRow.modelData.name; color: Theme.text; font.pixelSize: 14; elide: Text.ElideRight; Layout.fillWidth: true }
-                                    Text { textFormat: Text.PlainText; text: blockedRow.modelData.address; color: Theme.muted; font.family: Theme.mono; font.pixelSize: 12 }
+                                    Text { textFormat: Text.PlainText; text: qsTr("Blocked people"); color: Theme.text; font.pixelSize: 14; font.weight: Font.Medium }
+                                    Text { textFormat: Text.PlainText; color: Theme.muted; font.pixelSize: 12; Layout.fillWidth: true; wrapMode: Text.WordWrap
+                                        text: Backend.blockedPeople.length === 0 ? qsTr("Nobody – block someone with ⊘ next to them in a network")
+                                            : Backend.blockedPeople.length === 1 ? qsTr("1 person") : qsTr("%1 people").arg(Backend.blockedPeople.length) }
                                 }
-                                AppButton { kind: "secondary"; implicitHeight: 38; text: qsTr("Unblock"); Accessible.name: qsTr("Unblock %1").arg(blockedRow.modelData.name)
-                                    onClicked: Backend.unblockPerson(blockedRow.modelData.steamId) }
+                                SvgIcon { name: "back"; size: 18; color: Theme.muted; rotation: 180 }
                             }
-                            Rectangle { visible: blockedRow.index < Backend.blockedPeople.length - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.border }
                         }
                     }
                 }
@@ -280,6 +276,67 @@ Item {
                     text: qsTr("Quit KettleLAN")
                     onClicked: Backend.quitApp()
                 }
+            }
+        }
+    }
+
+    // Blocked people – in its own window, scrolls when the list is long.
+    Popup {
+        id: blockedDialog
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: Math.min(parent ? parent.width - 40 : 380, 400)
+        height: Math.min(parent ? parent.height - 80 : 520, implicitHeight)
+        modal: true
+        focus: true
+        padding: 20
+        background: Rectangle { radius: Theme.radius + 4; color: Theme.surface; border.color: Theme.border }
+        Overlay.modal: Rectangle { color: Theme.dark ? "#99000000" : "#55000000" }
+
+        contentItem: ColumnLayout {
+            spacing: 12
+            Text { textFormat: Text.PlainText; text: qsTr("Blocked people"); color: Theme.text; font.pixelSize: 18; font.weight: Font.Bold }
+            Text { textFormat: Text.PlainText; Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.muted; font.pixelSize: 13
+                text: Backend.blockedPeople.length === 0 ? qsTr("Nobody is blocked. To block someone, click ⊘ next to them in a network.")
+                    : qsTr("Nothing is exchanged with them in any of your networks. They are not told.") }
+            ListView {
+                id: blockedList
+                visible: count > 0
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.preferredHeight: contentHeight
+                clip: true
+                model: Backend.blockedPeople
+                boundsBehavior: Flickable.StopAtBounds
+                ScrollBar.vertical: ScrollBar {}
+                delegate: Rectangle {
+                    id: blockedRow
+                    required property var modelData
+                    required property int index
+                    width: blockedList.width
+                    height: 58
+                    color: "transparent"
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.rightMargin: 4
+                        spacing: 10
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 2
+                            Text { textFormat: Text.PlainText; text: blockedRow.modelData.name; color: Theme.text; font.pixelSize: 14; elide: Text.ElideRight; Layout.fillWidth: true }
+                            Text { textFormat: Text.PlainText; text: blockedRow.modelData.address; color: Theme.muted; font.family: Theme.mono; font.pixelSize: 12 }
+                        }
+                        AppButton { kind: "secondary"; implicitHeight: 38; text: qsTr("Unblock"); Accessible.name: qsTr("Unblock %1").arg(blockedRow.modelData.name)
+                            onClicked: Backend.unblockPerson(blockedRow.modelData.steamId) }
+                    }
+                    Rectangle { visible: blockedRow.index < blockedList.count - 1; anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.border }
+                }
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.topMargin: 4
+                Item { Layout.fillWidth: true }
+                AppButton { kind: "secondary"; text: qsTr("Close"); onClicked: blockedDialog.close() }
             }
         }
     }

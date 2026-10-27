@@ -130,7 +130,7 @@ Every file on the Releases page shows its SHA256 next to it, and `SHA256SUMS.txt
 
 - **Windows** (PowerShell):
   ```powershell
-  Get-FileHash .\KettleLAN-0.3.1-windows-x64-setup.exe -Algorithm SHA256
+  Get-FileHash .\KettleLAN-0.3.2-windows-x64-setup.exe -Algorithm SHA256
   ```
 - **Linux**:
   ```sh
@@ -139,7 +139,7 @@ Every file on the Releases page shows its SHA256 next to it, and `SHA256SUMS.txt
 - **Build origin** (any system with the [GitHub CLI](https://cli.github.com)) – proves that the file was built by
   GitHub Actions in this repository from a tagged release:
   ```sh
-  gh attestation verify KettleLAN-0.3.1-windows-x64-setup.exe -R maxiuz94/kettlelan
+  gh attestation verify KettleLAN-0.3.2-windows-x64-setup.exe -R maxiuz94/kettlelan
   ```
 
 The bundled `wintun.dll` and `steam_api64.dll` keep their original digital signatures (WireGuard LLC and Valve);

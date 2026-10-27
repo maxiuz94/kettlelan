@@ -4,6 +4,7 @@
 
 #include <QAction>
 #include <QClipboard>
+#include <QCollator>
 #include <QDateTime>
 #include <QCoreApplication>
 #include <QDesktopServices>
@@ -624,9 +625,12 @@ QVariantList Backend::blockedPeople() const {
         out.append(QVariantMap{{QStringLiteral("steamId"), it.key()},
                                {QStringLiteral("name"), it.value().toString()},
                                {QStringLiteral("address"), QString::fromStdString(ip::addressForSteamId(it.key().toULongLong()).toString())}});
-    std::sort(out.begin(), out.end(), [](const QVariant& a, const QVariant& b) {
-        return a.toMap().value(QStringLiteral("name")).toString().compare(b.toMap().value(QStringLiteral("name")).toString(),
-                                                                         Qt::CaseInsensitive) < 0;
+    QCollator collator; // "Player 2" before "Player 10"
+    collator.setNumericMode(true);
+    collator.setCaseSensitivity(Qt::CaseInsensitive);
+    std::sort(out.begin(), out.end(), [&collator](const QVariant& a, const QVariant& b) {
+        return collator.compare(a.toMap().value(QStringLiteral("name")).toString(),
+                                b.toMap().value(QStringLiteral("name")).toString()) < 0;
     });
     return out;
 }

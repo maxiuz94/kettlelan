@@ -487,8 +487,13 @@ void Network::onSessionRequest(SteamNetworkingMessagesSessionRequest_t* ev) {
 }
 
 void Network::onSessionFailed(SteamNetworkingMessagesSessionFailed_t* ev) {
-    KLOG_WARN("Connection to " << nameOf(ev->m_info.m_identityRemote.GetSteamID64())
-              << " lost: " << ev->m_info.m_szEndDebug);
+    const uint64_t who = ev->m_info.m_identityRemote.GetSteamID64();
+    // a blocked person keeps trying to connect and we refuse – that is expected, not worth a warning
+    if (router_.isBlocked(who)) {
+        KLOG_DEBUG("Refused connection from blocked " << who << ": " << ev->m_info.m_szEndDebug);
+        return;
+    }
+    KLOG_WARN("Connection to " << nameOf(who) << " lost: " << ev->m_info.m_szEndDebug);
 }
 
 // ---------------------------------------------------------------- HELLO (logic in router::Router)
