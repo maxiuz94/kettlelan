@@ -1,6 +1,7 @@
 # Releasing a new version
 
-1. Bump the version in `CMakeLists.txt`: `project(KettleLAN VERSION 0.3.0 …)`.
+1. Bump the version in `CMakeLists.txt` (`project(KettleLAN VERSION 0.3.0 …)`) and in the file names of the
+   download table in `README.md`. The release workflow stops if a file name there does not match the version.
 2. In [`CHANGELOG.md`](../CHANGELOG.md) rename `## [Unreleased]` to `## [0.2.0] – date` (and start a new empty
    `## [Unreleased]` above it). Keep the format: a flat list, one line per change – `Area: what changed`.
    This text becomes the description of the GitHub release – preview it with `scripts/release-notes.sh 0.3.0`.

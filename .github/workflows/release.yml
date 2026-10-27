@@ -15,7 +15,7 @@ env:
 
 jobs:
   changelog:
-    name: CHANGELOG.md entry
+    name: CHANGELOG.md and README.md
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -26,6 +26,11 @@ jobs:
             echo "Tag ${GITHUB_REF_NAME} does not match the version in CMakeLists.txt (${VERSION})"; exit 1
           fi
           scripts/release-notes.sh "$VERSION" "$GITHUB_SHA"
+          # the download table in README.md names the files of this version
+          for f in "KettleLAN-${VERSION}-windows-x64-setup.exe" "kettlelan_${VERSION}_ubuntu24.04_amd64.deb" \
+                   "kettlelan_${VERSION}_debian12_amd64.deb" "KettleLAN-${VERSION}-x86_64.AppImage"; do
+            grep -qF "$f" README.md || { echo "README.md does not name $f – update the download table"; exit 1; }
+          done
 
   deb:
     name: .deb package (${{ matrix.distro }})
