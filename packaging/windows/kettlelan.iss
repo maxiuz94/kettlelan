@@ -56,12 +56,17 @@ Source: "{#SourceDir}\wintun.dll"; DestDir: "{#ServiceDir}"; Flags: ignoreversio
 ; KettleLAN 0.3.0 kept the service in the program's folder
 Type: files; Name: "{app}\kettlelan-service.exe"
 Type: files; Name: "{app}\wintun.dll"
+; KettleLAN 0.3.3 and older wrote the service log to ProgramData
+Type: files; Name: "{commonappdata}\KettleLAN\service.log"
+Type: dirifempty; Name: "{commonappdata}\KettleLAN"
 
 [Icons]
 Name: "{autoprograms}\KettleLAN"; Filename: "{app}\KettleLAN.exe"
 Name: "{autodesktop}\KettleLAN"; Filename: "{app}\KettleLAN.exe"; Tasks: desktopicon
 
 [Run]
+; "install" also gives the program's and the service's folders safe permissions (only administrators may
+; change them), wherever the user put them.
 Filename: "{#ServiceDir}\kettlelan-service.exe"; Parameters: "install ""{app}\KettleLAN.exe"""; Flags: runhidden waituntilterminated; \
     StatusMsg: "Installing KettleLAN Service..."
 Filename: "{app}\KettleLAN.exe"; Description: "Launch KettleLAN"; Flags: nowait postinstall skipifsilent runasoriginaluser
@@ -73,10 +78,27 @@ Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM kettlelan-cli.exe"; Flags: r
 Filename: "{#ServiceDir}\kettlelan-service.exe"; Parameters: "uninstall"; Flags: runhidden waituntilterminated; RunOnceId: "RemoveService"
 
 [UninstallDelete]
-; the service log
-Type: filesandordirs; Name: "{commonappdata}\KettleLAN"
+; the service log (next to the service since 0.3.4)
+Type: files; Name: "{#ServiceDir}\service.log"
+Type: dirifempty; Name: "{#ServiceDir}"
 
 [Code]
+// KettleLAN always gets a folder of its own, wherever the user puts it: choosing "D:\Games" installs to
+// "D:\Games\KettleLAN". The service then restricts that folder's permissions, which must never touch a
+// whole drive or a folder with other programs.
+function NextButtonClick(CurPageID: Integer): Boolean;
+var
+  Dir: String;
+begin
+  Result := True;
+  if CurPageID = wpSelectDir then
+  begin
+    Dir := RemoveBackslashUnlessRoot(WizardForm.DirEdit.Text);
+    if Pos('kettlelan', Lowercase(ExtractFileName(Dir))) = 0 then
+      WizardForm.DirEdit.Text := AddBackslash(Dir) + 'KettleLAN';
+  end;
+end;
+
 // Before files are replaced (update or repair): close KettleLAN and stop the service, which keeps its
 // files open. Both are started again at the end of the installation.
 function PrepareToInstall(var NeedsRestart: Boolean): String;
