@@ -124,6 +124,8 @@ have nothing to do with games:
   9443, 10000, Jellyfin, Plex,
 - databases: MySQL/MariaDB, PostgreSQL, MS SQL, MongoDB, Redis, Memcached, Elasticsearch,
 - home and AI servers: Home Assistant, Ollama, SNMP and metrics (9100),
+- Windows services: time sync (W32Time), VPN (IPsec/IKE), connected devices (CDPSvc), Windows Update sharing
+  (Delivery Optimization),
 - KDE Connect, Steam Remote Play, UPnP/SSDP, Windows network discovery (WS-Discovery, WSD), mDNS and LLMNR (your
   computer's name), DNS, mail.
 

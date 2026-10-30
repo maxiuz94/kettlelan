@@ -261,6 +261,14 @@ static void testFilter() {
     CHECK(filter::inspectInbound(makePacket(6, 11434)).verdict == Verdict::BlockedService);  // Ollama
     CHECK(filter::inspectInbound(makePacket(6, 47001)).verdict == Verdict::BlockedService);  // WinRM (local)
     CHECK(filter::serviceName(5985) == "remote management (WinRM)");
+    // found listening on a Windows 11 test computer (Get-NetUDPEndpoint, nmap) – 0.3.4
+    CHECK(filter::inspectInbound(makePacket(17, 123)).verdict == Verdict::BlockedService);   // time (W32Time)
+    CHECK(filter::inspectInbound(makePacket(17, 500)).verdict == Verdict::BlockedService);   // VPN (IKE)
+    CHECK(filter::inspectInbound(makePacket(17, 4500)).verdict == Verdict::BlockedService);  // VPN (IKE NAT-T)
+    CHECK(filter::inspectInbound(makePacket(6, 5040)).verdict == Verdict::BlockedService);   // Connected Devices (CDPSvc)
+    CHECK(filter::inspectInbound(makePacket(17, 5050)).verdict == Verdict::BlockedService);  // Connected Devices (CDPSvc)
+    CHECK(filter::inspectInbound(makePacket(6, 7680)).verdict == Verdict::BlockedService);   // Delivery Optimization
+    CHECK(filter::serviceName(7680) == "Windows Update sharing (Delivery Optimization)");
     // the games from the README table still work
     for (uint16_t port : {27960, 27015, 27005, 27020, 7777, 7778, 7781, 6112, 2300, 2350, 2400, 47624, 25565, 34197})
         CHECK(filter::inspectInbound(makePacket(17, port)).verdict == Verdict::Allow);
