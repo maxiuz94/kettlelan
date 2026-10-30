@@ -53,13 +53,14 @@ void reportStatus(DWORD state, DWORD exitCode = NO_ERROR, DWORD waitHint = 0) {
     if (g_statusHandle) SetServiceStatus(g_statusHandle, &g_status);
 }
 
-// The log goes to C:\ProgramData\KettleLAN\service.log.
+// The log goes to service.log next to the service (Program Files\KettleLAN Service), a folder only
+// administrators can change. Not to ProgramData: ordinary users may create folders there, and a folder
+// someone else prepared (for example a link to another place) would let them choose where SYSTEM writes.
 void openLogFile() {
-    wchar_t base[MAX_PATH];
-    if (!GetEnvironmentVariableW(L"ProgramData", base, MAX_PATH)) return;
-    const std::wstring dir = std::wstring(base) + L"\\KettleLAN";
-    CreateDirectoryW(dir.c_str(), nullptr);
-    _wfreopen((dir + L"\\service.log").c_str(), L"a", stderr);
+    const std::wstring dir = programFolder();
+    // the service does not start from such a folder anyway (runServer) – then there is nothing to log
+    if (dir.empty() || folderChangeableByNonAdmins(dir)) return;
+    _wfreopen((dir + L"service.log").c_str(), L"a", stderr);
 }
 
 std::wstring lower(std::wstring s) {
@@ -161,6 +162,14 @@ void serveClient(HANDLE handle, WintunAdapter& adapter) {
     if (!clientAllowed(handle, who)) {
         KLOG_WARN("Refused a connection from " << (who.empty() ? std::string("an unknown program") : who));
         pipe.write(svc::encodeError(svc::ErrorCode::NotAllowed, "Only KettleLAN from its installation folder may use it."));
+        return;
+    }
+    // The program's folder may be on any drive. If ordinary programs can put files there, any of them
+    // could pretend to be KettleLAN – the installer sets safe permissions, so this means a damaged install.
+    if (folderChangeableByNonAdmins(clientFolder())) {
+        KLOG_WARN("Refused " << who << ": its folder can be changed by ordinary programs");
+        pipe.write(svc::encodeError(svc::ErrorCode::NotAllowed,
+                                    "KettleLAN's folder can be changed by other programs. Reinstall KettleLAN to fix its permissions."));
         return;
     }
 

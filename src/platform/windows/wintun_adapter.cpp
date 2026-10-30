@@ -329,7 +329,31 @@ bool folderChangeableByNonAdmins(const std::wstring& dir) {
     }
     // The service runs as SYSTEM – its own account is not an ordinary program. Only a person's account
     // (the "debug" mode, started by hand) counts.
-    if (user && IsWellKnownSid(user, WinLocalSystemSid)) user = nullptr;
+    const bool asSystem = user && IsWellKnownSid(user, WinLocalSystemSid);
+    if (asSystem) user = nullptr;
+
+    // As SYSTEM we do not know which person might own the folder, so the owner must be an account only
+    // administrators control: whoever owns a folder can always change its permissions.
+    if (asSystem && owner) {
+        BYTE trustedInstaller[SECURITY_MAX_SID_SIZE];
+        PSID ti = nullptr;
+        if (ConvertStringSidToSidW(L"S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464", &ti) && ti) {
+            DWORD size = SECURITY_MAX_SID_SIZE;
+            if (CopySid(size, trustedInstaller, ti)) {
+                LocalFree(ti);
+                ti = trustedInstaller;
+            } else {
+                LocalFree(ti);
+                ti = nullptr;
+            }
+        }
+        const bool trustedOwner = IsWellKnownSid(owner, WinLocalSystemSid) || IsWellKnownSid(owner, WinBuiltinAdministratorsSid) ||
+                                  (ti && EqualSid(owner, ti));
+        if (!trustedOwner) {
+            LocalFree(sd);
+            return true;
+        }
+    }
 
     // well-known groups every ordinary program runs with
     BYTE everyone[SECURITY_MAX_SID_SIZE], users[SECURITY_MAX_SID_SIZE], authUsers[SECURITY_MAX_SID_SIZE],

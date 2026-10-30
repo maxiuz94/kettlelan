@@ -50,10 +50,10 @@ Get the latest version from the [**Releases**](https://github.com/maxiuz94/kettl
 
 | System | File | How to install |
 |--------|------|----------------|
-| **Windows** 10/11<br>(64-bit) | [`KettleLAN-0.3.3-windows-x64-setup.exe`](https://github.com/maxiuz94/kettlelan/releases/latest/download/KettleLAN-0.3.3-windows-x64-setup.exe) | run the installer |
-| **Ubuntu** 24.04+,<br>Mint 22+, Pop!_OS,<br>Debian 13 | [`kettlelan_0.3.3_ubuntu24.04_amd64.deb`](https://github.com/maxiuz94/kettlelan/releases/latest/download/kettlelan_0.3.3_ubuntu24.04_amd64.deb) | `sudo apt install ./kettlelan_*.deb` |
-| **Debian 12**,<br>MX Linux 23 | [`kettlelan_0.3.3_debian12_amd64.deb`](https://github.com/maxiuz94/kettlelan/releases/latest/download/kettlelan_0.3.3_debian12_amd64.deb) | `sudo apt install ./kettlelan_*.deb` |
-| **Any other Linux** | [`KettleLAN-0.3.3-x86_64.AppImage`](https://github.com/maxiuz94/kettlelan/releases/latest/download/KettleLAN-0.3.3-x86_64.AppImage) | `chmod +x KettleLAN-*.AppImage`,<br>then run it |
+| **Windows** 10/11<br>(64-bit) | [`KettleLAN-0.3.4-windows-x64-setup.exe`](https://github.com/maxiuz94/kettlelan/releases/latest/download/KettleLAN-0.3.4-windows-x64-setup.exe) | run the installer |
+| **Ubuntu** 24.04+,<br>Mint 22+, Pop!_OS,<br>Debian 13 | [`kettlelan_0.3.4_ubuntu24.04_amd64.deb`](https://github.com/maxiuz94/kettlelan/releases/latest/download/kettlelan_0.3.4_ubuntu24.04_amd64.deb) | `sudo apt install ./kettlelan_*.deb` |
+| **Debian 12**,<br>MX Linux 23 | [`kettlelan_0.3.4_debian12_amd64.deb`](https://github.com/maxiuz94/kettlelan/releases/latest/download/kettlelan_0.3.4_debian12_amd64.deb) | `sudo apt install ./kettlelan_*.deb` |
+| **Any other Linux** | [`KettleLAN-0.3.4-x86_64.AppImage`](https://github.com/maxiuz94/kettlelan/releases/latest/download/KettleLAN-0.3.4-x86_64.AppImage) | `chmod +x KettleLAN-*.AppImage`,<br>then run it |
 
 Click a file name to download it. The Windows installer asks for administrator rights once, and you can choose
 any folder or drive. On Linux run the commands in the folder with the downloaded file.
@@ -118,12 +118,14 @@ which KettleLAN does not need. Ping works too.
 With **Settings → Protect this computer's services** (on by default) other players cannot reach services that
 have nothing to do with games:
 
-- remote access: SSH, Telnet, remote desktop (RDP, VNC), X11,
+- remote access: SSH, Telnet, remote desktop (RDP, VNC), X11, Windows remote management (WinRM), Android debugging (ADB),
 - file sharing: Windows sharing (SMB, NetBIOS), NFS, AFP, Syncthing, printers,
 - web servers and admin panels: ports 80, 443, 3000, 5000–5001, 8000, 8080–8081, 8443, 8888, 9000, 9090–9091,
   9443, 10000, Jellyfin, Plex,
-- databases: MySQL/MariaDB, PostgreSQL, MS SQL, MongoDB, Redis, Memcached,
-- KDE Connect, Steam Remote Play, UPnP/SSDP, mDNS and LLMNR (your computer's name), DNS, mail.
+- databases: MySQL/MariaDB, PostgreSQL, MS SQL, MongoDB, Redis, Memcached, Elasticsearch,
+- home and AI servers: Home Assistant, Ollama, SNMP and metrics (9100),
+- KDE Connect, Steam Remote Play, UPnP/SSDP, Windows network discovery (WS-Discovery, WSD), mDNS and LLMNR (your
+  computer's name), DNS, mail.
 
 Your computer also does not announce its name and shared folders to other players. The full list with port
 numbers is in [`src/core/filter.cpp`](src/core/filter.cpp).
@@ -257,9 +259,9 @@ desktop. Run only one KettleLAN (window or terminal) at a time.
 ## Logs and troubleshooting
 
 - **Program log:** *Settings → Open log*. In a terminal, `kettlelan-cli` prints the same messages.
-- **Windows service log:** `C:\ProgramData\KettleLAN\service.log`. In PowerShell:
+- **Windows service log:** `C:\Program Files\KettleLAN Service\service.log`. In PowerShell:
   `Get-Service KettleLAN` (should be *Running*) and
-  `Get-Content C:\ProgramData\KettleLAN\service.log -Tail 20 -Encoding UTF8`.
+  `Get-Content "C:\Program Files\KettleLAN Service\service.log" -Tail 20 -Encoding UTF8`.
 - **Steam must be running and signed in** before KettleLAN connects. If KettleLAN shows "Not connected to
   Steam", press **▶**.
 - **Problems or ideas:** [open an issue](https://github.com/maxiuz94/kettlelan/issues) and attach the log.

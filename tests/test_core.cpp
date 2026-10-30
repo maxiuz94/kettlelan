@@ -245,6 +245,28 @@ static void testFilter() {
     CHECK(filter::inspectInbound(std::span<const uint8_t>()).verdict == Verdict::Malformed);
     CHECK(filter::serviceName(22) == "SSH");
 
+    // services that answer on a LAN and are not games (0.3.4)
+    CHECK(filter::inspectInbound(makePacket(17, 161)).verdict == Verdict::BlockedService);   // SNMP
+    CHECK(filter::inspectInbound(makePacket(17, 162)).verdict == Verdict::BlockedService);   // SNMP traps
+    CHECK(filter::inspectInbound(makePacket(6, 2869)).verdict == Verdict::BlockedService);   // UPnP (Windows)
+    CHECK(filter::inspectInbound(makePacket(17, 3702)).verdict == Verdict::BlockedService);  // WS-Discovery
+    CHECK(filter::inspectInbound(makePacket(6, 5357)).verdict == Verdict::BlockedService);   // WSD (Windows)
+    CHECK(filter::inspectInbound(makePacket(6, 5358)).verdict == Verdict::BlockedService);   // WSD over HTTPS
+    CHECK(filter::inspectInbound(makePacket(6, 5555)).verdict == Verdict::BlockedService);   // Android debugging
+    CHECK(filter::inspectInbound(makePacket(6, 5985)).verdict == Verdict::BlockedService);   // WinRM
+    CHECK(filter::inspectInbound(makePacket(6, 5986)).verdict == Verdict::BlockedService);   // WinRM (HTTPS)
+    CHECK(filter::inspectInbound(makePacket(6, 8123)).verdict == Verdict::BlockedService);   // Home Assistant
+    CHECK(filter::inspectInbound(makePacket(6, 9100)).verdict == Verdict::BlockedService);   // printers (JetDirect), metrics
+    CHECK(filter::inspectInbound(makePacket(6, 9200)).verdict == Verdict::BlockedService);   // Elasticsearch
+    CHECK(filter::inspectInbound(makePacket(6, 11434)).verdict == Verdict::BlockedService);  // Ollama
+    CHECK(filter::inspectInbound(makePacket(6, 47001)).verdict == Verdict::BlockedService);  // WinRM (local)
+    CHECK(filter::serviceName(5985) == "remote management (WinRM)");
+    // the games from the README table still work
+    for (uint16_t port : {27960, 27015, 27005, 27020, 7777, 7778, 7781, 6112, 2300, 2350, 2400, 47624, 25565, 34197})
+        CHECK(filter::inspectInbound(makePacket(17, port)).verdict == Verdict::Allow);
+    for (uint16_t port : {27015, 6112, 2300, 2400, 47624, 25565, 7777})
+        CHECK(filter::inspectInbound(makePacket(6, port)).verdict == Verdict::Allow);
+
     CHECK(filter::isDiscoveryBroadcast(makePacket(17, 5353, 0, 8)));   // mDNS
     CHECK(filter::isDiscoveryBroadcast(makePacket(17, 1716, 0, 8)));   // KDE Connect
     CHECK(!filter::isDiscoveryBroadcast(makePacket(17, 27960, 0, 8))); // Quake 3 – server discovery
