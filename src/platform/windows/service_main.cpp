@@ -9,6 +9,7 @@
 // through the program, and every packet from the program is checked before it goes to Windows.
 #include <winsock2.h>
 #include <windows.h>
+#include <aclapi.h>
 #include <sddl.h>
 
 #include <atomic>
@@ -325,6 +326,55 @@ void runQuiet(const std::wstring& commandLine) {
     }
 }
 
+// Lets this process set any owner and permissions (administrators have these rights, but they are off).
+void enablePrivilege(const wchar_t* name) {
+    HANDLE token = nullptr;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &token)) return;
+    TOKEN_PRIVILEGES tp{};
+    tp.PrivilegeCount = 1;
+    tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+    if (LookupPrivilegeValueW(nullptr, name, &tp.Privileges[0].Luid)) AdjustTokenPrivileges(token, FALSE, &tp, 0, nullptr, nullptr);
+    CloseHandle(token);
+}
+
+// Gives one of KettleLAN's folders and everything in it fixed permissions: SYSTEM and administrators
+// full access, users read and run, owner Administrators. All other entries go – also "deny" entries
+// and anything left by older versions – so no ordinary program can change what the service trusts.
+// Only for a folder of KettleLAN's own (its name contains "KettleLAN"), never a drive or a shared folder.
+// Returns false with `error` set when it did not change anything.
+bool secureFolder(std::wstring dir, std::string& error) {
+    while (!dir.empty() && (dir.back() == L'\\' || dir.back() == L'/')) dir.pop_back();
+    const size_t slash = dir.find_last_of(L"\\/");
+    const std::wstring name = lower(slash == std::wstring::npos ? dir : dir.substr(slash + 1));
+    if (slash == std::wstring::npos || name.find(L"kettlelan") == std::wstring::npos) {
+        error = "not a folder of KettleLAN's own, left as it is: " + toUtf8(dir.c_str());
+        return false;
+    }
+    PSECURITY_DESCRIPTOR sd = nullptr;
+    // 0x1200a9 = read and execute (what Explorer calls "Read & execute")
+    if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(
+            L"O:BAD:P(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1200a9;;;BU)", SDDL_REVISION_1, &sd, nullptr)) {
+        error = "could not build the permissions: " + systemError(GetLastError());
+        return false;
+    }
+    BOOL present = FALSE, defaulted = FALSE;
+    PACL dacl = nullptr;
+    PSID owner = nullptr;
+    GetSecurityDescriptorDacl(sd, &present, &dacl, &defaulted);
+    GetSecurityDescriptorOwner(sd, &owner, &defaulted);
+    // replaces the permissions of the folder and of every file in it (children only inherit them)
+    const DWORD r = TreeResetNamedSecurityInfoW(dir.data(), SE_FILE_OBJECT,
+                                                OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION |
+                                                    PROTECTED_DACL_SECURITY_INFORMATION,
+                                                owner, nullptr, dacl, nullptr, FALSE, nullptr, ProgressInvokeNever, nullptr);
+    LocalFree(sd);
+    if (r != ERROR_SUCCESS) {
+        error = "could not set the permissions of " + toUtf8(dir.c_str()) + ": " + systemError(r);
+        return false;
+    }
+    return true;
+}
+
 int install(const wchar_t* programExe) {
     SC_HANDLE scm = OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CREATE_SERVICE);
     if (!scm) {
@@ -355,6 +405,16 @@ int install(const wchar_t* programExe) {
             return 1;
         }
     }
+    // Only administrators may change the service's and the program's folders – wherever the user put the
+    // program (on a second drive new folders are usually writable by everybody). A failure is reported
+    // but does not stop the installation: the service then refuses an unsafe folder with a clear message.
+    enablePrivilege(SE_RESTORE_NAME);
+    enablePrivilege(SE_TAKE_OWNERSHIP_NAME);
+    std::string error;
+    if (!secureFolder(programFolder(), error)) std::cerr << "Service folder: " << error << "\n";
+    const std::wstring program = clientFolder();
+    if (lower(program) != lower(programFolder()) && !secureFolder(program, error))
+        std::cerr << "Program folder: " << error << "\n";
     SC_HANDLE svc = CreateServiceW(scm, kServiceName, kDisplayName, SERVICE_ALL_ACCESS, SERVICE_WIN32_OWN_PROCESS,
                                    SERVICE_AUTO_START, SERVICE_ERROR_NORMAL, command.c_str(), nullptr, nullptr, nullptr,
                                    nullptr, nullptr);

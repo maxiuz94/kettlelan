@@ -65,14 +65,8 @@ Name: "{autoprograms}\KettleLAN"; Filename: "{app}\KettleLAN.exe"
 Name: "{autodesktop}\KettleLAN"; Filename: "{app}\KettleLAN.exe"; Tasks: desktopicon
 
 [Run]
-; Only administrators (and SYSTEM) may change the program's and the service's folders, wherever the user put
-; them: the service accepts KettleLAN only from such a folder. On a second drive new folders are usually
-; writable by every user, so the permissions are set here instead of being inherited.
-Filename: "{sys}\icacls.exe"; Parameters: """{#ServiceDir}"" /setowner *S-1-5-32-544 /T /C /Q"; Flags: runhidden waituntilterminated
-Filename: "{sys}\icacls.exe"; Parameters: """{#ServiceDir}"" /inheritance:r /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F *S-1-5-32-545:(OI)(CI)RX /T /C /Q"; Flags: runhidden waituntilterminated
-Filename: "{sys}\icacls.exe"; Parameters: """{app}"" /setowner *S-1-5-32-544 /T /C /Q"; Flags: runhidden waituntilterminated; Check: IsOwnFolder
-Filename: "{sys}\icacls.exe"; Parameters: """{app}"" /inheritance:r /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F *S-1-5-32-545:(OI)(CI)RX /T /C /Q"; Flags: runhidden waituntilterminated; \
-    Check: IsOwnFolder; StatusMsg: "Setting the folder's permissions..."
+; "install" also gives the program's and the service's folders safe permissions (only administrators may
+; change them), wherever the user put them.
 Filename: "{#ServiceDir}\kettlelan-service.exe"; Parameters: "install ""{app}\KettleLAN.exe"""; Flags: runhidden waituntilterminated; \
     StatusMsg: "Installing KettleLAN Service..."
 Filename: "{app}\KettleLAN.exe"; Description: "Launch KettleLAN"; Flags: nowait postinstall skipifsilent runasoriginaluser
@@ -90,7 +84,7 @@ Type: dirifempty; Name: "{#ServiceDir}"
 
 [Code]
 // KettleLAN always gets a folder of its own, wherever the user puts it: choosing "D:\Games" installs to
-// "D:\Games\KettleLAN". The installer then restricts that folder's permissions, which must never touch a
+// "D:\Games\KettleLAN". The service then restricts that folder's permissions, which must never touch a
 // whole drive or a folder with other programs.
 function NextButtonClick(CurPageID: Integer): Boolean;
 var
@@ -103,12 +97,6 @@ begin
     if Pos('kettlelan', Lowercase(ExtractFileName(Dir))) = 0 then
       WizardForm.DirEdit.Text := AddBackslash(Dir) + 'KettleLAN';
   end;
-end;
-
-// Whether {app} is KettleLAN's own folder (an update keeps the folder chosen by an older version).
-function IsOwnFolder: Boolean;
-begin
-  Result := Pos('kettlelan', Lowercase(ExtractFileName(RemoveBackslashUnlessRoot(ExpandConstant('{app}'))))) > 0;
 end;
 
 // Before files are replaced (update or repair): close KettleLAN and stop the service, which keeps its

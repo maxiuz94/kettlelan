@@ -12,7 +12,7 @@ Before tagging a release add a `## [x.y.z] – date` section (see [docs/RELEASIN
 
 - Security: protect more services from network members – SNMP, WinRM, Windows network discovery (WS-Discovery, WSD, UPnP), Android debugging, Home Assistant, Elasticsearch, Ollama and port 9100
 - Windows: write the service log next to the service (Program Files\KettleLAN Service\service.log) instead of ProgramData, where other users could redirect it
-- Windows: let only administrators change the program's and the service's folders, also on other drives; the service accepts KettleLAN only from such a folder
+- Windows: let only administrators change the program's and the service's folders, also on other drives – set when the service is installed; the service accepts KettleLAN only from such a folder
 - Windows: always install into a folder of its own – choosing D:\Games installs to D:\Games\KettleLAN
 - CI: do not keep the GitHub token in the checked-out repository
 
